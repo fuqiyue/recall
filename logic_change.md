@@ -1,0 +1,42 @@
+# Recall Skill Active Changes
+
+## 文档控制
+
+- scope: .
+- scope_path: .
+- module_id: MOD-ROOT
+- current_policy: logic_readme.md
+- owner: self
+- governance_mode: personal
+- governance_ref: git:main-branch
+- governance_evidence: git:main-branch
+- governance_verification: recorded
+- governance_verified_at: 2026-08-08
+- last_updated: 2026-08-08
+- active_changes: none
+
+## 议案规则
+
+- 本文件所有条目默认 `effective: false`
+- 允许状态：draft | awaiting-decision | implementing | verifying | promoting | blocked
+- 个人小项目使用简化流程：draft -> implementing -> verifying -> promoting
+- 高风险修改使用决策流程：draft -> awaiting-decision -> implementing -> verifying -> promoting
+
+## 讨论主题索引
+
+当前无活跃讨论主题。
+
+## 活跃议案索引
+
+当前无活跃修改议案。
+
+---
+
+**说明**：
+
+当需要追踪修改时，在此文件中创建 CHG 条目。完成后：
+1. 更新 `logic_readme.md`（如规则变化）
+2. 归档到 `logic_version/records/`（如为高风险）
+3. 从本文件删除 CHG 条目
+
+**记住**：logic_change.md 是临时的工作记录，不是长期真相源。

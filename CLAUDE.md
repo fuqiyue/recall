@@ -1,0 +1,98 @@
+# Recall Skill for Claude
+
+## 首次使用初始化
+
+**第一次使用 Recall 时，请先运行初始化**：
+
+```bash
+# 推荐：使用统一 CLI
+recall init
+
+# 或直接调用脚本
+python scripts/init_recall.py
+```
+
+这个脚本会：
+1. ✅ 检查 Git 是否已安装
+2. ✅ 初始化 Git 仓库（如未初始化）
+3. ✅ 配置 Git 用户信息（姓名和邮箱）
+4. ✅ 创建 .gitignore 文件
+5. ✅ 创建初始提交
+
+**为什么需要 Git？**
+- Recall 使用 Git 管理代码变化（what changed）
+- logic_version/ 记录决策原因（why changed）
+- 两者通过 commit hash 关联，形成完整的追溯链
+
+## 统一 CLI 工具
+
+所有 Recall 功能已整合到 `recall` 命令：
+
+```bash
+# Windows
+recall <命令>
+
+# Linux/macOS (需要先赋予执行权限)
+chmod +x recall.sh
+./recall.sh <命令>
+```
+
+**常用命令**：
+```bash
+recall status       # 查看系统状态
+recall validate     # 验证一致性
+recall new "描述" tag  # 创建决策记录
+recall list         # 列出最近记录
+recall query file <路径>  # 查询文件历史
+recall help         # 查看完整帮助
+```
+
+## 日常使用流程
+
+修改、规划、诊断、审查项目逻辑，或解释"为什么这样设计"前：
+
+1. 先读 `logic_readme.md`（当前有效规则与代码地图）
+2. 再读 `logic_change.md`（活跃议案）
+3. 然后读相关代码、测试和必要的运行证据
+
+代理自审按自身能力执行，但先以上述上下文校验设计意图。
+
+## Git 集成工作流
+
+**修改代码时的标准流程**：
+
+```
+1. 记录议案 → logic_change.md (CHG-ID)
+2. 实施修改 → git commit (代码变化)
+3. 归档决策 → logic_version/records/ (为什么改)
+4. 更新现行 → logic_readme.md (RULE-ID)
+```
+
+**Commit Message 规范**：
+```
+<type>: <简短描述>
+
+<详细说明>
+
+Ref: logic_version/records/<filename>.md
+```
+
+**快速命令**：
+```bash
+# Recall CLI（推荐）
+recall status                    # 查看系统状态
+recall validate                  # 验证一致性
+recall query file <path>         # 查询文件历史
+recall query commit <hash>       # 查询提交详情
+
+# Git 原生命令（直接查看）
+git log --oneline | head -5      # 最近提交
+git log --follow -- <file-path>  # 文件完整历史
+git show <commit-hash>           # 提交详细内容
+```
+
+## 重要约束
+
+- 不要把业务制度、议案、ADR 或历史记录复制到 `.claude/` 目录
+- 代码变化由 Git 管理，不在 logic_version/ 中保存代码快照
+- logic_version/ 只记录"为什么"（原因、背景、决策过程），不记录"是什么"（具体代码）

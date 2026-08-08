@@ -1,0 +1,4 @@
+interface:
+  display_name: "Recall Project Logic"
+  short_description: "Route changes with policy and decision recall"
+  default_prompt: "Use $recall to route this change as simple, medium, or high; inspect current policy and evidence, clarify unresolved requirement conflicts with the user before affected edits, then make the authorized update."
