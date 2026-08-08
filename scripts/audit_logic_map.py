@@ -870,14 +870,70 @@ def is_dependency_tree_root(path: Path, root: Path, file_names: Iterable[str]) -
     return "pyvenv.cfg" in names
 
 
+def is_nested_project_root(path: Path, root: Path, file_names: Iterable[str]) -> bool:
+    """Identify a separately-governed project vendored inside this one.
+
+    A subdirectory whose own ``logic_readme.md`` declares ``scope: .`` plus
+    ``scope_type: root`` is another project's root (a vendored dependency,
+    a bundled example, or an audit fixture), not a module of this project.
+
+    Auditing it as a module corrupts the enclosing result: its ``module_id``
+    is usually ``MOD-ROOT`` too, so it displaces the real root document in
+    the ``module_id``-keyed maps, which then makes the genuine root scope
+    look like it has no governance parent.  It is also counted as an
+    unregistered governance directory even though registering it would be
+    wrong -- it is not in this project's scope hierarchy at all.
+    """
+    if path == root:
+        return False
+    if "logic_readme.md" not in {name.lower() for name in file_names}:
+        return False
+    text, error = read_text(path / "logic_readme.md")
+    if error:
+        return False
+    # Read the document-control block only.  ``control_values`` over the whole
+    # file also picks up per-scope sections (e.g. a nested ``- scope_path: src``
+    # for a sub-module), which would mask the root declaration.
+    values = control_values(markdown_section_text(text, "文档控制"))
+    declared_scopes = {
+        normalize_scope_path(value)
+        for field in ("scope", "scope_path")
+        for value in values.get(field, [])
+    }
+    return declared_scopes == {"."} and (values.get("scope_type") or [""])[0] == "root"
+
+
+def is_foreign_subtree(path: Path, root: Path, file_names: Iterable[str]) -> bool:
+    """A subtree whose contents must not be attributed to this project.
+
+    Covers vendored Python environments and separately-governed projects
+    nested inside this one.  Scanners that report "this project has a
+    problem" must prune these, otherwise another project's parallel files,
+    stray temp records or misplaced history get blamed on this one.
+    """
+    return is_dependency_tree_root(path, root, file_names) or is_nested_project_root(
+        path, root, file_names
+    )
+
+
 def iter_directories(
-    root: Path, max_depth: int | None, excludes: set[str]
+    root: Path,
+    max_depth: int | None,
+    excludes: set[str],
+    nested_project_roots: list[str] | None = None,
 ) -> Iterable[tuple[Path, list[Path]]]:
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
         if is_dependency_tree_root(current, root, file_names):
             # Do not report the environment itself or descend into its
             # site-packages as if they were project modules.
+            dir_names[:] = []
+            continue
+        if is_nested_project_root(current, root, file_names):
+            # Skip the nested root and its whole subtree; its modules belong
+            # to that project's registry, not to this one.
+            if nested_project_roots is not None:
+                nested_project_roots.append(current.relative_to(root).as_posix())
             dir_names[:] = []
             continue
         depth = relative_depth(current, root)
@@ -3516,6 +3572,22 @@ def audit_current_state_integrity(
     readme_control = markdown_section_text(readme_text, "文档控制")
     readme_values = control_values(readme_control)
     readme_raw = control_values_raw(readme_control)
+    # `registry_status` and the two canonical pointers are defined under
+    # "范围登记与归属" by references/logic-readme-template.md, not under
+    # "文档控制".  Read the registry section as a fallback so a
+    # template-conformant document is not reported as missing them; the
+    # single-value requirement below still applies to the merged result.
+    registry_control = markdown_section_text(readme_text, "范围登记与归属")
+    registry_values = control_values(registry_control)
+    registry_raw = control_values_raw(registry_control)
+
+    def registered_field(field: str, raw: bool = False) -> list[str]:
+        """Look the field up in 文档控制 first, then 范围登记与归属."""
+        primary = (readme_raw if raw else readme_values).get(field, [])
+        if primary:
+            return primary
+        return (registry_raw if raw else registry_values).get(field, [])
+
     expected_readme_values = {
         "module_id": "mod-root",
         "scope": ".",
@@ -3528,7 +3600,7 @@ def audit_current_state_integrity(
         "registry_status": "registered",
     }
     for field, expected in expected_readme_values.items():
-        values = readme_values.get(field, [])
+        values = registered_field(field)
         normalized = [
             normalize_scope_path(value) if field in {"scope", "scope_path"} else value
             for value in values
@@ -3584,7 +3656,7 @@ def audit_current_state_integrity(
         ("canonical_readme", "logic_readme.md"),
         ("canonical_change", "logic_change.md"),
     ):
-        values = readme_raw.get(field, [])
+        values = registered_field(field, raw=True)
         normalized = [normalize_scope_path(value.strip("<>")) for value in values]
         if normalized != [expected]:
             document_issues.append(
@@ -4963,7 +5035,7 @@ def find_misplaced_records(
     }
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
-        if is_dependency_tree_root(current, root, file_names):
+        if is_foreign_subtree(current, root, file_names):
             dir_names[:] = []
             continue
         dir_names[:] = [
@@ -5005,7 +5077,7 @@ def find_parallel_current_candidates(root: Path, excludes: set[str]) -> list[str
     }
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
-        if is_dependency_tree_root(current, root, file_names):
+        if is_foreign_subtree(current, root, file_names):
             dir_names[:] = []
             continue
         dir_names[:] = [
@@ -5031,7 +5103,7 @@ def find_nonroot_current_documents(root: Path, excludes: set[str]) -> list[str]:
     }
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
-        if is_dependency_tree_root(current, root, file_names):
+        if is_foreign_subtree(current, root, file_names):
             dir_names[:] = []
             continue
         dir_names[:] = [
@@ -5053,7 +5125,7 @@ def find_misplaced_temp_records(root: Path, excludes: set[str]) -> list[str]:
     scan_excludes = excludes - {CURRENT_HISTORY_ROOT}
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
-        if is_dependency_tree_root(current, root, file_names):
+        if is_foreign_subtree(current, root, file_names):
             dir_names[:] = []
             continue
         dir_names[:] = [
@@ -5076,7 +5148,7 @@ def find_scattered_backup_candidates(root: Path) -> list[str]:
 
     for current_raw, dir_names, file_names in os.walk(root, followlinks=False):
         current = Path(current_raw)
-        if is_dependency_tree_root(current, root, file_names):
+        if is_foreign_subtree(current, root, file_names):
             dir_names[:] = []
             continue
         kept: list[str] = []
@@ -5589,8 +5661,12 @@ def collect_audit(args: argparse.Namespace) -> dict:
     excludes = DEFAULT_EXCLUDES | set(args.exclude)
     audits: list[ModuleAudit] = []
     skipped_dirs = 0
+    nested_project_roots: list[str] = []
 
-    for directory, files in iter_directories(root, args.max_depth, excludes):
+    for directory, files in iter_directories(
+        root, args.max_depth, excludes, nested_project_roots
+    ):
+        is_root = directory == root
         has_source = any(is_source_file(file) for file in files)
         has_runtime_data = any(
             is_runtime_data_file(file) for file in files
@@ -5599,7 +5675,6 @@ def collect_audit(args: argparse.Namespace) -> dict:
         has_docs = (directory / "logic_readme.md").exists() or (
             directory / "logic_change.md"
         ).exists()
-        is_root = directory == root
         if (
             args.all_dirs
             or is_root

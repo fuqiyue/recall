@@ -5,11 +5,44 @@ Recall 一致性验证工具
 检查 logic_readme.md, logic_change.md 和 logic_version/ 之间的一致性
 """
 
-import os
 import re
 import subprocess
+import sys
 from pathlib import Path
 from typing import List, Dict, Tuple
+
+# 决策记录文件名：logic_version-YYYYMMDD-NNN-<scope>.md
+RECORD_NAME_RE = re.compile(
+    r'^logic_version-\d{8}-\d{3}-.+\.md$', re.IGNORECASE
+)
+
+# commit 关联的几种写法，按 references/ 下两个模板的实际格式
+COMMIT_PATTERNS = (
+    # logic-version-git-template.md: - **关联 Commit**: `abc123`
+    r'关联\s*Commit\*{0,2}\s*[：:]\s*`?([0-9a-f]{7,40})`?',
+    # logic-version-template.md 的 based_on: ... code: commit:abc123
+    r'\bcode\s*:\s*commit\s*:\s*`?([0-9a-f]{7,40})`?',
+    # 独立控制字段: - commit: abc123
+    r'^\s*-\s*commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
+)
+
+
+def _force_utf8_when_redirected() -> None:
+    """重定向到文件/管道时把输出流切成 UTF-8。
+
+    Windows 上重定向后的 stdout 用 ANSI 代码页（如 cp936），
+    报告里的 emoji 会触发 UnicodeEncodeError。本脚本既可被
+    recall.py 以子进程调用，也可被用户直接运行，所以必须自带这个修复。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            if not stream.isatty():
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
 
 class ValidationResult:
     def __init__(self):
@@ -111,12 +144,23 @@ def extract_chg_ids(change_path: Path) -> List[Dict]:
     return chg_records
 
 def find_version_records(version_dir: Path) -> List[Path]:
-    """查找所有决策记录文件"""
+    """查找所有决策记录文件。
+
+    实际文件名格式是 `logic_version-YYYYMMDD-NNN-<scope>.md`
+    （见 references/logic-version-template.md 的 version_slug）。
+    旧代码 glob 的是 `ver-*.md`，永远匹配不到任何文件，
+    导致下游的必填字段和 commit 校验全部成为死代码。
+    这里按记录名正则筛选，并排除 README.md 等说明文件。
+    """
     records_dir = version_dir / "records"
     if not records_dir.exists():
         return []
 
-    return list(records_dir.glob("ver-*.md"))
+    return sorted(
+        path
+        for path in records_dir.glob("*.md")
+        if RECORD_NAME_RE.match(path.name)
+    )
 
 def extract_commit_hash(record_path: Path) -> str:
     """从决策记录中提取 Git commit hash"""
@@ -125,22 +169,29 @@ def extract_commit_hash(record_path: Path) -> str:
 
     with open(record_path, 'r', encoding='utf-8') as f:
         content = f.read()
-        # 查找关联 Commit 字段
-        match = re.search(r'关联\s*Commit[：:]\s*`?([0-9a-f]{7,40})`?', content, re.IGNORECASE)
+
+    for pattern in COMMIT_PATTERNS:
+        match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
         if match:
             return match.group(1)
 
     return ""
 
 def check_required_fields(record_path: Path) -> List[str]:
-    """检查决策记录的必填字段"""
+    """检查决策记录的必填字段。
+
+    字段名以 references/logic-version-template.md 为准。旧代码检查的
+    `版本号` / `关联 Commit` / `创建日期` / `## 修改原因` / `## 决策过程`
+    从来不是这个 schema 的字段，一旦 glob 修好就会让每条记录都报假缺失。
+    """
     required_fields = [
-        r'版本号[：:]',
-        r'关联\s*Commit[：:]',
-        r'创建日期[：:]',
-        r'##\s*修改原因',
-        r'##\s*决策过程',
-        r'##\s*影响范围'
+        (r'^\s*-\s*version_id\s*:', 'version_id'),
+        (r'^\s*-\s*date\s*:', 'date'),
+        (r'^\s*-\s*status\s*:', 'status'),
+        (r'^\s*##\s*为什么', '## 为什么做这个决策？'),
+        (r'^\s*##\s*影响范围', '## 影响范围'),
+        (r'^\s*##\s*验证方式', '## 验证方式'),
+        (r'^\s*##\s*回滚方式', '## 回滚方式'),
     ]
 
     missing_fields = []
@@ -148,11 +199,9 @@ def check_required_fields(record_path: Path) -> List[str]:
     with open(record_path, 'r', encoding='utf-8') as f:
         content = f.read()
 
-        for field_pattern in required_fields:
-            if not re.search(field_pattern, content):
-                # 提取字段名用于报告
-                field_name = field_pattern.replace(r'[：:]', '').replace(r'##\s*', '').replace(r'\s*', ' ')
-                missing_fields.append(field_name)
+    for field_pattern, field_name in required_fields:
+        if not re.search(field_pattern, content, re.MULTILINE):
+            missing_fields.append(field_name)
 
     return missing_fields
 
@@ -166,11 +215,14 @@ def is_valid_git_commit(commit_hash: str) -> bool:
             ['git', 'cat-file', '-t', commit_hash],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             timeout=5
         )
-        return result.returncode == 0 and 'commit' in result.stdout
-    except:
+    except (OSError, subprocess.SubprocessError):
+        # git 未安装、不在 PATH，或超时
         return False
+    return result.returncode == 0 and 'commit' in (result.stdout or '')
 
 def validate_recall() -> ValidationResult:
     """执行完整的验证流程"""
@@ -243,22 +295,25 @@ def validate_recall() -> ValidationResult:
             ['git', 'status', '--porcelain'],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             cwd=root,
             timeout=5
         )
+    except (OSError, subprocess.SubprocessError):
+        result.add_warning("Git 不可用或未安装")
+    else:
         if git_status.returncode == 0:
-            uncommitted = git_status.stdout.strip()
-            if uncommitted:
+            if (git_status.stdout or '').strip():
                 result.add_warning("有未提交的文件变更")
         else:
             result.add_warning("无法检查 Git 状态（可能未初始化 Git）")
-    except:
-        result.add_warning("Git 不可用或未安装")
 
     return result
 
-def main():
-    """主入口"""
+def main() -> int:
+    """主入口。返回退出码，供 recall.py 直接使用。"""
+    _force_utf8_when_redirected()
     print("\n🔍 开始验证 Recall 系统一致性...\n")
 
     result = validate_recall()
@@ -267,4 +322,4 @@ def main():
     return 0 if result.is_valid() else 1
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

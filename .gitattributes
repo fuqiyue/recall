@@ -1,0 +1,10 @@
+# 仓库内统一用 LF 存储，检出时按平台/配置转换
+* text=auto
+
+# cmd.exe 按字节偏移在批处理文件里定位，LF-only 会让它错行执行。
+# 必须强制 CRLF，不受用户 core.autocrlf 设置影响。
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# shell 脚本必须保持 LF，CRLF 会让 shebang 失效（bad interpreter）
+*.sh text eol=lf

@@ -13,6 +13,22 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+def _force_utf8_when_redirected():
+    """重定向到文件/管道时把输出流切成 UTF-8。
+
+    Windows 上重定向后的 stdout 用 ANSI 代码页（如 cp936），
+    帮助信息里的 emoji 会触发 UnicodeEncodeError。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            if not stream.isatty():
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
 def print_help():
     """显示帮助信息"""
     help_text = """
@@ -71,11 +87,11 @@ def print_help():
 """
     print(help_text)
 
-def cmd_init():
-    """初始化命令"""
+def cmd_init(args):
+    """初始化命令。参数原样转交 init_recall。"""
     try:
         import init_recall
-        return init_recall.main()
+        return init_recall.main(args)
     except ImportError:
         print("❌ 错误: 找不到 init_recall.py")
         return 1
@@ -291,6 +307,8 @@ def cmd_status():
 
 def main():
     """主入口"""
+    _force_utf8_when_redirected()
+
     if len(sys.argv) < 2:
         print_help()
         return 0
@@ -299,7 +317,7 @@ def main():
     args = sys.argv[2:]
 
     commands = {
-        'init': lambda: cmd_init(),
+        'init': lambda: cmd_init(args),
         'new': lambda: cmd_new(args),
         'query': lambda: cmd_query(args),
         'list': lambda: cmd_list(args),
@@ -322,4 +340,4 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    exit(main())
+    sys.exit(main())

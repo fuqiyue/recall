@@ -20,6 +20,23 @@ python scripts/init_recall.py
 - ✅ 创建必要的配置文件
 - ✅ 完成初始提交
 
+**非交互运行**（CI、容器、AI 代理等 stdin 不可用的环境）：
+
+```bash
+python scripts/init_recall.py --non-interactive \
+    --name "张三" --email "zhangsan@example.com"
+```
+
+| 参数 | 作用 |
+| --- | --- |
+| `--name` / `--email` | 直接给出 Git 身份，跳过提问 |
+| `--scope global\|local` | 配置写入范围，默认 `global` |
+| `--non-interactive` | 从不读 stdin，缺少必要输入时退出（码 130） |
+| `--yes` / `-y` | 确认项按默认值处理 |
+| `--no-commit` | 新仓库也不创建初始提交 |
+
+也可以用环境变量代替参数：`RECALL_GIT_NAME`、`RECALL_GIT_EMAIL`（回退到 `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL`）。stdin 不可用时脚本会自动降级为非交互模式，不再崩溃。
+
 ### 日常使用
 
 对任何可能改变行为或需要审查既有设计的任务：

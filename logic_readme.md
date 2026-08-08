@@ -15,15 +15,15 @@
 - status: active
 - owner: self
 - governance_mode: personal
-- governance_ref: git:https://github.com/[your-repo]/recall
-- governance_evidence: git:main-branch
+- governance_ref: git:https://github.com/fuqiyue/recall@main
+- governance_evidence: git:https://github.com/fuqiyue/recall@main
 - governance_verification: recorded
-- governance_verified_at: 2026-08-07
+- governance_verified_at: 2026-08-08
 - effective_from: 2026-08-07
 - last_verified: 2026-08-08
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: none
+- source_decisions: VER-20260808-001, VER-20260808-002
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -40,31 +40,46 @@
 
 - canonical_readme: logic_readme.md
 - canonical_change: logic_change.md
-- owned_paths: SKILL.md, logic_readme.md, logic_change.md, logic_version/, references/, scripts/, tests/
+- owned_paths: SKILL.md, logic_readme.md, logic_change.md, logic_version/, references/, scripts/, tests/, recall.bat, recall.sh, .gitattributes, AGENTS.md, CLAUDE.md, README.md
 - child_policy: inherit
 - data_owner: none
 - registry_status: registered
 
 ## 当前制度
 
-| rule_id | 规则等级 | 当前有效规则/行为 | why | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
+| rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
 |---|---|---|---|---|---|---|---|---|---|
 | RULE-001 | key | 逻辑回档而非代码回档 | 避免上下文膨胀，保持文档简洁可读 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | SKILL.md 章节 | valid | 2026-08-08 | self |
 | RULE-002 | key | logic_readme.md 只保留最新规则 | 删除已废弃内容，保持单一真相源 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | 当前文档 | valid | 2026-08-08 | self |
 | RULE-003 | key | 历史记录保存设计逻辑 | 记录为什么、取舍、影响，不记录代码快照 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | logic_version/ | valid | 2026-08-08 | self |
 | RULE-004 | ordinary | 三条通道分流修改 | 简单/中等/高风险，避免过度流程化 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 最佳实践 | SKILL.md | valid | 2026-08-08 | self |
+| RULE-005 | key | 批处理入口必须纯 ASCII + CRLF | cmd.exe 按字节偏移定位命令，多字节字符加 LF 换行会错行执行注释片段 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | .gitattributes + recall.bat 实测 | valid | 2026-08-08 | self |
+| RULE-006 | key | 脚本调用外部命令必须用 argv 列表，禁止 shell=True | 多行 commit message 会被 shell 截断，用户输入可注入命令 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | init_recall.py / link_ver_git.py 注入测试 | valid | 2026-08-08 | self |
+| RULE-007 | key | 嵌套项目根不计入本项目审计 | 自带 `scope: .` 的子目录属于另一个项目，按模块审计会用其 module_id 顶掉真实根文档 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | audit_logic_map.py 静态门 | valid | 2026-08-08 | self |
+| RULE-008 | ordinary | CLI 必须可非交互运行，且重定向下不崩 | CI、容器和 AI 代理环境没有 tty；Windows 重定向后 stdout 走 ANSI 代码页 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | 空 stdin 与重定向实测 | valid | 2026-08-08 | self |
+| RULE-009 | ordinary | 校验脚本的字段名以 references/ 模板为准 | schema 漂移会让检查静默失效或报假错误 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | validate.py 记录发现测试 | valid | 2026-08-08 | self |
 
 ## 代码地图
 
-| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | contract_class | 关联测试 |
-|---|---|---|---|---|---|---|---|---|
-| SKILL.md | source/runtime-code | Recall skill 主入口，定义核心原则和使用方式 | AI 读取 | 指导 AI 行为 | SKILL.md | yes | internal | none |
-| logic_readme.md | source/runtime-code | 当前生效的规则和代码地图（唯一真相源） | AI 读取 | 当前制度 | logic_readme.md | yes | internal | none |
-| logic_change.md | source/runtime-code | 活跃的修改记录（未生效） | AI 读取/写入 | 修改议案 | logic_change.md | yes | internal | none |
-| logic_version/records/ | source/runtime-code | 历史决策记录（逻辑回档） | AI 按需读取 | 设计逻辑回忆 | VER-*.md | no | internal | none |
-| references/ | source/runtime-code | 模板文件和参考文档 | AI 按需读取 | 文档模板 | 模板文件 | yes | internal | none |
-| scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度 | 项目根路径 | 审计报告 | 脚本文件 | yes | internal | tests/test_audit_logic_map.py |
-| tests/ | source/runtime-code | 审计脚本测试套件 | pytest | 测试结果 | 测试文件 | yes | internal | pytest tests/ |
+| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|
+| SKILL.md | source/runtime-code | Recall skill 主入口，定义核心原则和使用方式 | AI 读取 | 指导 AI 行为 | SKILL.md | yes | none |
+| logic_readme.md | source/runtime-code | 当前生效的规则和代码地图（唯一真相源） | AI 读取 | 当前制度 | logic_readme.md | yes | none |
+| logic_change.md | source/runtime-code | 活跃的修改记录（未生效） | AI 读取/写入 | 修改议案 | logic_change.md | yes | none |
+| logic_version/records/ | source/runtime-code | 历史决策记录（逻辑回档） | AI 按需读取 | 设计逻辑回忆 | VER-*.md | no | none |
+| logic_version/index.md | source/runtime-code | 决策记录索引 | AI 按需读取 | VER-* 列表 | logic_version/index.md | yes | none |
+| references/ | source/runtime-code | 模板文件和参考文档；字段名的权威来源 | AI 按需读取 | 文档模板 | 模板文件 | yes | none |
+| recall.bat | source/runtime-code | Windows CLI 入口；探测 python/py/python3 后转发 | 命令行参数 | 子命令输出与退出码 | recall.bat | yes | none |
+| recall.sh | source/runtime-code | Linux/macOS CLI 入口；同上 | 命令行参数 | 子命令输出与退出码 | recall.sh | yes | none |
+| .gitattributes | source/runtime-config | 固定 *.bat 为 CRLF、*.sh 为 LF | Git 检出 | 换行符 | .gitattributes | yes | none |
+| scripts/recall.py | source/runtime-code | CLI 调度器；转发到各子命令 | 子命令与参数 | 退出码 | 脚本文件 | yes | none |
+| scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
+| scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态 | 项目根路径 | 验证报告 | 脚本文件 | yes | none |
+| scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交 | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
+| scripts/create_ver.py | source/runtime-code | 按模板创建 VER-* 决策记录 | 描述与 scope | 记录文件 | 脚本文件 | yes | none |
+| scripts/link_ver_git.py | source/runtime-code | 关联查询：文件/提交 ↔ 决策记录 | 文件路径或 commit | 关联报告 | 脚本文件 | yes | none |
+| tests/test_audit_logic_map.py | test/test-fixture | 审计脚本测试套件 | unittest | 测试结果 | 测试文件 | yes | python tests/test_audit_logic_map.py |
+| references/examples/audit-repro-legacy/ | test/test-fixture | 审计复现夹具；自带 `scope: .`，按嵌套项目根排除 | 审计脚本读取 | 复现场景 | 夹具文件 | yes | none |
 
 - coverage_policy: governed-boundaries
 - membership_policy: root-registry-first
@@ -72,15 +87,29 @@
 - version_root: logic_version/
 - temp_root: logic_version/working/
 - 子范围路由：无（单一根文档）
-- unmapped_paths: .tmp-tests/ (临时测试), agents/ (配置文件), .agents/ (空目录), .claude/ (配置文件)
+- unmapped_paths: agents/ (Codex 配置), .agents/ (代理私有目录), .claude/ (代理私有目录), logic_version/backups/ (归档快照)
 
 ### 范围登记表
 
 | module_id | scope_path | membership | scope_type/layer | doc_policy | logic_readme | logic_change | owner | status |
 |---|---|---|---|---|---|---|---|---|
 | MOD-ROOT | . | in-system | root/runtime-code | paired | [logic_readme.md](logic_readme.md) | [logic_change.md](logic_change.md) | self | active |
-| MOD-TEMPLATES | references/ | in-system | module/runtime-code | inherited | [root policy](logic_readme.md) | [active changes](logic_change.md) | self | active |
-| MOD-HISTORY | logic_version/ | in-system | module/runtime-code | inherited | [root policy](logic_readme.md) | none | self | active |
+| MOD-TEMPLATES | references/ | in-system | module/runtime-code | inherited | [root policy](logic_readme.md#scope-mod-templates) | [active changes](logic_change.md) | self | active |
+| MOD-HISTORY | logic_version/ | in-system | module/runtime-code | inherited | [root policy](logic_readme.md#scope-mod-history) | [active changes](logic_change.md) | self | active |
+
+<a id="scope-mod-templates"></a>
+### MOD-TEMPLATES: 模板与参考文档
+
+- scope_path: references/
+- 适用规则与不变量：RULE-009, INV-001, INV-002
+- 代码地图入口：references/（模板文件是字段名的权威来源）
+
+<a id="scope-mod-history"></a>
+### MOD-HISTORY: 历史决策记录
+
+- scope_path: logic_version/
+- 适用规则与不变量：RULE-001, RULE-003, INV-003, INV-004
+- 代码地图入口：logic_version/records/、logic_version/index.md
 
 ## 责任记录约定
 
@@ -170,14 +199,26 @@ AI 更新 logic_readme.md（如规则变化）
 
 | test_level | 规则/不变量 | 当前验证命令/检查 | expected | authoritative_evidence |
 |---|---|---|---|---|
-| manual | INV-001 单一 logic_readme.md | 文件系统检查 | 只有一个 logic_readme.md | 目录列表 |
-| manual | INV-002 单一 logic_change.md | 文件系统检查 | 只有一个 logic_change.md | 目录列表 |
-| manual | INV-003 VER-* 不可变 | Git 历史检查 | 已发布的 VER-* 无修改 | Git log |
-| manual | INV-004 逻辑回档原则 | VER-* 内容审查 | 无代码快照 | 人工审查 |
+| unit | 审计脚本行为（含 INV-001/INV-002 平行真源检测） | `python tests/test_audit_logic_map.py` | 62 tests OK | unittest 输出 |
+| contract | INV-001/INV-002 单一现行文档 | `python scripts/audit_logic_map.py . --current-state` | 无 parallel-current 或 nonroot-current 报告 | 审计报告 + 退出码 |
+| contract | RULE-007 嵌套项目根不计入审计 | `python scripts/audit_logic_map.py . --current-state` | 夹具不出现在 Non-root current documents | 审计报告 |
+| integration | RULE-009 校验字段名与模板一致 | `python scripts/validate.py` | 决策记录被发现且无假缺失字段 | 验证报告 |
+| integration | INV-003 VER-* 不可变 | `git log --follow -- logic_version/records/` | 已发布 VER-* 只有创建提交 | Git log |
+| runtime | RULE-005 批处理入口不错行 | `recall status` / `recall help` | 无 `is not recognized` 输出 | 终端输出 |
+| runtime | RULE-008 非交互可用（三种无输入形式） | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive` | 三者均退出 0 | 终端输出 |
+| runtime | RULE-008 重定向不崩 | `recall help > out.txt`；`recall status > out.txt` | 退出码 0，无 UnicodeEncodeError | 输出文件 |
+| unit | RULE-009 决策记录字段名与模板一致 | `python tests/test_audit_logic_map.py` | 记录 schema 检查通过 | unittest 输出 |
+
+INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能人工审查，列在“不可破坏约束”里。此表只登记可执行的验证命令。
 
 ## 有效决策索引
 
-当前无历史决策记录。
+| version_id | 决策摘要 | 关联规则 | 记录 |
+|---|---|---|---|
+| VER-20260808-001 | Recall 系统结构重组：账本完整性、平行真源、反膨胀强制点、状态机补全 | RULE-001..004 | [记录](logic_version/records/logic_version-20260808-001-recall-restructure.md) |
+| VER-20260808-002 | 工具链与自审一致性加固：跨平台入口、schema 对齐、嵌套项目根排除 | RULE-005..009 | [记录](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) |
+
+完整索引见 [logic_version/index.md](logic_version/index.md)。
 
 ## 活跃议案入口
 
@@ -188,7 +229,8 @@ AI 更新 logic_readme.md（如规则变化）
 
 - 仅支持个人或小团队使用（low-concurrency）
 - 不提供实际权限控制（依赖 Git）
-- 历史记录为手动归档，无自动化工具
+- 归档需人工判断：`scripts/create_ver.py` 按模板生成记录骨架，但"为什么"必须手写
+- 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为
 
 ## 修改检查清单
 

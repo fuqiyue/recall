@@ -62,3 +62,6 @@ desktop.ini
 # Logs
 *.log
 logs/
+
+# Claude
+.claude/settings.local.json

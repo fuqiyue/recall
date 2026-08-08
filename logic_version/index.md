@@ -5,7 +5,7 @@
 - history_format: 2
 - history_root: logic_version/
 - root_only: true
-- allowed_children: records, index.md
+- allowed_children: records, index.md, working, backups
 - last_updated: 2026-08-08
 - owner: self
 
@@ -36,6 +36,7 @@
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
 | VER-20260808-001 | recall-restructure | 2026-08-08 | closed | . | RULE-001, RULE-002, RULE-003, RULE-004 | 1 | Recall 系统结构重组：修复账本完整性、平行真源、反膨胀无强制点、状态机空洞 | [logic_version-20260808-001-recall-restructure.md](records/logic_version-20260808-001-recall-restructure.md) |
+| VER-20260808-002 | toolchain-hardening | 2026-08-08 | effective | ., scripts/, references/, logic_version/ | RULE-005, RULE-006, RULE-007, RULE-008, RULE-009 | 1 | 工具链与自审一致性加固：批处理错行、仓库误判、shell 注入、schema 漂移导致的静默失效、夹具污染审计 | [logic_version-20260808-002-toolchain-hardening.md](records/logic_version-20260808-002-toolchain-hardening.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 
@@ -62,9 +63,9 @@
 
 ---
 
-**首次使用提示**：
+**新增记录步骤**：
 
-当完成第一个高风险变更后：
 1. 在 `records/` 目录创建 `logic_version-YYYYMMDD-NNN-<scope>.md`
 2. 在上方"不可变决策记录"表中添加索引行
-3. 从 `logic_change.md` 删除对应的 CHG 条目
+3. 在 `logic_readme.md` 的"有效决策索引"中登记，并让相关 key 规则链接该记录
+4. 从 `logic_change.md` 删除对应的 CHG 条目

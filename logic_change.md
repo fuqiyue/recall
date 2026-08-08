@@ -8,8 +8,8 @@
 - current_policy: logic_readme.md
 - owner: self
 - governance_mode: personal
-- governance_ref: git:main-branch
-- governance_evidence: git:main-branch
+- governance_ref: git:https://github.com/fuqiyue/recall@main
+- governance_evidence: git:https://github.com/fuqiyue/recall@main
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - last_updated: 2026-08-08
@@ -24,7 +24,10 @@
 
 ## 讨论主题索引
 
-当前无活跃讨论主题。
+| topic_id | 同类议题/共享问题 | coordinator | discussion_refs | related_changes | status |
+|---|---|---|---|---|---|
+
+当前无活跃讨论主题。表头保留以声明 schema。
 
 ## 活跃议案索引
 

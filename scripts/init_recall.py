@@ -1,173 +1,284 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Recall 初始化脚本
-用于引导用户配置 Git 并初始化 Recall 项目结构
+
+引导用户配置 Git 并初始化 Recall 项目结构。
+
+支持非交互运行（CI、代理环境、stdin 不可用时）：
+    python scripts/init_recall.py --non-interactive --name "张三" --email "z@example.com"
 """
 
+import argparse
 import os
 import subprocess
 import sys
 from pathlib import Path
 
 
-def run_command(cmd, cwd=None, check=True):
-    """运行命令并返回结果"""
+class Aborted(Exception):
+    """用户中断，或非交互模式下缺少必要输入。"""
+
+
+def run_git(args, cwd=None):
+    """运行 git 命令，返回 (成功, stdout, stderr)。
+
+    参数以列表传入且不经过 shell：多行 commit message、
+    含空格或引号的用户名都能原样传递，也不会被 shell 解释。
+    """
     try:
         result = subprocess.run(
-            cmd,
-            shell=True,
-            cwd=cwd,
+            ["git"] + list(args),
+            cwd=str(cwd) if cwd else None,
             capture_output=True,
             text=True,
-            check=check
+            encoding="utf-8",
+            errors="replace",
         )
-        return result.returncode == 0, result.stdout.strip(), result.stderr.strip()
-    except subprocess.CalledProcessError as e:
-        return False, e.stdout, e.stderr
+    except (OSError, ValueError) as e:
+        return False, "", str(e)
+    return (
+        result.returncode == 0,
+        (result.stdout or "").strip(),
+        (result.stderr or "").strip(),
+    )
 
 
 def check_git_installed():
-    """检查 Git 是否已安装"""
-    success, _, _ = run_command("git --version", check=False)
-    return success
+    """检查 Git 是否可用"""
+    ok, _, _ = run_git(["--version"])
+    return ok
 
 
-def check_git_repo(project_root):
-    """检查是否已经是 Git 仓库"""
-    git_dir = project_root / ".git"
-    return git_dir.exists()
+def describe_repo_state(project_root):
+    """判断 project_root 与 Git 仓库的关系。
+
+    返回 "repo_root" / "nested" / "none"。
+
+    以 `git rev-parse --show-toplevel` 为准，而不是判断 .git 是否存在：
+      - 上层目录是仓库时，project_root 本身并不是仓库；
+      - 残留或损坏的 .git 会让路径检查误判为"已经是仓库"。
+    """
+    ok, toplevel, _ = run_git(["rev-parse", "--show-toplevel"], cwd=project_root)
+    if not ok or not toplevel:
+        return "none"
+    try:
+        same = Path(toplevel).resolve() == project_root.resolve()
+    except OSError:
+        same = False
+    return "repo_root" if same else "nested"
 
 
 def init_git_repo(project_root):
     """初始化 Git 仓库"""
     print("\n📦 正在初始化 Git 仓库...")
-    success, stdout, stderr = run_command("git init", cwd=project_root)
-
-    if success:
+    ok, _, stderr = run_git(["init"], cwd=project_root)
+    if ok:
         print("✅ Git 仓库初始化成功")
         return True
-    else:
-        print(f"❌ Git 仓库初始化失败: {stderr}")
-        return False
+    print(f"❌ Git 仓库初始化失败: {stderr}")
+    return False
 
 
-def check_git_config():
-    """检查 Git 用户配置"""
-    success_name, name, _ = run_command("git config user.name", check=False)
-    success_email, email, _ = run_command("git config user.email", check=False)
+def read_git_config(project_root):
+    """读取生效的 Git 用户配置，返回 (name, email)，缺失为 None"""
+    values = []
+    for key in ("user.name", "user.email"):
+        ok, value, _ = run_git(["config", "--get", key], cwd=project_root)
+        values.append(value if ok and value else None)
+    return values[0], values[1]
 
-    return success_name and success_email, name, email
+
+def write_git_config(project_root, name, email, scope):
+    """写入 Git 用户配置。scope 为 "global" 或 "local"。"""
+    flag = "--global" if scope == "global" else "--local"
+    for key, value in (("user.name", name), ("user.email", email)):
+        ok, _, stderr = run_git(["config", flag, key, value], cwd=project_root)
+        if not ok:
+            print(f"❌ 写入 {key} 失败: {stderr}")
+            return False
+    return True
 
 
-def configure_git_user():
-    """配置 Git 用户信息"""
+def prompt_text(label, interactive):
+    """读一行输入；非交互模式或 stdin 关闭时抛 Aborted 而不是崩溃"""
+    if not interactive:
+        raise Aborted(f"非交互模式下缺少必要输入：{label.strip()}")
+    try:
+        return input(label).strip()
+    except (EOFError, KeyboardInterrupt):
+        raise Aborted("输入已中断")
+
+
+def confirm(label, default, ask):
+    """确认提示。ask 为 False 时直接返回 default，不读 stdin。
+
+    EOF 按 default 处理，不中断：本函数的每个调用点都有安全默认值，
+    读不到输入不构成失败。`sys.stdin.isatty()` 不足以判断 stdin 可用——
+    Windows/Git Bash 下 `< /dev/null` 会把 NUL 当字符设备，isatty 返回
+    True，但第一次读取就 EOF。真正的判据是读取本身。
+
+    KeyboardInterrupt 仍然中断：那是用户显式打断，不是缺少输入。
+    """
+    if not ask:
+        return default
+    suffix = "(Y/n)" if default else "(y/N)"
+    try:
+        answer = input(f"{label} {suffix}: ").strip().lower()
+    except EOFError:
+        print("(stdin 不可用，按默认值处理)")
+        return default
+    except KeyboardInterrupt:
+        raise Aborted("输入已中断")
+    if not answer:
+        return default
+    return answer in ("y", "yes")
+
+
+def configure_git_user(project_root, name, email, scope, interactive):
+    """配置 Git 用户信息。name/email 已给出时不再询问。"""
     print("\n👤 配置 Git 用户信息")
-    print("这将用于记录每次修改的作者信息\n")
+    print("这将用于记录每次修改的作者信息")
+    scope_label = "全局 (--global)" if scope == "global" else "当前仓库 (--local)"
+    print(f"写入范围: {scope_label}\n")
 
-    name = input("请输入你的名字 (例如: 张三): ").strip()
-    email = input("请输入你的邮箱 (例如: zhangsan@example.com): ").strip()
+    if not name:
+        name = prompt_text("请输入你的名字 (例如: 张三): ", interactive)
+    if not email:
+        email = prompt_text("请输入你的邮箱 (例如: zhangsan@example.com): ", interactive)
 
     if not name or not email:
         print("❌ 用户名和邮箱不能为空")
         return False
 
-    # 配置用户信息（全局）
-    run_command(f'git config --global user.name "{name}"')
-    run_command(f'git config --global user.email "{email}"')
+    if not write_git_config(project_root, name, email, scope):
+        return False
 
-    print(f"\n✅ Git 用户配置完成:")
+    print("\n✅ Git 用户配置完成:")
     print(f"   名字: {name}")
     print(f"   邮箱: {email}")
     return True
 
 
-def create_gitignore(project_root):
-    """创建 .gitignore 文件"""
-    gitignore_path = project_root / ".gitignore"
-
-    if gitignore_path.exists():
-        print("✅ .gitignore 已存在")
-        return True
-
-    gitignore_content = """# Python
+GITIGNORE_CONTENT = """# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-.venv
+build/
+dist/
 *.egg-info/
+*.egg
 
-# IDEs
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.tmp-tests/
+
+# Recall 临时文件
+logic_version/working/
+*.tmp
+*.bak
+
+# 敏感信息
+.env
+.env.local
+secrets/
+*.key
+*.pem
+
 # OS
 .DS_Store
 Thumbs.db
+desktop.ini
 
-# Recall temporary
-.tmp-tests/
-logic_version/working/
+# Logs
+*.log
+logs/
 
 # Claude
 .claude/settings.local.json
 """
 
+
+def create_gitignore(project_root):
+    """创建 .gitignore 文件（已存在则不改动）"""
+    gitignore_path = project_root / ".gitignore"
+
+    if gitignore_path.exists():
+        print("✅ .gitignore 已存在")
+        return True
+
     try:
-        gitignore_path.write_text(gitignore_content, encoding="utf-8")
+        gitignore_path.write_text(GITIGNORE_CONTENT, encoding="utf-8")
         print("✅ 已创建 .gitignore")
         return True
-    except Exception as e:
+    except OSError as e:
         print(f"❌ 创建 .gitignore 失败: {e}")
         return False
 
 
-def create_initial_commit(project_root):
-    """创建初始提交"""
-    print("\n📝 创建初始提交...")
-
-    # 添加所有文件
-    run_command("git add .", cwd=project_root)
-
-    # 创建初始提交
-    commit_msg = """chore: 初始化 Recall 项目
+COMMIT_MESSAGE = """chore: 初始化 Recall 项目
 
 - 初始化项目结构
 - 配置 Git 版本控制
 - Recall 系统用于记录需求和决策逻辑
 """
 
-    success, stdout, stderr = run_command(
-        f'git commit -m "{commit_msg}"',
-        cwd=project_root,
-        check=False
+
+def create_initial_commit(project_root):
+    """创建初始提交"""
+    print("\n📝 创建初始提交...")
+
+    ok, _, stderr = run_git(["add", "."], cwd=project_root)
+    if not ok:
+        print(f"❌ 添加文件失败: {stderr}")
+        return False
+
+    # message 作为独立 argv 传入，多行内容不会被 shell 截断
+    ok, stdout, stderr = run_git(
+        ["commit", "-m", COMMIT_MESSAGE], cwd=project_root
     )
 
-    if success:
+    if ok:
         print("✅ 初始提交完成")
         return True
-    else:
-        if "nothing to commit" in stderr:
-            print("ℹ️  没有需要提交的更改")
-            return True
-        print(f"❌ 提交失败: {stderr}")
-        return False
+
+    combined = f"{stdout}\n{stderr}"
+    if "nothing to commit" in combined or "nothing added to commit" in combined:
+        print("ℹ️  没有需要提交的更改")
+        return True
+
+    print(f"❌ 提交失败: {stderr or stdout}")
+    return False
 
 
 def show_git_status(project_root):
     """显示当前 Git 状态"""
     print("\n📊 当前 Git 状态:")
-    success, stdout, _ = run_command("git status --short", cwd=project_root)
-    if stdout:
+    ok, stdout, _ = run_git(["status", "--short"], cwd=project_root)
+    if ok and stdout:
         print(stdout)
-    else:
+    elif ok:
         print("  (工作目录干净)")
+    else:
+        print("  ⚠️  无法读取 Git 状态")
 
 
 def show_welcome_message():
@@ -202,72 +313,141 @@ def show_completion_message():
     """)
 
 
-def main():
-    """主函数"""
+def build_parser():
+    parser = argparse.ArgumentParser(
+        prog="recall init",
+        description="初始化 Recall 项目（配置 Git、创建 .gitignore、可选初始提交）",
+    )
+    parser.add_argument("--name", help="Git user.name，跳过交互提问")
+    parser.add_argument("--email", help="Git user.email，跳过交互提问")
+    parser.add_argument(
+        "--scope",
+        choices=("global", "local"),
+        default="global",
+        help="用户配置写入范围，默认 global",
+    )
+    parser.add_argument(
+        "--non-interactive",
+        action="store_true",
+        help="从不读取 stdin；缺少必要输入时报错退出",
+    )
+    parser.add_argument(
+        "--yes",
+        "-y",
+        action="store_true",
+        help="所有确认项按默认值处理，不提问",
+    )
+    parser.add_argument(
+        "--no-commit",
+        action="store_true",
+        help="即使是新仓库也不创建初始提交",
+    )
+    return parser
+
+
+def _run(argv):
+    args = build_parser().parse_args(argv)
+
+    # stdin 不可用时自动降级为非交互，不再抛 EOFError
+    stdin_usable = bool(sys.stdin) and sys.stdin.isatty()
+    interactive = stdin_usable and not args.non_interactive
+    ask = interactive and not args.yes
+
+    name = args.name or os.environ.get("RECALL_GIT_NAME") or os.environ.get("GIT_AUTHOR_NAME")
+    email = args.email or os.environ.get("RECALL_GIT_EMAIL") or os.environ.get("GIT_AUTHOR_EMAIL")
+
     show_welcome_message()
 
-    # 确定项目根目录
     project_root = Path(__file__).parent.parent.resolve()
-    print(f"📁 项目路径: {project_root}\n")
+    print(f"📁 项目路径: {project_root}")
+    if not interactive:
+        print("🤖 非交互模式：确认项按默认值处理\n")
+    else:
+        print()
 
-    # 1. 检查 Git 是否安装
+    # 1. Git 是否安装
     print("🔍 检查 Git 安装状态...")
     if not check_git_installed():
         print("❌ 未检测到 Git，请先安装 Git")
         print("   下载地址: https://git-scm.com/downloads")
-        sys.exit(1)
+        return 1
     print("✅ Git 已安装")
 
-    # 2. 检查是否已经是 Git 仓库
-    is_git_repo = check_git_repo(project_root)
-    if is_git_repo:
+    # 2. 仓库状态
+    state = describe_repo_state(project_root)
+    created_repo = False
+    if state == "repo_root":
         print("✅ 已经是 Git 仓库")
+    elif state == "nested":
+        print("⚠️  当前目录位于另一个 Git 仓库内部，本身不是仓库根目录")
+        if confirm("是否在此目录单独初始化仓库？", False, ask):
+            if not init_git_repo(project_root):
+                return 1
+            created_repo = True
+        else:
+            print("ℹ️  跳过初始化，继续使用上层仓库")
     else:
-        # 初始化 Git 仓库
         if not init_git_repo(project_root):
-            sys.exit(1)
+            return 1
+        created_repo = True
 
-    # 3. 检查 Git 用户配置
+    # 3. 用户配置
     print("\n🔍 检查 Git 用户配置...")
-    has_config, name, email = check_git_config()
+    current_name, current_email = read_git_config(project_root)
+    explicit = bool(name or email)
 
-    if has_config:
-        print(f"✅ Git 用户已配置:")
-        print(f"   名字: {name}")
-        print(f"   邮箱: {email}")
-
-        reconfigure = input("\n是否重新配置？(y/N): ").strip().lower()
-        if reconfigure == 'y':
-            if not configure_git_user():
-                sys.exit(1)
+    if current_name and current_email and not explicit:
+        print("✅ Git 用户已配置:")
+        print(f"   名字: {current_name}")
+        print(f"   邮箱: {current_email}")
+        if confirm("\n是否重新配置？", False, ask):
+            if not configure_git_user(project_root, None, None, args.scope, interactive):
+                return 1
     else:
-        print("⚠️  Git 用户信息未配置")
-        if not configure_git_user():
-            sys.exit(1)
+        if not current_name or not current_email:
+            print("⚠️  Git 用户信息未配置")
+        if not configure_git_user(
+            project_root,
+            name or current_name,
+            email or current_email,
+            args.scope,
+            interactive,
+        ):
+            return 1
 
-    # 4. 创建 .gitignore
+    # 4. .gitignore
     print("\n🔍 检查 .gitignore...")
     create_gitignore(project_root)
 
-    # 5. 显示当前状态
+    # 5. 状态
     show_git_status(project_root)
 
-    # 6. 询问是否创建初始提交
-    if not is_git_repo:
-        create_initial = input("\n是否创建初始提交？(Y/n): ").strip().lower()
-        if create_initial != 'n':
+    # 6. 初始提交（仅新建仓库时）
+    if created_repo and not args.no_commit:
+        if confirm("\n是否创建初始提交？", True, ask):
             create_initial_commit(project_root)
 
     # 7. 完成
     show_completion_message()
 
     print("\n💡 快速开始:")
-    print("   - 查看文档: cat README.md")
-    print("   - 查看当前规则: cat logic_readme.md")
+    print("   - 查看文档: README.md")
+    print("   - 查看当前规则: logic_readme.md")
     print("   - 记录修改预案: 编辑 logic_change.md")
     print("   - 查看 Git 历史: git log --oneline")
     print()
+    return 0
+
+
+def main(argv=None):
+    """入口。返回退出码，供 recall.py 直接使用。"""
+    try:
+        return _run(sys.argv[1:] if argv is None else list(argv))
+    except Aborted as e:
+        print(f"\n⚠️  {e}")
+        print("   提示: 用 --name/--email 传入，或设置 RECALL_GIT_NAME / RECALL_GIT_EMAIL")
+        return 130
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
