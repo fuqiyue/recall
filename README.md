@@ -1,123 +1,193 @@
 # Recall
 
-**保存设计逻辑，而非代码快照。**
+**AI 驱动的项目逻辑追溯系统** — 让每次代码修改都能理解当初的设计意图。
 
-Recall 让 AI 能够回忆"当初为什么这么设计"，而不是"当初代码长什么样"。代码版本交给 Git，Recall 负责设计推理、关键取舍和影响分析。
+Recall 回答"为什么这样设计"，而不是"代码长什么样"。代码版本交给 Git，设计逻辑交给 Recall。
+
+---
+
+## 这是什么？
+
+在 AI 辅助开发中，代理常常因为缺乏上下文而：
+- 🔄 重复踩坑（不知道为什么要避开某个方案）
+- 💥 破坏性修改（不知道这个设计保护了什么）
+- 🤷 过度兼容（不知道 V1 已经没有真实用户）
+
+Recall 通过记录 **决策原因、权衡、影响分析**，让 AI 代理能够：
+- 📝 理解历史约束，避免重复错误
+- 🔍 追溯设计意图，做出知情决策
+- ⚖️ 评估风险等级，选择合适的修改通道
+
+---
 
 ## 快速开始
 
-### 首次使用
-
-**第一次使用 Recall 时，请先运行初始化脚本**：
+### 1. 初始化
 
 ```bash
+# 推荐：使用统一 CLI
+recall init
+
+# 或直接调用脚本
 python scripts/init_recall.py
 ```
 
-这个脚本会引导你：
-- ✅ 检查并初始化 Git 仓库
-- ✅ 配置 Git 用户信息（姓名和邮箱）
-- ✅ 创建必要的配置文件
+这会：
+- ✅ 检查/初始化 Git 仓库
+- ✅ 配置 Git 用户信息
+- ✅ 创建必要的文档结构
 - ✅ 完成初始提交
 
-**非交互运行**（CI、容器、AI 代理等 stdin 不可用的环境）：
+**非交互模式**（CI/容器环境）：
 
 ```bash
-python scripts/init_recall.py --non-interactive \
-    --name "张三" --email "zhangsan@example.com"
+recall init --non-interactive --name "张三" --email "zhangsan@example.com"
 ```
 
-| 参数 | 作用 |
-| --- | --- |
-| `--name` / `--email` | 直接给出 Git 身份，跳过提问 |
-| `--scope global\|local` | 配置写入范围，默认 `global` |
-| `--non-interactive` | 从不读 stdin，缺少必要输入时退出（码 130） |
-| `--yes` / `-y` | 确认项按默认值处理 |
-| `--no-commit` | 新仓库也不创建初始提交 |
+### 2. 日常使用
 
-也可以用环境变量代替参数：`RECALL_GIT_NAME`、`RECALL_GIT_EMAIL`（回退到 `GIT_AUTHOR_NAME` / `GIT_AUTHOR_EMAIL`）。stdin 不可用时脚本会自动降级为非交互模式，不再崩溃。
+修改代码前的标准流程：
 
-### 日常使用
+```bash
+# 1. 查看当前规则
+recall status
 
-对任何可能改变行为或需要审查既有设计的任务：
+# 2. 阅读相关决策历史
+cat logic_readme.md        # 当前生效规则
+cat logic_change.md        # 活跃修改议案
 
-1. 读 `logic_readme.md`（当前有效规则）
-2. 读 `logic_change.md`（活跃议案）
-3. 读相关代码、测试和运行证据
-4. 只在需要解释冲突或追溯兼容性时，按 ID 读取 `logic_version/records/` 中的历史记录
+# 3. 查询特定文件的历史
+recall query file <path>
 
-### 标准工作流
-
-```
-用户需求 → logic_change.md（记录议案）
-         ↓
-    实施修改 → git commit（代码变化）
-         ↓
-    归档决策 → logic_version/records/（为什么改）
-         ↓
-    更新规则 → logic_readme.md（现行规则）
+# 4. 修改代码并记录决策
+recall new "描述" tag      # 创建决策记录
+git commit -m "..."        # 提交代码变化
 ```
 
-## 文档
+### 3. 完整工作流
 
-- **[SKILL.md](SKILL.md)** — 完整使用指南（核心原则、三条通道、调用模式）
-- **[CLAUDE.md](CLAUDE.md)** — Claude AI 使用说明（含初始化指引）
-- **[logic_readme.md](logic_readme.md)** — 当前有效规则与代码地图
-- **[logic_change.md](logic_change.md)** — 活跃修改议案
-- **[references/](references/)** — 模板与参考文档
+```
+需求 → 记录议案（logic_change.md）
+    ↓
+实施 → 提交代码（git commit）
+    ↓
+归档 → 保存决策（logic_version/）
+    ↓
+更新 → 现行规则（logic_readme.md）
+```
 
-## Git 集成
+---
 
-Recall 使用 **Git 管理代码变化**，**文档管理决策原因**：
+## 核心理念
+
+### Git vs Recall 职责分工
 
 | 维度 | Git 负责 | Recall 负责 |
 |------|----------|-------------|
-| **内容** | 代码的"是什么" | 决策的"为什么" |
+| **回答** | "改了什么" | "为什么改" |
 | **存储** | 代码快照、diff | 原因、背景、权衡 |
 | **工具** | `git log`, `git show` | logic_version/*.md |
 | **关联** | commit hash | 文档中引用 commit |
 
-**快速命令**：
+### 文档结构
 
-```bash
-# 创建新的决策记录
-python scripts/create_ver.py "添加功能X" "feature-x"
-
-# 查询文件的历史和决策记录
-python scripts/link_ver_git.py file logic_readme.md
-
-# 查询某个提交的详情
-python scripts/link_ver_git.py commit abc123d
-
-# 列出最近的决策记录
-python scripts/link_ver_git.py list
+```
+logic_readme.md          # 📗 当前生效规则（唯一真相源）
+logic_change.md          # 📙 活跃修改记录（临时）
+logic_version/           # 📚 历史决策归档（只读）
+  ├── records/           #    已完成的决策记录
+  └── index.md           #    快速索引
 ```
 
-## 核心理念
+**单一真相源原则**：
+- ✅ `logic_readme.md` 是当前唯一权威
+- ✅ `logic_change.md` 只记录进行中的修改
+- ✅ `logic_version/` 只在需要追溯时查询
 
-**历史记录保存什么？**
-
-✅ 为什么做这个决策、考虑过哪些方案（A/B/C）、为什么选择当前方案、影响了谁、如何验证和回滚
-
-❌ 完整代码快照、逐行 diff、详细实现细节、原始对话记录、思维推理过程
-
-**为什么这样设计？**
-
-1. 避免上下文爆炸 — 完整历史代码会让文档迅速膨胀
-2. Git 已经负责代码版本 — Recall 只负责"为什么"
-3. 重点是防止设计退化 — 修改时需要知道"当初为什么这么做"
-
-详见 [逻辑回档 vs 代码回档](references/logic-vs-code-recall.md)。
+---
 
 ## 三条变更通道
 
-| 通道 | 典型条件 |
-|---|---|
-| 简单修复 | 局部、隔离、无公共契约/持久化/兼容影响 |
-| 中等变更 | 涉及多个相关文件，但无未确认长期设计选择 |
-| 高风险变更 | 公共契约、跨模块、权限、安全、持久化数据、迁移 |
+Recall 根据风险等级提供三条通道，避免过度流程化：
+
+| 通道 | 适用场景 | 流程深度 |
+|------|----------|----------|
+| **简单修复** | 局部 Bug、UI 调整、单文件改动 | 快速修复，无需创建记录 |
+| **中等变更** | 添加功能、多文件修改、架构调整 | 先给计划，可选创建 CHG |
+| **高风险变更** | API 修改、数据迁移、破坏性变更 | 完整 Recall 流程，必须记录 |
 
 详见 [SKILL.md](SKILL.md#三条变更通道)。
+
+---
+
+## 避免常见陷阱
+
+### ❌ 错误方式
+```
+收到 Bug → 直接让 AI 修复 → AI 只看当前代码 → 实施修改
+→ Bug 修复了，但破坏了其他功能
+```
+
+### ✅ 正确方式（Recall）
+```
+收到 Bug → 读取 logic_readme.md → 高风险？
+→ Recall 历史决策 → "为什么这么设计？"
+→ 分析影响范围 → 提供方案对比 → 用户决策
+→ 实施修改 → 更新文档
+→ Bug 修复且不破坏设计
+```
+
+---
+
+## CLI 工具
+
+所有功能已整合到 `recall` 命令：
+
+```bash
+recall status          # 查看系统状态
+recall validate        # 验证一致性
+recall new "描述" tag  # 创建决策记录
+recall list            # 列出最近记录
+recall query file <路径>    # 查询文件历史
+recall query commit <hash>  # 查询提交详情
+recall help            # 查看完整帮助
+```
+
+---
+
+## 文档
+
+- **[SKILL.md](SKILL.md)** — 完整使用指南（核心原则、三条通道、调用模式）
+- **[CLAUDE.md](CLAUDE.md)** — Claude AI 集成说明
+- **[docs/RECALL_FLOW_GUIDE.md](docs/RECALL_FLOW_GUIDE.md)** — 详细流程指南（含实战案例）
+- **[logic_readme.md](logic_readme.md)** — 当前生效规则与代码地图
+- **[logic_change.md](logic_change.md)** — 活跃修改议案
+- **[references/](references/)** — 模板与参考文档
+
+---
+
+## 与其他工具兼容
+
+Recall 可与现有工具组合使用：
+
+- **Kiro Steering** — 提供长期背景（product.md / tech.md）
+- **Spec Kit** — 提供具体规格和需求
+- **Recall** — 记录"为什么这么实现"的决策逻辑
+- **Codex Plan** — 提供一次性实施计划
+
+每个工具负责自己的领域，通过 `logic_readme.md` 作为集成点。
+
+---
+
+## 设计原则
+
+- ✅ 记录决策原因，不记录代码快照
+- ✅ 单一真相源（logic_readme.md）
+- ✅ 风险相称的流程深度（三条通道）
+- ✅ 按需回忆，不强制加载全部历史
+- ✅ 模块化兼容，可接入其他工具
+
+---
 
 ## 许可
 
