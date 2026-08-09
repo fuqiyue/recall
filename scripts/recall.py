@@ -72,6 +72,11 @@ def print_help():
     包括规则数量、活跃变更、最近决策等
     示例: recall status
 
+  conflicts
+    检测规则间的潜在冲突
+    分析 RULE-* 和 CHG-* 是否存在逻辑矛盾
+    示例: recall conflicts
+
   help
     显示此帮助信息
     示例: recall help
@@ -305,6 +310,18 @@ def cmd_status():
         print(f"❌ 错误: {e}")
         return 1
 
+def cmd_conflicts():
+    """检测规则冲突"""
+    try:
+        import detect_conflicts
+        return detect_conflicts.main()
+    except ImportError:
+        print("❌ 错误: 找不到 detect_conflicts.py")
+        return 1
+    except Exception as e:
+        print(f"❌ 错误: {e}")
+        return 1
+
 def main():
     """主入口"""
     _force_utf8_when_redirected()
@@ -323,6 +340,7 @@ def main():
         'list': lambda: cmd_list(args),
         'validate': lambda: cmd_validate(),
         'status': lambda: cmd_status(),
+        'conflicts': lambda: cmd_conflicts(),
         'help': lambda: print_help() or 0,
         '--help': lambda: print_help() or 0,
         '-h': lambda: print_help() or 0,

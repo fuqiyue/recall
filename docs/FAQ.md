@@ -10,10 +10,10 @@
 
 | 维度 | Git | Recall |
 |------|-----|--------|
-| **记录内容** | 代码差异（diff） | 决策原因、权衡、影响 |
-| **回答问题** | "代码如何变化？" | "为什么这样设计？" |
-| **存储位置** | `.git/` 目录 | `logic_version/` 目录 |
-| **查询方式** | `git log`, `git blame` | `recall query`, 阅读 VER 记录 |
+| **记录内容** | 代码差异（diff） | 系统架构 + 决策原因、权衡、影响 |
+| **回答问题** | "代码如何变化？" | "系统结构是什么？为什么这样设计？" |
+| **存储位置** | `.git/` 目录 | `logic_readme.md` + `logic_version/` |
+| **查询方式** | `git log`, `git blame` | `recall query`, 阅读 Code Map 和 VER 记录 |
 | **目标用户** | 人类开发者 | AI 代理 + 人类 |
 
 ### Q: 为什么不直接用 Git commit message？
@@ -84,7 +84,42 @@ cd /path/to/your/project
 
 4. **冲突处理**
    - 如果多人同时修改同一规则，Git 会提示冲突
+   - 使用 `recall conflicts` 检测规则间的逻辑冲突
+   - AI 会自动标注潜在矛盾，提示用户澄清
    - 手动合并，保留最新共识
+
+### Q: 如何处理规则冲突？
+
+**场景示例**：
+```
+RULE-001: 所有文件必须有单元测试
+RULE-005: 配置文件不需要测试
+```
+
+**检测冲突**：
+```bash
+recall conflicts
+```
+
+输出示例：
+```
+⚠️  检测到潜在冲突
+
+## 规则间冲突
+- RULE-001 ↔ RULE-005
+  可能存在矛盾：涉及相同主题 {文件, 测试}，但使用对立表述
+
+## 建议行动
+1. 阅读冲突的规则/议案原文
+2. 确认是否真实冲突（可能是特例关系）
+3. 在 logic_change.md 中标注 conflicts_with: RULE-XXX
+4. 由用户明确优先级或澄清边界
+```
+
+**解决方案**：
+- **特例关系**：RULE-005 是 RULE-001 的例外 → 在 RULE-005 中添加 `supersedes: RULE-001 (限配置文件)`
+- **真实冲突**：需要用户澄清 → AI 会在 logic_change.md 中标注并询问用户
+- **修改规则**：更新 RULE-001 为"所有源代码文件必须有单元测试"
 
 ### Q: Recall CLI 的常用命令是什么？
 
@@ -94,6 +129,9 @@ recall status
 
 # 验证一致性
 recall validate
+
+# 检测规则冲突
+recall conflicts
 
 # 创建新决策记录
 recall new "添加用户认证" auth
