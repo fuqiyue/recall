@@ -1,0 +1,40 @@
+name: Recall Validation
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: 验证 Recall 一致性
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: 检出代码
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # 需要完整历史以验证 Git 集成
+
+    - name: 设置 Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: 运行 Recall 验证
+      run: |
+        chmod +x recall.sh
+        ./recall.sh validate
+
+    - name: 检查文档一致性
+      run: |
+        # 验证必要文件存在
+        test -f logic_readme.md || (echo "❌ logic_readme.md 缺失" && exit 1)
+        test -f logic_change.md || (echo "❌ logic_change.md 缺失" && exit 1)
+        test -d logic_version || (echo "❌ logic_version/ 目录缺失" && exit 1)
+
+        # 验证 Code Map 标记存在
+        grep -q "Code Map" logic_readme.md || (echo "⚠️ 警告: logic_readme.md 缺少 Code Map" && exit 0)
+
+        echo "✅ 文档结构完整"

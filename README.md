@@ -1,5 +1,9 @@
 # Recall
 
+[![Validation](https://github.com/fuqiyue/recall/actions/workflows/validate.yml/badge.svg)](https://github.com/fuqiyue/recall/actions/workflows/validate.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+
 **AI 驱动的项目逻辑追溯系统** — 让每次代码修改都能理解当初的设计意图。
 
 Recall 回答"为什么这样设计"，而不是"代码长什么样"。代码版本交给 Git，设计逻辑交给 Recall。

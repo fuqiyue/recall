@@ -1,0 +1,25 @@
+# 根据文件路径自动为 PR 添加标签
+
+documentation:
+  - changed-files:
+    - any-glob-to-any-file: ['*.md', 'docs/**/*']
+
+scripts:
+  - changed-files:
+    - any-glob-to-any-file: ['scripts/**/*', '*.py']
+
+cli:
+  - changed-files:
+    - any-glob-to-any-file: ['recall.bat', 'recall.sh', 'scripts/cli.py']
+
+core-logic:
+  - changed-files:
+    - any-glob-to-any-file: ['logic_readme.md', 'logic_change.md', 'logic_version/**/*']
+
+ci-cd:
+  - changed-files:
+    - any-glob-to-any-file: ['.github/**/*']
+
+dependencies:
+  - changed-files:
+    - any-glob-to-any-file: ['requirements.txt', 'setup.py']
