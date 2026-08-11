@@ -27,6 +27,12 @@ jobs:
         chmod +x recall.sh
         ./recall.sh validate
 
+    - name: 运行逻辑地图测试
+      run: python tests/test_audit_logic_map.py
+
+    - name: 运行 Git 自动同步测试
+      run: python -m unittest tests.test_git_sync
+
     - name: 检查文档一致性
       run: |
         # 验证必要文件存在
