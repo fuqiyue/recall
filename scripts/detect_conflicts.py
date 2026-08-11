@@ -15,11 +15,19 @@ from typing import List, Dict, Tuple, Optional
 
 
 def _force_utf8_output():
-    """强制 stdout/stderr 使用 UTF-8 编码（Windows 兼容）"""
-    if sys.stdout.encoding != 'utf-8':
-        sys.stdout.reconfigure(encoding='utf-8', errors='replace')
-    if sys.stderr.encoding != 'utf-8':
-        sys.stderr.reconfigure(encoding='utf-8', errors='replace')
+    """强制 stdout/stderr 使用 UTF-8 编码（Windows 兼容）。
+
+    与其他脚本一致地做防护：流可能被替换成没有 reconfigure 的对象
+    （测试、包装器），失败时保持原编码而不是崩溃。
+    """
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            if (stream.encoding or "").lower() != "utf-8":
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
 
 
 def extract_rules(content: str) -> List[Dict[str, str]]:
@@ -46,12 +54,15 @@ def extract_changes(content: str) -> List[Dict[str, str]]:
     """从 logic_change.md 提取所有 CHG-* 议案"""
     changes = []
 
-    # 简单模式：找到 CHG-ID 行
+    # 找到 CHG-ID 标题行。标准写法是 `## CHG-YYYYMMDD-NNN: 标题`
+    # （与 validate.py 的提取规则一致），也兼容无 # 前缀的裸写法。
+    # 旧正则要求行首就是 "CHG-"，对标准标题永远匹配不到，
+    # 导致议案与规则的冲突检测一直返回空。
     lines = content.split('\n')
     current_chg = None
 
     for line in lines:
-        chg_match = re.match(r'CHG-(\d{8}-\d+):\s*(.+)', line)
+        chg_match = re.match(r'(?:#{1,6}\s+)?CHG-(\d{8}-\d+):\s*(.+)', line)
         if chg_match:
             if current_chg:
                 changes.append(current_chg)

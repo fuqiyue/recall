@@ -1,117 +1,156 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 创建版本决策记录的辅助工具
 使用 Git 集成模板快速创建新的决策记录
+
+文件名遵循 references/logic-version-template.md 的规范：
+logic_version-YYYYMMDD-NNN-<scope>.md。validate.py / link_ver_git.py /
+recall status 都按这个名字发现记录，任何一方改名都会让记录静默消失
+（RULE-009）。
 """
 
+import re
 import sys
 from datetime import date
 from pathlib import Path
 
+# 规范记录名；旧命名 ver-YYYYMMDD-NNN-*.md 只用于提取已占用的序号
+RECORD_NAME_RE = re.compile(r'^logic_version-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE)
+LEGACY_NAME_RE = re.compile(r'^ver-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE)
 
-def get_next_ver_number(today_str):
-    """获取今天的下一个可用版本号"""
-    records_dir = Path(__file__).parent.parent / "logic_version" / "records"
 
+def _force_utf8_when_redirected():
+    """重定向到文件/管道时把输出流切成 UTF-8（Windows cp936 下 emoji 会崩）。"""
+    for stream in (sys.stdout, sys.stderr):
+        if stream is None or not hasattr(stream, "reconfigure"):
+            continue
+        try:
+            if not stream.isatty():
+                stream.reconfigure(encoding="utf-8", errors="replace")
+        except (OSError, ValueError):
+            pass
+
+
+def find_project_root(start=None):
+    """向上查找包含 logic_readme.md 的目录。
+
+    找不到时退回脚本所在项目根：skill 被集中安装、而用户在无
+    logic_readme.md 的目录运行时，记录应落回 Recall 自身而不是 cwd。
+    """
+    current = (start or Path.cwd()).resolve()
+    while current != current.parent:
+        if (current / "logic_readme.md").exists():
+            return current
+        current = current.parent
+    return Path(__file__).resolve().parent.parent
+
+
+def get_next_ver_number(records_dir, today_str):
+    """获取当天的下一个可用序号；新旧两种文件名的序号都计入，避免撞号。"""
     if not records_dir.exists():
-        records_dir.mkdir(parents=True, exist_ok=True)
+        return 1
 
-    # 查找今天已有的版本记录
-    pattern = f"*{today_str}*.md"
-    existing = list(records_dir.glob(pattern))
-
-    # 提取序号
     max_num = 0
-    for f in existing:
-        # 从文件名中提取序号，格式: ver-YYYYMMDD-NNN-scope.md
-        parts = f.stem.split('-')
-        if len(parts) >= 3:
-            try:
-                num = int(parts[2])
-                max_num = max(max_num, num)
-            except ValueError:
-                continue
-
+    for f in records_dir.glob("*.md"):
+        for pattern in (RECORD_NAME_RE, LEGACY_NAME_RE):
+            match = pattern.match(f.name)
+            if match and match.group(1) == today_str:
+                max_num = max(max_num, int(match.group(2)))
     return max_num + 1
 
 
-def read_template():
-    """读取 Git 集成模板"""
-    template_path = Path(__file__).parent.parent / "references" / "logic-version-git-template.md"
+def extract_quick_template(template_text):
+    """提取 "## 快速模板" 小节里 ```markdown 围栏内的内容。
+
+    只收集围栏内部的行：小节标题与围栏之间允许有说明文字，
+    不应进入生成的记录。块内不支持嵌套围栏（模板中已注明）。
+    """
+    lines = template_text.split('\n')
+    in_section = False
+    in_fence = False
+    collected = []
+
+    for line in lines:
+        stripped = line.strip()
+        if stripped == '## 快速模板':
+            in_section = True
+            continue
+        if not in_section:
+            continue
+        if not in_fence:
+            if stripped.startswith('```markdown'):
+                in_fence = True
+            continue
+        if stripped == '```':
+            break
+        collected.append(line)
+
+    return '\n'.join(collected).strip('\n')
+
+
+def create_ver_record(title, scope, template_path=None, output_dir=None):
+    """创建版本决策记录。返回退出码：0 成功，1 失败。"""
+    root = find_project_root()
+    if template_path is None:
+        template_path = root / "references" / "logic-version-git-template.md"
+    if output_dir is None:
+        output_dir = root / "logic_version" / "records"
+
+    template_path = Path(template_path)
+    output_dir = Path(output_dir)
 
     if not template_path.exists():
         print(f"❌ 模板文件不存在: {template_path}")
-        sys.exit(1)
+        return 1
 
-    return template_path.read_text(encoding="utf-8")
-
-
-def create_ver_record(title, scope):
-    """创建版本决策记录"""
     today = date.today()
     today_str = today.strftime("%Y%m%d")
     today_iso = today.isoformat()
 
-    # 获取下一个序号
-    next_num = get_next_ver_number(today_str)
+    next_num = get_next_ver_number(output_dir, today_str)
 
-    # 生成 ID 和文件名
     ver_id = f"VER-{today_str}-{next_num:03d}"
-    filename = f"ver-{today_str}-{next_num:03d}-{scope}.md"
+    filename = f"logic_version-{today_str}-{next_num:03d}-{scope}.md"
+    filepath = output_dir / filename
 
-    # 生成文件路径
-    records_dir = Path(__file__).parent.parent / "logic_version" / "records"
-    filepath = records_dir / filename
+    content = extract_quick_template(template_path.read_text(encoding="utf-8"))
+    if not content:
+        print(f"❌ 模板中找不到 '## 快速模板' 代码块: {template_path}")
+        return 1
 
-    # 读取模板
-    template = read_template()
-
-    # 模板中的快速模板部分（从 "## 快速模板" 到下一个 "---"）
-    # 提取并使用
-    lines = template.split('\n')
-    in_quick_template = False
-    quick_template_lines = []
-
-    for line in lines:
-        if line.strip() == '## 快速模板':
-            in_quick_template = True
-            continue
-        if in_quick_template:
-            if line.strip().startswith('```markdown'):
-                continue
-            if line.strip() == '```' and quick_template_lines:
-                break
-            quick_template_lines.append(line)
-
-    content = '\n'.join(quick_template_lines)
-
-    # 替换占位符
     content = content.replace("YYYYMMDD-NNN", f"{today_str}-{next_num:03d}")
     content = content.replace("<变更标题>", title)
+    content = content.replace("<scope>", scope)
     content = content.replace("YYYY-MM-DD", today_iso)
     content = content.replace("<git-commit-hash>", "_待填写_")
-    content = content.replace("CHG-YYYYMMDD-NNN", f"CHG-{today_str}-{next_num:03d}")
 
-    # 写入文件
     try:
-        filepath.write_text(content, encoding="utf-8")
-        print(f"✅ 已创建决策记录")
-        print(f"   📄 文件: {filepath.relative_to(Path.cwd())}")
-        print(f"   🆔 版本号: {ver_id}")
-        print(f"   📅 日期: {today_iso}")
-        print()
-        print("📝 下一步:")
-        print(f"   1. 编辑文件填写详细内容: {filepath.name}")
-        print("   2. 实施代码修改")
-        print("   3. Git 提交时引用此记录:")
-        print(f"      git commit -m 'feat: {title}'")
-        print(f"      git commit -m '...'")
-        print(f"      git commit -m 'Ref: logic_version/records/{filename}'")
-        print("   4. 更新决策记录中的 commit hash")
-        return True
-    except Exception as e:
+        output_dir.mkdir(parents=True, exist_ok=True)
+        filepath.write_text(content + "\n", encoding="utf-8")
+    except OSError as e:
         print(f"❌ 创建文件失败: {e}")
-        return False
+        return 1
+
+    try:
+        display_path = filepath.relative_to(Path.cwd())
+    except ValueError:
+        display_path = filepath
+
+    print(f"✅ 已创建决策记录")
+    print(f"   📄 文件: {display_path}")
+    print(f"   🆔 版本号: {ver_id}")
+    print(f"   📅 日期: {today_iso}")
+    print()
+    print("📝 下一步:")
+    print(f"   1. 编辑文件填写详细内容: {filepath.name}")
+    print("   2. 实施代码修改")
+    print("   3. Git 提交时引用此记录:")
+    print(f"      git commit -m 'feat: {title}'")
+    print(f"      git commit -m '...'")
+    print(f"      git commit -m 'Ref: logic_version/records/{filename}'")
+    print("   4. 更新决策记录中的 commit hash")
+    return 0
 
 
 def show_usage():
@@ -130,14 +169,16 @@ def show_usage():
   python scripts/create_ver.py "修复登录Bug" "login-fix"
 
 生成的文件命名规则:
-  ver-YYYYMMDD-NNN-<范围标识>.md
+  logic_version-YYYYMMDD-NNN-<范围标识>.md
 
-  例如: ver-20260808-001-dark-mode.md
+  例如: logic_version-20260808-001-dark-mode.md
 """)
 
 
 def main():
     """主函数"""
+    _force_utf8_when_redirected()
+
     if len(sys.argv) < 3:
         show_usage()
         sys.exit(1)
@@ -150,9 +191,7 @@ def main():
         print("❌ 范围标识符只能包含字母、数字、连字符和下划线")
         sys.exit(1)
 
-    # 创建记录
-    success = create_ver_record(title, scope)
-    sys.exit(0 if success else 1)
+    sys.exit(create_ver_record(title, scope))
 
 
 if __name__ == "__main__":

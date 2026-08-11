@@ -12,29 +12,23 @@
 
 ## 快速模板
 
+控制字段名（`version_id`/`date`/`status` 等）以 `logic-version-template.md` 为准；
+`validate.py` 按这些字段名校验，改名会让校验静默失效（RULE-009）。
+本块内不要嵌套 ``` 代码围栏：`scripts/create_ver.py` 以第一个独立的 ``` 行为块结束标记。
+
 ```markdown
 # VER-YYYYMMDD-NNN: <变更标题>
 
-## 版本信息
-- **版本号**: VER-YYYYMMDD-NNN
-- **日期**: YYYY-MM-DD
-- **状态**: effective | rejected | cancelled
-- **关联 Commit**: `<git-commit-hash>`
-- **关联 CHG**: CHG-YYYYMMDD-NNN (或 none)
+## 记录控制
 
-## Git 追溯
-```bash
-# 查看这次变更的代码
-git show <commit-hash>
+- version_id: VER-YYYYMMDD-NNN
+- version_slug: logic_version-YYYYMMDD-NNN-<scope>
+- status: effective
+- date: YYYY-MM-DD
+- change_id: none
+- commit: <git-commit-hash>
 
-# 查看相关文件的完整历史
-git log --follow -- <file-path>
-
-# 查看代码差异
-git diff <before-commit> <after-commit>
-```
-
-## 修改原因
+## 为什么做这个决策？
 
 **背景**：
 <为什么需要这次修改？遇到了什么问题？>
@@ -42,96 +36,40 @@ git diff <before-commit> <after-commit>
 **用户需求/反馈**：
 <来自用户的具体诉求，引用原话或 issue>
 
-**痛点**：
-<当前实现的问题是什么？>
-
 ## 决策过程
 
-### 考虑的方案
+**方案 A**：<描述>（优点 / 缺点 / 复杂度：低-中-高）
 
-**方案 A**：<描述>
-- ✅ 优点：
-- ❌ 缺点：
-- 复杂度：低/中/高
+**方案 B**：<描述>（优点 / 缺点 / 复杂度：低-中-高）
 
-**方案 B**：<描述>
-- ✅ 优点：
-- ❌ 缺点：
-- 复杂度：低/中/高
-
-### 最终选择
-
-**选中方案**：方案 X
-
-**选择原因**：
+**选中方案与原因**：
 <为什么选这个方案？权衡了什么？>
 
 ## 影响范围
 
 **修改的文件/模块**：
 - `path/to/file1.py` - 修改了什么
-- `path/to/file2.ts` - 添加了什么
-- `path/to/file3.md` - 删除了什么
 
-**影响的功能**：
-<列出受影响的用户可见功能>
+**破坏性变更**：是/否（如是，说明向后兼容策略）
 
-**破坏性变更**：
-- 是/否
-- 如果是，说明向后兼容策略
+## 验证方式
 
-## 实施记录
+<如何验证这次修改成功？测试命令与结果。
+代码差异用 git 查看：git show <commit>；git log --follow -- <file-path>>
 
-**修改前状态**：
-<简述修改前的行为>
+## 回滚方式
 
-**修改后状态**：
-<简述修改后的行为>
-
-**迁移步骤**（如需要）：
-1. ...
-2. ...
-
-## 验证
-
-**测试方法**：
-<如何验证这次修改是成功的？>
-
-**测试结果**：
-- [ ] 单元测试通过
-- [ ] 集成测试通过
-- [ ] 手动测试通过
-
-**运行证据**：
-<测试输出、截图、日志等>
-
-## 回滚计划
-
-**如何回滚**：
-```bash
-git revert <commit-hash>
-# 或
-git checkout <before-commit> -- <file-path>
-```
-
-**回滚风险**：
-<回滚会导致什么问题？>
+<如何撤销：git revert <commit>，或说明配置回退步骤与回滚风险>
 
 ## 经验与教训
 
-**可复用的原则**：
-<这次决策中有什么可以在未来类似情况下复用的原则？>
-
-**注意事项**：
-<未来修改这块代码需要注意什么？>
+<可复用的原则与注意事项；没有填 none>
 
 ## 关联
 
-- **当前规则**: logic_readme.md#RULE-XXX
-- **原始议案**: logic_change.md#CHG-YYYYMMDD-NNN
-- **相关 Issue**: #123 (如有)
-- **相关 PR**: #456 (如有)
-- **文档更新**: README.md, CHANGELOG.md (如有)
+- current_logic: logic_readme.md#RULE-XXX
+- proposal_id: none
+- code/tests: <相关文件>
 ```
 
 ---
@@ -141,10 +79,10 @@ git checkout <before-commit> -- <file-path>
 ### 1. 创建决策记录
 
 ```bash
-# 在 logic_version/records/ 创建新文件
-touch logic_version/records/ver-20260808-001-add-dark-mode.md
+# 推荐：用 CLI 自动取号并按模板生成
+recall new "添加暗色模式支持" "add-dark-mode"
 
-# 使用模板填写
+# 生成 logic_version/records/logic_version-20260808-001-add-dark-mode.md
 ```
 
 ### 2. 实施代码修改
@@ -158,7 +96,7 @@ git commit -m "feat: 添加暗色模式支持
 
 实现 CSS 变量驱动的主题切换系统
 
-Ref: logic_version/records/ver-20260808-001-add-dark-mode.md"
+Ref: logic_version/records/logic_version-20260808-001-add-dark-mode.md"
 ```
 
 ### 3. 更新决策记录
@@ -168,8 +106,8 @@ Ref: logic_version/records/ver-20260808-001-add-dark-mode.md"
 COMMIT=$(git rev-parse HEAD)
 
 # 在决策记录中填入 commit hash
-# 编辑 ver-20260808-001-add-dark-mode.md
-# - **关联 Commit**: `$COMMIT`
+# 编辑 logic_version-20260808-001-add-dark-mode.md
+# - commit: $COMMIT
 ```
 
 ### 4. 归档议案
@@ -188,23 +126,23 @@ COMMIT=$(git rev-parse HEAD)
 
 | 字段 | 说明 | 示例 |
 |------|------|------|
-| 版本号 | VER-YYYYMMDD-NNN 格式 | VER-20260808-001 |
-| 日期 | 归档日期 | 2026-08-08 |
-| 状态 | effective/rejected/cancelled | effective |
-| 关联 Commit | Git commit hash（完整或短版） | abc123def456 |
-| 修改原因 | 为什么要改 | 用户反馈... |
-| 决策过程 | 考虑了哪些方案，为什么选这个 | 方案A vs 方案B... |
-| 影响范围 | 改了什么文件/功能 | 修改了样式系统 |
+| version_id | VER-YYYYMMDD-NNN 格式 | VER-20260808-001 |
+| date | 归档日期 | 2026-08-08 |
+| status | effective/rejected/cancelled | effective |
+| commit | Git commit hash（完整或短版） | abc123def456 |
+| ## 为什么做这个决策？ | 为什么要改 | 用户反馈... |
+| ## 影响范围 | 改了什么文件/功能 | 修改了样式系统 |
+| ## 验证方式 | 如何验证修改成功 | 测试命令与结果 |
+| ## 回滚方式 | 如何撤销 | git revert ... |
 
 ### 可选字段
 
 | 字段 | 说明 | 何时使用 |
 |------|------|----------|
-| 关联 CHG | 原始议案 ID | 高风险修改 |
+| change_id | 原始议案 ID | 高风险修改 |
+| 决策过程 | 考虑了哪些方案，为什么选这个 | 有多个候选方案时 |
 | 破坏性变更 | 是否不兼容 | API/数据结构变化 |
 | 迁移步骤 | 如何升级 | 需要用户操作时 |
-| 验证 | 测试证据 | 关键功能修改 |
-| 回滚计划 | 如何撤销 | 高风险修改 |
 | 经验与教训 | 可复用的知识 | 有通用价值时 |
 
 ---
@@ -281,47 +219,11 @@ exit 0
 
 ### 快速创建决策记录
 
-```python
-# scripts/create_ver.py
-import sys
-from datetime import date
-from pathlib import Path
+实现见 `scripts/create_ver.py`（即 `recall new` 命令）。此处不再内嵌副本：
+模板里的示例代码无法随实现更新，曾因此出现文件命名漂移（ver-* vs logic_version-*）。
 
-def create_ver(title, scope):
-    today = date.today().strftime("%Y%m%d")
-    
-    # 查找下一个序号
-    records_dir = Path("logic_version/records")
-    existing = list(records_dir.glob(f"ver-{today}-*.md"))
-    next_num = len(existing) + 1
-    
-    # 生成文件名
-    ver_id = f"VER-{today}-{next_num:03d}"
-    filename = f"ver-{today}-{next_num:03d}-{scope}.md"
-    filepath = records_dir / filename
-    
-    # 读取模板
-    template = Path("references/logic-version-git-template.md").read_text()
-    
-    # 替换占位符
-    content = template.replace("YYYYMMDD-NNN", f"{today}-{next_num:03d}")
-    content = content.replace("<变更标题>", title)
-    content = content.replace("YYYY-MM-DD", date.today().isoformat())
-    
-    # 写入文件
-    filepath.write_text(content, encoding="utf-8")
-    
-    print(f"✅ 已创建决策记录: {filepath}")
-    print(f"   版本号: {ver_id}")
-    print(f"   请编辑文件并填写详细内容")
-
-if __name__ == "__main__":
-    if len(sys.argv) < 3:
-        print("用法: python scripts/create_ver.py <标题> <范围>")
-        print("示例: python scripts/create_ver.py '添加暗色模式' 'dark-mode'")
-        sys.exit(1)
-    
-    create_ver(sys.argv[1], sys.argv[2])
+```bash
+recall new "添加暗色模式" "dark-mode"
 ```
 
 ### 关联查询

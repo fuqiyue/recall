@@ -285,9 +285,11 @@ def sync_repository(
         if not ok:
             return 1
     elif _is_dirty(project_root):
+        # 只同步已提交历史（RULE-011）：脏文件绝不被自动提交，但也
+        # 不阻断已提交 commit 的推送——部分提交是 post-commit hook 的
+        # 常见场景。pull 侧由 --autostash 保护未提交变更。
         if not quiet:
-            print("⚠️  工作区有未提交变更；未自动提交。使用 --commit-message 明确提交后再同步")
-        return 2
+            print("ℹ️  工作区有未提交变更；仅同步已提交历史（提交当前文件请用 --commit-message）")
 
     branch = _current_branch(project_root)
     if not branch:
@@ -337,6 +339,8 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-pull", action="store_true", help="只推送，不先拉取远端")
     parser.add_argument("--no-push", action="store_true", help="只拉取并变基，不推送")
     parser.add_argument("--disable", action="store_true", help="关闭自动同步并移除受管理的 hook")
+    # hook 内部标记：软性跳过（无远端/无分支）不算失败，避免每次提交都以
+    # 非零退出码结束；真正的拉取/推送失败仍返回 1 并打印警告
     parser.add_argument("--post-commit", action="store_true", help=argparse.SUPPRESS)
     return parser
 
@@ -356,13 +360,16 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
             return 1
         print("✅ Git 自动同步已关闭")
         return 0
-    return sync_repository(
+    code = sync_repository(
         root,
         remote=args.remote,
         commit_message=args.commit_message,
         pull=not args.no_pull,
         push=not args.no_push,
     )
+    if args.post_commit and code == 2:
+        return 0
+    return code
 
 
 if __name__ == "__main__":

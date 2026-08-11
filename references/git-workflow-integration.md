@@ -74,10 +74,10 @@ git rev-parse HEAD
 ```bash
 # 1. 创建决策记录
 python scripts/create_ver.py "添加暗色模式支持" "dark-mode"
-# 创建: logic_version/records/ver-20260808-001-dark-mode.md
+# 创建: logic_version/records/logic_version-20260808-001-dark-mode.md
 
 # 2. 编辑决策记录，填入 commit hash
-vim logic_version/records/ver-20260808-001-dark-mode.md
+vim logic_version/records/logic_version-20260808-001-dark-mode.md
 ```
 
 在决策记录中：
@@ -120,7 +120,7 @@ git commit -m "docs: 归档暗色模式决策记录
 - 归档 CHG-20260808-001
 - 创建 VER-20260808-001
 
-Ref: logic_version/records/ver-20260808-001-dark-mode.md"
+Ref: logic_version/records/logic_version-20260808-001-dark-mode.md"
 ```
 
 ## Commit Message 规范
@@ -177,7 +177,7 @@ git commit -m "refactor(db): 迁移到新的数据库架构
 
 迁移步骤见决策记录
 
-Ref: logic_version/records/ver-20260808-003-db-migration.md
+Ref: logic_version/records/logic_version-20260808-003-db-migration.md
 BREAKING CHANGE: 需要手动运行 migrate.sql"
 ```
 
@@ -404,7 +404,7 @@ python scripts/create_ver.py "数据库架构迁移" "db-migration"
 # 4. 提交时引用决策记录
 git commit -m "refactor(db): 迁移到新架构
 
-Ref: logic_version/records/ver-20260808-003-db-migration.md"
+Ref: logic_version/records/logic_version-20260808-003-db-migration.md"
 
 # 5. 在决策记录中填入 commit hash
 ```

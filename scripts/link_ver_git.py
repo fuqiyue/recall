@@ -20,7 +20,22 @@ COMMIT_PATTERNS = (
     r'^\s*-\s*commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
 )
 
-RECORDS_DIR = Path("logic_version/records")
+def find_project_root(start=None):
+    """向上查找包含 logic_readme.md 的目录，找不到时退回当前目录。
+
+    旧代码用相对 cwd 的常量路径，在子目录中运行 query/list 会
+    静默找不到任何记录，与 CLI 帮助承诺的"子目录可执行"不符。
+    """
+    current = (start or Path.cwd()).resolve()
+    while current != current.parent:
+        if (current / "logic_readme.md").exists():
+            return current
+        current = current.parent
+    return (start or Path.cwd()).resolve()
+
+
+def _records_dir():
+    return find_project_root() / "logic_version" / "records"
 
 
 def run_git(args):
@@ -92,9 +107,10 @@ def _parse_record(record_file):
 
 def _iter_records():
     """按文件名规则遍历决策记录，跳过 README.md 等说明文件。"""
-    if not RECORDS_DIR.exists():
+    records_dir = _records_dir()
+    if not records_dir.exists():
         return
-    for record_file in sorted(RECORDS_DIR.glob("*.md")):
+    for record_file in sorted(records_dir.glob("*.md")):
         if not RECORD_NAME_RE.match(record_file.name):
             continue
         record = _parse_record(record_file)

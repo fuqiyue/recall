@@ -5,6 +5,7 @@ Recall 统一命令行工具
 整合所有 Recall 功能到一个简洁的 CLI 接口
 """
 
+import re
 import sys
 import os
 from pathlib import Path
@@ -12,6 +13,18 @@ from pathlib import Path
 # 添加 scripts 目录到 Python 路径
 SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
+
+# 决策记录文件名，与 validate.py / link_ver_git.py / create_ver.py 一致（RULE-009）
+RECORD_NAME_RE = re.compile(r'^logic_version-\d{8}-\d{3}-.+\.md$', re.IGNORECASE)
+
+
+def find_version_records(records_dir):
+    """按规范文件名列出决策记录，跳过 README.md 等说明文件。"""
+    if not records_dir.exists():
+        return []
+    return sorted(
+        path for path in records_dir.glob("*.md") if RECORD_NAME_RE.match(path.name)
+    )
 
 def _force_utf8_when_redirected():
     """重定向到文件/管道时把输出流切成 UTF-8。
@@ -128,23 +141,13 @@ def cmd_new(args):
         return 1
 
     title = args[0]
-    short_desc = args[1]
+    scope = args[1]
 
     try:
         import create_ver
 
-        # 查找项目根目录
-        root = create_ver.find_project_root()
-        template_path = root / "references" / "logic-version-git-template.md"
-        output_dir = root / "logic_version" / "records"
-
-        if not template_path.exists():
-            print(f"❌ 错误: 模板文件不存在 {template_path}")
-            return 1
-
-        output_dir.mkdir(parents=True, exist_ok=True)
-
-        return create_ver.create_ver_record(title, short_desc, template_path, output_dir)
+        # 路径解析（项目根、模板、输出目录）由 create_ver 内部完成
+        return create_ver.create_ver_record(title, scope)
     except ImportError:
         print("❌ 错误: 找不到 create_ver.py")
         return 1
@@ -270,18 +273,14 @@ def cmd_status():
         # 检查决策记录
         records_dir = root / "logic_version" / "records"
         if records_dir.exists():
-            records = list(records_dir.glob("ver-*.md"))
+            records = find_version_records(records_dir)
             print(f"📚 决策记录: {len(records)} 个文件")
 
-            # 显示最近 3 条
+            # 显示最近 3 条：文件名自带日期和序号，按名字倒序比 mtime 稳定
             if records:
-                sorted_records = sorted(records, key=lambda x: x.stat().st_mtime, reverse=True)
                 print(f"\n   最近的决策记录:")
-                for record in sorted_records[:3]:
-                    mtime = record.stat().st_mtime
-                    from datetime import datetime
-                    date_str = datetime.fromtimestamp(mtime).strftime('%Y-%m-%d')
-                    print(f"   • {record.name} ({date_str})")
+                for record in sorted(records, key=lambda x: x.name, reverse=True)[:3]:
+                    print(f"   • {record.name}")
         else:
             print("📚 决策记录: ⚠️  logic_version/records/ 不存在")
 
@@ -315,7 +314,7 @@ def cmd_status():
                     print(f"⚠️  未提交变更: {len(lines)} 个文件")
                 else:
                     print(f"✅ 工作区状态: 干净")
-        except:
+        except (OSError, subprocess.SubprocessError):
             print(f"\n🔖 Git: ⚠️  未安装或不可用")
 
         print("\n" + "=" * 60)
