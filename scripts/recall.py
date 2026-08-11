@@ -59,10 +59,12 @@ def print_help():
     示例: recall init
 
   sync [选项]
-    拉取远端变基并推送已提交的变更
+    自动保存并同步：默认把工作区变更自动提交，再拉取变基并推送
     示例: recall sync
     示例: recall sync --commit-message "docs: 更新 Recall 规则"
-    示例: recall sync --disable
+    示例: recall sync --manual    # 切换为手动模式（不自动提交）
+    示例: recall sync --auto      # 恢复自动保存（默认）
+    示例: recall sync --disable   # 完全关闭自动同步
 
   new <描述> <短标签>
     创建新的决策记录

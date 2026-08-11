@@ -59,8 +59,9 @@
 | RULE-008 | ordinary | CLI 必须可非交互运行，且重定向下不崩 | CI、容器和 AI 代理环境没有 tty；Windows 重定向后 stdout 走 ANSI 代码页 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | 空 stdin 与重定向实测 | valid | 2026-08-08 | self |
 | RULE-009 | ordinary | 校验脚本的字段名以 references/ 模板为准 | schema 漂移会让检查静默失效或报假错误 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | validate.py 记录发现测试 | valid | 2026-08-08 | self |
 | RULE-010 | key | `recall init` 默认启用仓库级 Git 自动同步并安装受管理的 post-commit hook | 让已提交的 Recall 逻辑和代码及时进入配置的远端，减少本地历史与远端漂移 | [VER-20260811-001](logic_version/records/logic_version-20260811-001-git-auto-sync.md) | 用户要求 | git_sync.py + hook 集成测试 | valid | 2026-08-11 | self |
-| RULE-011 | key | 自动同步只处理已提交历史：脏工作区绝不被自动提交（提交需显式 `--commit-message`），但不阻断已提交 commit 的推送 | 避免代理或 hook 静默提交未审阅文件；部分提交是 hook 常见场景，已提交历史应照常同步 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 用户要求/安全取舍 | git_sync.py 单元测试 | valid | 2026-08-11 | self |
+| RULE-011 | key | `recall sync` 默认自动保存：脏工作区自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；post-commit hook 场景绝不自动提交其他脏文件 | 用户要求默认自动保存上传，消除未提交窗口期的丢失风险；hook 侧不提交以保护部分提交工作流 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | git_sync.py 单元测试 | valid | 2026-08-11 | self |
 | RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
+| RULE-013 | ordinary | 提交后同步流程自动回填决策记录的 after_commit：解析 commit message 的 Ref 行，把占位符替换为提交哈希并以内部提交落盘；内部提交通过环境变量防止 hook 递归 | 手工回填常被遗忘，记录到提交方向的追溯链会静默断裂 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | tests/test_git_sync.py | valid | 2026-08-11 | self |
 
 ## 代码地图
 
@@ -79,7 +80,7 @@
 | scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
 | scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态 | 项目根路径 | 验证报告 | 脚本文件 | yes | none |
 | scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交 | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
-| scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
+| scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、自动保存提交、回填 after_commit、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
 | scripts/create_ver.py | source/runtime-code | 按模板创建 VER-* 决策记录（规范文件名取号） | 描述与 scope | 记录文件 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/link_ver_git.py | source/runtime-code | 关联查询：文件/提交 ↔ 决策记录 | 文件路径或 commit | 关联报告 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/detect_conflicts.py | source/runtime-code | 规则间与议案-规则冲突的启发式检测 | logic_readme/logic_change | 冲突报告与退出码 | 脚本文件 | yes | tests/test_recall_cli.py |
@@ -201,7 +202,7 @@ AI 更新 logic_readme.md（如规则变化）
 - 性能/并发：单用户读写，无并发问题
 - 部署/配置：无需部署，直接使用
 - 日志/监控/告警：通过 Git 历史追踪
-- 自动同步：仓库级 `recall.autoSync=true` 控制受管理的 `post-commit` hook；远端缺失、网络失败或变基冲突只告警，不丢弃本地提交
+- 自动同步：仓库级 `recall.autoSync=true` 控制受管理的 `post-commit` hook；`recall.autoCommit=true`（默认）时 `recall sync` 自动提交脏工作区；远端缺失、网络失败或变基冲突只告警，不丢弃本地提交
 
 ## 测试与验证
 
@@ -216,9 +217,9 @@ AI 更新 logic_readme.md（如规则变化）
 | runtime | RULE-008 非交互可用（三种无输入形式） | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive` | 三者均退出 0 | 终端输出 |
 | runtime | RULE-008 重定向不崩 | `recall help > out.txt`；`recall status > out.txt` | 退出码 0，无 UnicodeEncodeError | 输出文件 |
 | unit | RULE-009 决策记录字段名与模板一致 | `python tests/test_audit_logic_map.py` | 记录 schema 检查通过 | unittest 输出 |
-| unit | RULE-010/RULE-011 自动同步策略与脏工作区保护 | `python -m unittest tests.test_git_sync` | 6 tests OK；配置、hook、pull/push、脏工作区不阻断已提交历史、post-commit 软性跳过 | unittest 输出 |
+| unit | RULE-010/RULE-011/RULE-013 自动同步、自动保存与回填 | `python -m unittest tests.test_git_sync` | 12 tests OK；配置、hook、pull/push、自动保存提交、手动模式、hook 不提交脏文件、递归防护、after_commit 回填 | unittest 输出 |
 | unit | RULE-012 CLI 胶水层接口一致性（new/status/conflicts/记录发现） | `python -m unittest tests.test_recall_cli` | 8 tests OK；记录命名、必填字段、CHG 标题提取、项目根查找通过 | unittest 输出 |
-| runtime | RULE-010 自动同步 CLI 可发现 | `python scripts/recall.py help`; `python scripts/git_sync.py --help` | 帮助包含 `sync`、`--no-auto-sync` 和 `--disable` | 终端输出 |
+| runtime | RULE-010 自动同步 CLI 可发现 | `python scripts/recall.py help`; `python scripts/git_sync.py --help` | 帮助包含 `sync`、`--auto`、`--manual`、`--no-auto-sync` 和 `--disable` | 终端输出 |
 
 INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能人工审查，列在“不可破坏约束”里。此表只登记可执行的验证命令。
 
@@ -230,6 +231,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260808-002 | 工具链与自审一致性加固：跨平台入口、schema 对齐、嵌套项目根排除 | RULE-005..009 | [记录](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) |
 | VER-20260811-001 | Git 自动同步：初始化默认配置、提交后 hook、显式脏工作区提交与手动 sync | RULE-010..011 | [记录](logic_version/records/logic_version-20260811-001-git-auto-sync.md) |
 | VER-20260811-002 | CLI 胶水层接口修复：recall new 断裂、记录命名统一、冲突检测失灵、脏工作区不阻断同步 | RULE-011..012 | [记录](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) |
+| VER-20260811-003 | 默认自动保存上传（--manual 可切手动）与 after_commit 自动回填 | RULE-011, RULE-013 | [记录](logic_version/records/logic_version-20260811-003-auto-save-sync.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 

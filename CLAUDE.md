@@ -21,9 +21,12 @@ python scripts/init_recall.py
 6. ✅ 创建 .gitignore 文件
 7. ✅ 创建初始提交
 
-自动同步只处理已经提交的变更。脏工作区不会被静默提交；需要提交当前文件时，
-显式运行 `recall sync --commit-message "<message>"`。没有远端时初始化不会失败，
-添加 `origin` 后运行 `recall sync` 即可。使用 `recall sync --disable` 可关闭自动同步。
+`recall sync` 默认自动保存：工作区有未提交变更时自动创建保存提交，再拉取变基
+并推送，用户无需手写 commit。用户选择手动上传时运行 `recall sync --manual`，
+此后仅在显式 `recall sync --commit-message "<message>"` 时提交；`recall sync --auto`
+恢复自动保存。post-commit hook 永不自动提交其他脏文件，只回填提交所引用决策
+记录的 `after_commit` 后同步。没有远端时初始化不会失败，添加 `origin` 后运行
+`recall sync` 即可。使用 `recall sync --disable` 可完全关闭自动同步。
 
 **为什么需要 Git？**
 - Recall 使用 Git 管理代码变化（what changed）
@@ -78,6 +81,7 @@ recall help         # 查看完整帮助
 2. 实施修改 → git commit (代码变化)
 3. 归档决策 → logic_version/records/ (为什么改)
 4. 更新现行 → logic_readme.md (RULE-ID)
+5. 同步远端 → recall sync (自动保存并推送；after_commit 由 hook 自动回填)
 ```
 
 **Commit Message 规范**：
@@ -96,7 +100,7 @@ recall status                    # 查看系统状态
 recall validate                  # 验证一致性
 recall query file <path>         # 查询文件历史
   recall query commit <hash>       # 查询提交详情
-  recall sync                      # 拉取变基并推送已提交变更
+  recall sync                      # 自动保存工作区变更并拉取变基、推送
 
 # Git 原生命令（直接查看）
 git log --oneline | head -5      # 最近提交

@@ -42,7 +42,7 @@
 - semantic_review_ref: tests:test_recall_cli.py, test_git_sync.py; runtime:recall status/new/list 实测
 - semantic_reviewed_at: 2026-08-11
 - before_commit: 60aea3f
-- after_commit: _待填写_
+- after_commit: 5afe9bb
 - supersedes: none
 - corrects: none
 

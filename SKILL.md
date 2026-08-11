@@ -16,10 +16,13 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 `git pull --rebase --autostash`，再执行 `git push`；远端不可用或发生冲突时只发出
 警告，不阻断已经完成的本地提交。
 
-自动同步只处理已经提交的历史，不会自动把脏工作区加入提交。需要把当前文件作为
-一次明确的同步提交时运行 `recall sync --commit-message "<message>"`。没有远端时，
-先配置 `git remote add origin <url>`，再运行 `recall sync`。可用
-`recall init --no-auto-sync` 或 `recall sync --disable` 关闭。
+`recall sync` 默认自动保存：工作区有未提交变更时先以自动保存消息提交，再拉取
+变基并推送（`recall.autoCommit`，默认开启）。用户选择手动时运行
+`recall sync --manual`，此后仅在提供 `--commit-message "<message>"` 时才提交；
+`recall sync --auto` 恢复自动保存。post-commit hook 场景永不自动提交其他脏文件，
+只回填提交所引用决策记录的 `after_commit` 占位符后同步，保护部分提交工作流。
+没有远端时，先配置 `git remote add origin <url>`，再运行 `recall sync`。可用
+`recall init --no-auto-sync` 或 `recall sync --disable` 完全关闭。
 
 ## 核心原则（10 条）
 

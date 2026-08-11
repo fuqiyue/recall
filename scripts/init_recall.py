@@ -451,7 +451,8 @@ def _run(argv):
         if confirm("\n是否创建初始提交？", True, ask):
             create_initial_commit(project_root)
 
-    # 8. 配置完成后立即同步已提交历史；脏工作区不会被隐式提交。
+    # 8. 配置完成后立即同步；自动保存默认开启（recall.autoCommit），
+    #    脏工作区会作为一次自动保存提交进入同步。
     if not args.no_auto_sync:
         try:
             sync_status = git_sync.sync_repository(project_root)

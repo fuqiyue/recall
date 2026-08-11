@@ -5,9 +5,12 @@
 The sync policy is intentionally small and explicit:
 
 * ``recall init`` enables it by default and installs a managed post-commit hook.
-* The hook only synchronizes commits that already exist; it never stages files.
-* ``recall sync --commit-message ...`` is the explicit way to include a dirty
-  worktree in a synchronization.
+* ``recall sync`` defaults to auto-save: a dirty worktree is committed with a
+  generated message before pulling and pushing (``recall.autoCommit``, default
+  on; switch off with ``recall sync --manual``).
+* The hook never stages files: it only backfills ``after_commit`` placeholders
+  referenced by the fresh commit, then synchronizes existing commits. This
+  keeps partial-commit workflows safe.
 * Network failures are reported but do not make a completed local commit fail.
 
 All Git commands are passed as argv lists so commit messages and remote URLs are
@@ -31,6 +34,14 @@ HOOK_BEGIN = f"{HOOK_MARKER}: begin"
 HOOK_END = f"{HOOK_MARKER}: end"
 DEFAULT_REMOTE = "origin"
 DEFAULT_COMMIT_MESSAGE = "chore: synchronize Recall changes"
+AUTOCOMMIT_MESSAGE = "chore(recall): 自动保存本地修改"
+BACKFILL_MESSAGE = "chore(recall): 回填决策记录 after_commit"
+AFTER_COMMIT_PLACEHOLDER = "- after_commit: _待填写_"
+# commit message 里的 `Ref: logic_version/records/<file>.md` 行
+REF_LINE_RE = re.compile(r"Ref:\s*(logic_version/records/\S+?\.md)", re.IGNORECASE)
+# 内部提交（自动保存/回填）触发的嵌套 post-commit hook 必须直接退出，
+# 否则 hook -> 内部 commit -> hook 会无限递归
+INTERNAL_COMMIT_ENV = "RECALL_INTERNAL_COMMIT"
 
 
 def _force_utf8_when_redirected() -> None:
@@ -199,6 +210,7 @@ def configure_git_sync(project_root: Path, enabled: bool = True, remote: str = D
     _force_utf8_when_redirected()
     values = (
         ("recall.autoSync", "true" if enabled else "false"),
+        ("recall.autoCommit", "true" if enabled else "false"),
         ("recall.syncRemote", remote),
         ("pull.rebase", "true"),
         ("fetch.prune", "true"),
@@ -228,13 +240,31 @@ def configure_git_sync(project_root: Path, enabled: bool = True, remote: str = D
     return True
 
 
+def _autocommit_enabled(project_root: Path) -> bool:
+    """自动保存开关 ``recall.autoCommit``；未设置时默认开启（RULE-011）。"""
+    ok, value, _ = run_git(["config", "--bool", "recall.autoCommit"], cwd=project_root)
+    if not ok or not value:
+        return True
+    return value == "true"
+
+
+def _run_git_internal_commit(args: Iterable[str], project_root: Path) -> Tuple[bool, str, str]:
+    """Run a commit created by Recall itself, guarded against hook recursion."""
+    os.environ[INTERNAL_COMMIT_ENV] = "1"
+    try:
+        return run_git(args, cwd=project_root)
+    finally:
+        os.environ.pop(INTERNAL_COMMIT_ENV, None)
+
+
 def _commit_dirty_worktree(
     project_root: Path, message: str, quiet: bool = False
 ) -> Tuple[bool, bool]:
-    """Commit all dirty files when explicitly requested.
+    """Commit all dirty files for an explicit or auto-save synchronization.
 
-    Returns ``(ok, committed)``. No files are staged unless this function is
-    called with an explicit commit message by the user.
+    Returns ``(ok, committed)``. Callers decide whether staging is allowed:
+    an explicit ``--commit-message`` or the auto-save mode of ``recall sync``.
+    The post-commit hook never reaches this function.
     """
     if not _is_dirty(project_root):
         return True, False
@@ -242,7 +272,7 @@ def _commit_dirty_worktree(
     if not ok:
         print(f"❌ 添加待同步文件失败: {stderr}")
         return False, False
-    ok, stdout, stderr = run_git(["commit", "-m", message], cwd=project_root)
+    ok, stdout, stderr = _run_git_internal_commit(["commit", "-m", message], project_root)
     if ok:
         if not quiet:
             print(f"✅ 已创建同步提交: {message.splitlines()[0]}")
@@ -254,6 +284,65 @@ def _commit_dirty_worktree(
     return False, False
 
 
+def backfill_after_commit(project_root: Path, quiet: bool = False) -> bool:
+    """把 HEAD 提交引用的决策记录里的 after_commit 占位符回填为提交哈希。
+
+    只处理 commit message 中 ``Ref: logic_version/records/*.md`` 指向、且
+    仍含占位符的记录；回填后以内部提交落盘（只 add 被回填的文件，绝不
+    ``add -A``，避免把无关脏文件卷进来）。失败只告警，不阻断同步。
+    """
+    ok, output, _ = run_git(["log", "-1", "--format=%h%n%B"], cwd=project_root)
+    if not ok or not output:
+        return True
+    short_hash, _, body = output.partition("\n")
+    refs = REF_LINE_RE.findall(body)
+    if not refs:
+        return True
+
+    filled = []
+    for ref in refs:
+        record_path = (project_root / Path(ref)).resolve()
+        try:
+            record_path.relative_to(project_root)
+        except ValueError:
+            continue  # Ref 指向项目外，不碰
+        if not record_path.is_file():
+            continue
+        try:
+            text = record_path.read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        if AFTER_COMMIT_PLACEHOLDER not in text:
+            continue
+        text = text.replace(
+            AFTER_COMMIT_PLACEHOLDER, f"- after_commit: {short_hash}", 1
+        )
+        try:
+            record_path.write_text(text, encoding="utf-8")
+        except OSError as exc:
+            if not quiet:
+                print(f"⚠️  回填 after_commit 失败（跳过）: {ref}: {exc}")
+            continue
+        filled.append(ref)
+
+    if not filled:
+        return True
+    ok, _, stderr = run_git(["add", "--", *filled], cwd=project_root)
+    if not ok:
+        if not quiet:
+            print(f"⚠️  暂存回填文件失败: {stderr}")
+        return True
+    ok, _, stderr = _run_git_internal_commit(
+        ["commit", "-m", f"{BACKFILL_MESSAGE} -> {short_hash}", "--", *filled],
+        project_root,
+    )
+    if ok and not quiet:
+        print(f"✅ 已回填 after_commit: {short_hash} ({', '.join(filled)})")
+    elif not ok and not quiet:
+        print(f"⚠️  回填提交失败（记录已修改，未提交）: {stderr}")
+    return True
+
+
 def sync_repository(
     project_root: Path,
     remote: Optional[str] = None,
@@ -261,8 +350,13 @@ def sync_repository(
     pull: bool = True,
     push: bool = True,
     quiet: bool = False,
+    autocommit: bool = True,
 ) -> int:
-    """Synchronize committed changes with a configured remote.
+    """Synchronize changes with a configured remote.
+
+    ``autocommit=True``（手动运行 recall sync）且 ``recall.autoCommit`` 开启时，
+    脏工作区先以自动保存消息提交再同步；``autocommit=False``（post-commit hook）
+    绝不提交别的脏文件，只回填 after_commit 并同步已提交历史。
 
     Pull uses rebase and autostash when the remote branch already exists. Push
     sets the upstream on first use. A non-zero result means synchronization did
@@ -285,11 +379,21 @@ def sync_repository(
         if not ok:
             return 1
     elif _is_dirty(project_root):
-        # 只同步已提交历史（RULE-011）：脏文件绝不被自动提交，但也
-        # 不阻断已提交 commit 的推送——部分提交是 post-commit hook 的
-        # 常见场景。pull 侧由 --autostash 保护未提交变更。
-        if not quiet:
-            print("ℹ️  工作区有未提交变更；仅同步已提交历史（提交当前文件请用 --commit-message）")
+        if autocommit and _autocommit_enabled(project_root):
+            # 自动保存（RULE-011）：默认把工作区变更提交后同步，避免
+            # 未提交窗口期的工作丢失；recall sync --manual 可切换回手动。
+            ok, _ = _commit_dirty_worktree(project_root, AUTOCOMMIT_MESSAGE, quiet=quiet)
+            if not ok:
+                return 1
+        else:
+            # 手动模式 / hook 场景：脏文件绝不被自动提交，但也不阻断
+            # 已提交 commit 的推送——部分提交是 post-commit hook 的
+            # 常见场景。pull 侧由 --autostash 保护未提交变更。
+            if not quiet:
+                print("ℹ️  工作区有未提交变更；仅同步已提交历史（提交当前文件请用 --commit-message）")
+
+    # 提交完成后回填决策记录的 after_commit（RULE-013）；失败只告警
+    backfill_after_commit(project_root, quiet=quiet)
 
     branch = _current_branch(project_root)
     if not branch:
@@ -335,9 +439,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--remote", default=None, help="远端名称，默认使用 recall.syncRemote 或 origin")
-    parser.add_argument("--commit-message", help="明确提交当前工作区后再同步；不提供时脏工作区不会被自动提交")
+    parser.add_argument("--commit-message", help="用指定消息提交当前工作区后再同步（替代自动保存消息）")
     parser.add_argument("--no-pull", action="store_true", help="只推送，不先拉取远端")
     parser.add_argument("--no-push", action="store_true", help="只拉取并变基，不推送")
+    parser.add_argument("--auto", action="store_true", help="启用自动保存：sync 时脏工作区自动提交（默认）")
+    parser.add_argument("--manual", action="store_true", help="切换为手动模式：脏工作区仅在提供 --commit-message 时提交")
     parser.add_argument("--disable", action="store_true", help="关闭自动同步并移除受管理的 hook")
     # hook 内部标记：软性跳过（无远端/无分支）不算失败，避免每次提交都以
     # 非零退出码结束；真正的拉取/推送失败仍返回 1 并打印警告
@@ -348,17 +454,36 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: Optional[Iterable[str]] = None) -> int:
     _force_utf8_when_redirected()
     args = build_parser().parse_args(list(argv) if argv is not None else None)
+    # 自动保存/回填产生的内部提交会再次触发 post-commit hook；
+    # 这里直接退出，外层调用继续完成拉取与推送
+    if args.post_commit and os.environ.get(INTERNAL_COMMIT_ENV):
+        return 0
     root = find_project_root(args.root)
     if args.disable:
-        ok, _, stderr = run_git(["config", "--local", "recall.autoSync", "false"], cwd=root)
-        if not ok:
-            print(f"❌ 关闭自动同步失败: {stderr}")
-            return 1
+        for key in ("recall.autoSync", "recall.autoCommit"):
+            ok, _, stderr = run_git(["config", "--local", key, "false"], cwd=root)
+            if not ok:
+                print(f"❌ 关闭自动同步失败: {stderr}")
+                return 1
         ok, detail = remove_post_commit_hook(root)
         if not ok:
             print(f"❌ 自动同步 hook 移除失败: {detail}")
             return 1
         print("✅ Git 自动同步已关闭")
+        return 0
+    if args.manual or args.auto:
+        if args.manual and args.auto:
+            print("❌ --auto 与 --manual 不能同时使用")
+            return 1
+        value = "true" if args.auto else "false"
+        ok, _, stderr = run_git(["config", "--local", "recall.autoCommit", value], cwd=root)
+        if not ok:
+            print(f"❌ 写入 recall.autoCommit 失败: {stderr}")
+            return 1
+        if args.auto:
+            print("✅ 已启用自动保存：recall sync 会自动提交工作区变更后同步")
+        else:
+            print("✅ 已切换为手动模式：仅在提供 --commit-message 时提交工作区")
         return 0
     code = sync_repository(
         root,
@@ -366,6 +491,8 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         commit_message=args.commit_message,
         pull=not args.no_pull,
         push=not args.no_push,
+        # hook 场景绝不自动提交其他脏文件，保护部分提交工作流
+        autocommit=not args.post_commit,
     )
     if args.post_commit and code == 2:
         return 0
