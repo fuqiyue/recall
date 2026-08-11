@@ -42,7 +42,7 @@
 - semantic_review_ref: tests:test_git_sync.py（12 tests）；runtime:提交本记录时 hook 实测回填
 - semantic_reviewed_at: 2026-08-11
 - before_commit: 5afe9bb
-- after_commit: _待填写_
+- after_commit: 9d3f6dd
 - supersedes: none
 - corrects: none
 
