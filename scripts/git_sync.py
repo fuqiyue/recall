@@ -335,6 +335,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-pull", action="store_true", help="只推送，不先拉取远端")
     parser.add_argument("--no-push", action="store_true", help="只拉取并变基，不推送")
     parser.add_argument("--disable", action="store_true", help="关闭自动同步并移除受管理的 hook")
+    parser.add_argument("--post-commit", action="store_true", help=argparse.SUPPRESS)
     return parser
 
 
