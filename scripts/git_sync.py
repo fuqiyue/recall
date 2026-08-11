@@ -178,6 +178,8 @@ def remove_post_commit_hook(project_root: Path) -> Tuple[bool, str]:
             rf"\n?{re.escape(HOOK_BEGIN)}.*?{re.escape(HOOK_END)}\n?",
             re.DOTALL,
         )
+        if not pattern.search(existing):
+            return True, str(hook_path)
         content = pattern.sub("\n", existing).strip("\r\n")
         if not content or content == "#!/bin/sh":
             hook_path.unlink()
