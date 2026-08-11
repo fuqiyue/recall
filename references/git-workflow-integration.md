@@ -437,6 +437,28 @@ git pull --rebase
 git push
 ```
 
+### 6. Recall 自动同步
+
+`recall init` 默认会配置仓库级同步策略并安装受管理的 `post-commit` hook。每次
+本地提交完成后，hook 会先拉取远端并变基，再推送当前分支：
+
+```bash
+recall sync
+```
+
+自动同步不替用户提交未审阅的工作区文件。需要显式包含当前变更时：
+
+```bash
+recall sync --commit-message "docs: 更新决策记录"
+```
+
+没有 `origin` 远端时，初始化只配置策略并给出提示，不会失败。远端认证、网络错误
+或变基冲突会保留本地提交并返回警告；解决问题后重新运行 `recall sync`。关闭方式：
+
+```bash
+recall sync --disable
+```
+
 ## 故障排查
 
 ### 问题：找不到相关决策记录

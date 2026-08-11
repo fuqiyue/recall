@@ -23,7 +23,7 @@
 - last_verified: 2026-08-08
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -58,6 +58,8 @@
 | RULE-007 | key | 嵌套项目根不计入本项目审计 | 自带 `scope: .` 的子目录属于另一个项目，按模块审计会用其 module_id 顶掉真实根文档 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | audit_logic_map.py 静态门 | valid | 2026-08-08 | self |
 | RULE-008 | ordinary | CLI 必须可非交互运行，且重定向下不崩 | CI、容器和 AI 代理环境没有 tty；Windows 重定向后 stdout 走 ANSI 代码页 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | 空 stdin 与重定向实测 | valid | 2026-08-08 | self |
 | RULE-009 | ordinary | 校验脚本的字段名以 references/ 模板为准 | schema 漂移会让检查静默失效或报假错误 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | validate.py 记录发现测试 | valid | 2026-08-08 | self |
+| RULE-010 | key | `recall init` 默认启用仓库级 Git 自动同步并安装受管理的 post-commit hook | 让已提交的 Recall 逻辑和代码及时进入配置的远端，减少本地历史与远端漂移 | [VER-20260811-001](logic_version/records/logic_version-20260811-001-git-auto-sync.md) | 用户要求 | git_sync.py + hook 集成测试 | valid | 2026-08-11 | self |
+| RULE-011 | key | 自动同步只处理已提交历史，脏工作区必须显式提供 `--commit-message` 才能提交 | 避免代理或 hook 静默提交未审阅文件，同时保留明确的一键同步入口 | [VER-20260811-001](logic_version/records/logic_version-20260811-001-git-auto-sync.md) | 用户要求/安全取舍 | git_sync.py 单元测试 | valid | 2026-08-11 | self |
 
 ## 代码地图
 
@@ -76,9 +78,11 @@
 | scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
 | scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态 | 项目根路径 | 验证报告 | 脚本文件 | yes | none |
 | scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交 | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
+| scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
 | scripts/create_ver.py | source/runtime-code | 按模板创建 VER-* 决策记录 | 描述与 scope | 记录文件 | 脚本文件 | yes | none |
 | scripts/link_ver_git.py | source/runtime-code | 关联查询：文件/提交 ↔ 决策记录 | 文件路径或 commit | 关联报告 | 脚本文件 | yes | none |
 | tests/test_audit_logic_map.py | test/test-fixture | 审计脚本测试套件 | unittest | 测试结果 | 测试文件 | yes | python tests/test_audit_logic_map.py |
+| tests/test_git_sync.py | test/test-fixture | Git 自动同步行为测试 | unittest/mock | 同步断言 | 测试文件 | yes | python -m unittest tests.test_git_sync |
 | references/examples/audit-repro-legacy/ | test/test-fixture | 审计复现夹具；自带 `scope: .`，按嵌套项目根排除 | 审计脚本读取 | 复现场景 | 夹具文件 | yes | none |
 
 - coverage_policy: governed-boundaries
@@ -194,6 +198,7 @@ AI 更新 logic_readme.md（如规则变化）
 - 性能/并发：单用户读写，无并发问题
 - 部署/配置：无需部署，直接使用
 - 日志/监控/告警：通过 Git 历史追踪
+- 自动同步：仓库级 `recall.autoSync=true` 控制受管理的 `post-commit` hook；远端缺失、网络失败或变基冲突只告警，不丢弃本地提交
 
 ## 测试与验证
 
@@ -208,6 +213,8 @@ AI 更新 logic_readme.md（如规则变化）
 | runtime | RULE-008 非交互可用（三种无输入形式） | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive` | 三者均退出 0 | 终端输出 |
 | runtime | RULE-008 重定向不崩 | `recall help > out.txt`；`recall status > out.txt` | 退出码 0，无 UnicodeEncodeError | 输出文件 |
 | unit | RULE-009 决策记录字段名与模板一致 | `python tests/test_audit_logic_map.py` | 记录 schema 检查通过 | unittest 输出 |
+| unit | RULE-010/RULE-011 自动同步策略与脏工作区保护 | `python -m unittest tests.test_git_sync` | 5 tests OK；配置、hook、pull/push 与显式提交路径通过 | unittest 输出 |
+| runtime | RULE-010 自动同步 CLI 可发现 | `python scripts/recall.py help`; `python scripts/git_sync.py --help` | 帮助包含 `sync`、`--no-auto-sync` 和 `--disable` | 终端输出 |
 
 INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能人工审查，列在“不可破坏约束”里。此表只登记可执行的验证命令。
 
@@ -217,6 +224,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 |---|---|---|---|
 | VER-20260808-001 | Recall 系统结构重组：账本完整性、平行真源、反膨胀强制点、状态机补全 | RULE-001..004 | [记录](logic_version/records/logic_version-20260808-001-recall-restructure.md) |
 | VER-20260808-002 | 工具链与自审一致性加固：跨平台入口、schema 对齐、嵌套项目根排除 | RULE-005..009 | [记录](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) |
+| VER-20260811-001 | Git 自动同步：初始化默认配置、提交后 hook、显式脏工作区提交与手动 sync | RULE-010..011 | [记录](logic_version/records/logic_version-20260811-001-git-auto-sync.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 

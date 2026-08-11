@@ -9,6 +9,18 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 
 **核心理念**：保存设计逻辑（为什么、取舍、影响），而非代码快照。代码版本由 Git 负责，Recall 负责"当初为什么这么设计"。详见 [逻辑回档 vs 代码回档](references/logic-vs-code-recall.md)。
 
+## Git 自动同步
+
+首次运行 `recall init` 时默认启用 Git 自动同步：脚本会写入仓库级 Git 同步策略，
+安装受管理的 `post-commit` hook，并在配置完成后尝试同步当前分支。hook 先执行
+`git pull --rebase --autostash`，再执行 `git push`；远端不可用或发生冲突时只发出
+警告，不阻断已经完成的本地提交。
+
+自动同步只处理已经提交的历史，不会自动把脏工作区加入提交。需要把当前文件作为
+一次明确的同步提交时运行 `recall sync --commit-message "<message>"`。没有远端时，
+先配置 `git remote add origin <url>`，再运行 `recall sync`。可用
+`recall init --no-auto-sync` 或 `recall sync --disable` 关闭。
+
 ## 核心原则（10 条）
 
 1. 遵守用户的当前授权。未经授权不修改代码、制度或议案

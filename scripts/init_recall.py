@@ -7,6 +7,8 @@ Recall 初始化脚本
 
 支持非交互运行（CI、代理环境、stdin 不可用时）：
     python scripts/init_recall.py --non-interactive --name "张三" --email "z@example.com"
+
+首次初始化默认启用 Git 自动同步；使用 --no-auto-sync 可关闭。
 """
 
 import argparse
@@ -342,6 +344,16 @@ def build_parser():
         action="store_true",
         help="即使是新仓库也不创建初始提交",
     )
+    parser.add_argument(
+        "--remote",
+        default="origin",
+        help="自动同步使用的 Git 远端名称，默认 origin",
+    )
+    parser.add_argument(
+        "--no-auto-sync",
+        action="store_true",
+        help="不启用 Git 自动同步（默认启用）",
+    )
     return parser
 
 
@@ -419,15 +431,36 @@ def _run(argv):
     print("\n🔍 检查 .gitignore...")
     create_gitignore(project_root)
 
-    # 5. 状态
+    # 5. Git 自动同步配置
+    print("\n🔍 配置 Git 自动同步...")
+    try:
+        import git_sync
+
+        auto_sync = not args.no_auto_sync
+        if not git_sync.configure_git_sync(project_root, enabled=auto_sync, remote=args.remote):
+            return 1
+    except ImportError:
+        print("❌ 错误: 找不到 git_sync.py")
+        return 1
+
+    # 6. 状态
     show_git_status(project_root)
 
-    # 6. 初始提交（仅新建仓库时）
+    # 7. 初始提交（仅新建仓库时）
     if created_repo and not args.no_commit:
         if confirm("\n是否创建初始提交？", True, ask):
             create_initial_commit(project_root)
 
-    # 7. 完成
+    # 8. 配置完成后立即同步已提交历史；脏工作区不会被隐式提交。
+    if not args.no_auto_sync:
+        try:
+            sync_status = git_sync.sync_repository(project_root)
+            if sync_status == 2:
+                print("ℹ️  初始同步暂未完成；可配置远端后运行 recall sync")
+        except Exception as e:
+            print(f"⚠️  初始同步失败（本地配置不受影响）: {e}")
+
+    # 9. 完成
     show_completion_message()
 
     print("\n💡 快速开始:")
@@ -435,6 +468,7 @@ def _run(argv):
     print("   - 查看当前规则: logic_readme.md")
     print("   - 记录修改预案: 编辑 logic_change.md")
     print("   - 查看 Git 历史: git log --oneline")
+    print("   - 手动同步远端: recall sync")
     print()
     return 0
 

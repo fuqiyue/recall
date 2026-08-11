@@ -16,8 +16,14 @@ python scripts/init_recall.py
 1. ✅ 检查 Git 是否已安装
 2. ✅ 初始化 Git 仓库（如未初始化）
 3. ✅ 配置 Git 用户信息（姓名和邮箱）
-4. ✅ 创建 .gitignore 文件
-5. ✅ 创建初始提交
+4. ✅ 配置 `pull.rebase`、`fetch.prune` 和 `push.autoSetupRemote`
+5. ✅ 默认启用 Git 自动同步并安装受管理的 `post-commit` hook
+6. ✅ 创建 .gitignore 文件
+7. ✅ 创建初始提交
+
+自动同步只处理已经提交的变更。脏工作区不会被静默提交；需要提交当前文件时，
+显式运行 `recall sync --commit-message "<message>"`。没有远端时初始化不会失败，
+添加 `origin` 后运行 `recall sync` 即可。使用 `recall sync --disable` 可关闭自动同步。
 
 **为什么需要 Git？**
 - Recall 使用 Git 管理代码变化（what changed）
@@ -89,7 +95,8 @@ Ref: logic_version/records/<filename>.md
 recall status                    # 查看系统状态
 recall validate                  # 验证一致性
 recall query file <path>         # 查询文件历史
-recall query commit <hash>       # 查询提交详情
+  recall query commit <hash>       # 查询提交详情
+  recall sync                      # 拉取变基并推送已提交变更
 
 # Git 原生命令（直接查看）
 git log --oneline | head -5      # 最近提交

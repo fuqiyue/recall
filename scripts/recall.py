@@ -42,8 +42,14 @@ def print_help():
 🔧 可用命令:
 
   init
-    初始化 Recall 项目（配置 Git、创建目录结构）
+    初始化 Recall 项目（配置 Git、启用自动同步）
     示例: recall init
+
+  sync [选项]
+    拉取远端变基并推送已提交的变更
+    示例: recall sync
+    示例: recall sync --commit-message "docs: 更新 Recall 规则"
+    示例: recall sync --disable
 
   new <描述> <短标签>
     创建新的决策记录
@@ -99,6 +105,18 @@ def cmd_init(args):
         return init_recall.main(args)
     except ImportError:
         print("❌ 错误: 找不到 init_recall.py")
+        return 1
+
+def cmd_sync(args):
+    """同步 Git 远端。"""
+    try:
+        import git_sync
+        return git_sync.main(args)
+    except ImportError:
+        print("❌ 错误: 找不到 git_sync.py")
+        return 1
+    except Exception as e:
+        print(f"❌ 同步失败: {e}")
         return 1
 
 def cmd_new(args):
@@ -335,6 +353,7 @@ def main():
 
     commands = {
         'init': lambda: cmd_init(args),
+        'sync': lambda: cmd_sync(args),
         'new': lambda: cmd_new(args),
         'query': lambda: cmd_query(args),
         'list': lambda: cmd_list(args),

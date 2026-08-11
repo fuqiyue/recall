@@ -39,13 +39,25 @@ python scripts/init_recall.py
 这会：
 - ✅ 检查/初始化 Git 仓库
 - ✅ 配置 Git 用户信息
+- ✅ 默认启用 Git 自动同步（pull --rebase + push）并安装受管理的 post-commit hook
 - ✅ 创建必要的文档结构
 - ✅ 完成初始提交
+
+自动同步只同步已经提交的变更；工作区有未提交文件时不会静默提交。可以用
+`recall sync --commit-message "..."` 明确创建同步提交，或用
+`recall sync --disable` 关闭自动同步。没有 `origin` 远端时，初始化仍会完成，
+添加远端后即可运行 `recall sync`。
 
 **非交互模式**（CI/容器环境）：
 
 ```bash
 recall init --non-interactive --name "张三" --email "zhangsan@example.com"
+```
+
+不需要自动同步时显式关闭：
+
+```bash
+recall init --no-auto-sync
 ```
 
 ### 2. 日常使用
@@ -66,6 +78,7 @@ recall query file <path>
 # 4. 修改代码并记录决策
 recall new "描述" tag      # 创建决策记录
 git commit -m "..."        # 提交代码变化
+recall sync                 # 手动拉取变基并推送（post-commit 也会自动执行）
 ```
 
 ### 3. 完整工作流
@@ -154,6 +167,7 @@ recall new "描述" tag  # 创建决策记录
 recall list            # 列出最近记录
 recall query file <路径>    # 查询文件历史
 recall query commit <hash>  # 查询提交详情
+recall sync                 # 同步已提交变更
 recall help            # 查看完整帮助
 ```
 
