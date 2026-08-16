@@ -23,7 +23,7 @@
 - last_verified: 2026-08-08
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -62,6 +62,7 @@
 | RULE-011 | key | `recall sync` 默认自动保存：脏工作区自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；post-commit hook 场景绝不自动提交其他脏文件 | 用户要求默认自动保存上传，消除未提交窗口期的丢失风险；hook 侧不提交以保护部分提交工作流 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | git_sync.py 单元测试 | valid | 2026-08-11 | self |
 | RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
 | RULE-013 | ordinary | 提交后同步流程自动回填决策记录的 after_commit：解析 commit message 的 Ref 行，把占位符替换为提交哈希并以内部提交落盘；内部提交通过环境变量防止 hook 递归 | 手工回填常被遗忘，记录到提交方向的追溯链会静默断裂 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | tests/test_git_sync.py | valid | 2026-08-11 | self |
+| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis）；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图，融洽性分析不可复用 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) | 用户确认 | 本文件"功能意图与用户流程"节 + references/ 模板 | valid | 2026-08-16 | self |
 
 ## 代码地图
 
@@ -118,6 +119,37 @@
 - scope_path: logic_version/
 - 适用规则与不变量：RULE-001, RULE-003, INV-003, INV-004
 - 代码地图入口：logic_version/records/、logic_version/index.md
+
+## 功能意图与用户流程
+
+用户视角层，与代码地图（系统视角）互补；新增或调整用户可见功能前先对照本节做融入分析（RULE-014）。
+
+### 功能意图登记
+
+| intent_id | 功能入口 | intent（服务的用户目标） | 流程位置 | 关联规则/锚点 | last_verified |
+|---|---|---|---|---|---|
+| INT-001 | recall init | 一条命令完成 Git + Recall 接入，无需手动配置 | FLOW-001#1 | RULE-010 | 2026-08-16 |
+| INT-002 | 文档三件套阅读（SKILL/logic_readme/logic_change） | AI 在修改前恢复设计上下文，不从代码反推意图 | FLOW-002#1 | RULE-001..004 | 2026-08-16 |
+| INT-003 | recall new | 修改前留下"为什么改"的决策记录骨架 | FLOW-002#3 | RULE-003, RULE-012 | 2026-08-16 |
+| INT-004 | recall sync | 一条命令保存并同步全部进度，无需手写 Git 序列 | FLOW-001#3, FLOW-002#5 | RULE-011, RULE-013 | 2026-08-16 |
+| INT-005 | recall status / recall list | 快速了解系统当前状态与最近决策 | FLOW-003#1 | RULE-012 | 2026-08-16 |
+| INT-006 | recall query file/commit | 从代码定位"当初为什么这么改" | FLOW-003#2 | RULE-013 | 2026-08-16 |
+| INT-007 | recall validate | 确认文档、记录与 Git 状态一致 | FLOW-003#3 | RULE-009 | 2026-08-16 |
+| INT-008 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | none | 2026-08-16 |
+
+### 用户流程
+
+- FLOW-001 首次接入：1. recall init → INT-001；2. 配置远端（可选）；3. recall sync → INT-004
+- FLOW-002 日常修改：1. 读文档 → INT-002；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-003；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-004
+- FLOW-003 追溯审查：1. recall status/list → INT-005；2. recall query → INT-006；3. recall validate → INT-007
+- FLOW-004 冲突澄清：1. recall conflicts → INT-008；2. 在 logic_change.md 标注；3. 用户裁决后按通道实施
+
+### 操作直觉约束
+
+- UXI-001: 用户不手写 commit message，sync 自动保存；来源：VER-20260811-003；影响：INT-004
+- UXI-002: 一条命令完成一个用户目标，不要求用户记忆多步 Git 序列；来源：用户确认 2026-08-07；影响：INT-001, INT-004
+- UXI-003: hook 与自动化绝不提交用户未提交的其他文件；来源：VER-20260811-003；影响：INT-004
+- UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：INT-001..008
 
 ## 责任记录约定
 
@@ -232,6 +264,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260811-001 | Git 自动同步：初始化默认配置、提交后 hook、显式脏工作区提交与手动 sync | RULE-010..011 | [记录](logic_version/records/logic_version-20260811-001-git-auto-sync.md) |
 | VER-20260811-002 | CLI 胶水层接口修复：recall new 断裂、记录命名统一、冲突检测失灵、脏工作区不阻断同步 | RULE-011..012 | [记录](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) |
 | VER-20260811-003 | 默认自动保存上传（--manual 可切手动）与 after_commit 自动回填 | RULE-011, RULE-013 | [记录](logic_version/records/logic_version-20260811-003-auto-save-sync.md) |
+| VER-20260816-001 | 功能级"功能意图与用户流程"层（INT/FLOW/UXI）、CHG 需求拆解字段与 plan 模式落盘约定 | RULE-014 | [记录](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 

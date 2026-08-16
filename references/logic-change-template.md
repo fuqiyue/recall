@@ -32,6 +32,7 @@
 - `proposal_revision` 是同一 CHG 的决策版本。拟议规则、选定方案、范围、影响、兼容/迁移、回滚或退出条件发生实质变化时递增它，并将 `decision_state` 重置为 `pending`，清空旧确认字段。
 - 多个活跃 CHG 必须以 `authority_surfaces` 声明精确的规则、API、Schema、数据字段、开关或用户行为，例如 `RULE-021`、`API:/orders`、`DB:users.email`、`FLAG:checkout-v2`；目录或 `.` 只能用于 `affected_scopes`，不能代替影响面。相同影响面不表示一定冲突，但必须用双方互相引用的 `conflicts_with` 明确处理。
 - `based_on` 固定本 CHG 所依据的现行制度、代码/快照和精确影响面，例如 `policy: logic_readme.md#rule-021; code: commit:abc123; surfaces: RULE-021`。晋升前重新核对它：任何依赖 CHG、同一影响面或现行规则已变更，都要递增 `proposal_revision`，重新确认或转为 `awaiting-decision`/`blocked`，不能带着旧基线继续生效。
+- `raw_request`、`decomposition`、`fit_analysis` 构成需求拆解与融入分析：`medium`/`high` 通道在实施前填写，对照根 `logic_readme.md` 的功能意图与用户流程说明新功能复用/替代/新增哪个 `INT-*`、插入哪条 `FLOW-*` 的哪一步、是否触碰 `UXI-*`；`simple` 不要求。plan 模式产出的计划被批准后，其拆解结论在动代码前落入这三个字段，一次性 plan 本身不作为长期记录。
 - 每个 CHG 记录 `intent_source_refs` 和可审计意图提炼。来源只保存稳定引用（任务、Issue、会话、Plan、Spec、Steering、ADR 或 VER），不复制原始聊天、完整提示词、模型记忆或推理过程。提炼须区分目标、非目标、约束、验收条件和仍会改变方案的问题；`inferred` 只表示待确认推断，不能冒充用户决定。
 - 新请求与仍有效的旧需求、现行规则、活跃议案或已确认意图存在实质矛盾，或者模糊点会改变范围、语义、兼容、数据安全或方案选择时，必须在 `user_intent_gap`、`questions_for_user` 和适用的决策检查点中列明新旧来源、具体矛盾、可行选项、主要影响和建议，并向用户或授权决策方确认。确认前方案只能是 `candidate`，代理的建议不能标成 `selected`，也不得实施受影响部分。只有更高优先级当前指令或已声明的精确唯一权威已经直接裁定时才跳过询问，并记录裁定依据；可客观核实的事实问题先调查。这项咨询义务适用于所有通道，不自动要求把简单/中等事项升级为完整高风险表单。
 - 活跃依赖必须写成 `CHG-...@revision-N`，不能只写 CHG-ID。被依赖 CHG 改版、阻塞或关闭后，依赖方不得继续实施；先阻塞/重新决策，关闭后将事实改写为对应 `VER-*`/ADR/现行规则基线，不保留悬空 CHG 依赖。循环依赖不是等待条件，必须合并、拆分或重排。
@@ -63,7 +64,7 @@
 
 每一行的 `proposal_path` 都指向本文件内对应的 `#chg-id` 小写锚点，且锚点在文件内唯一。跨范围协调在同一 CHG 正文的 `affected_scopes`、`related_modules` 和影响表中说明，不另建正文或回链文件。
 
-普通追踪至少保留索引，以及正文中的 `status`、`effective`、`topic_id`、`proposal_revision`、决策门槛/状态、`owner`、`changed_by`、`scope`、`affected_scopes`、`intent_source_refs`、`intent_digest`、`intent_status`、`authority_surfaces`、`based_on`、依赖/冲突、运行暴露、历史保留级别、当前证据、拟议规则、验证/验收、回滚和开放问题。下面的完整字段与矩阵只在用户明确要求正式审查或表单合规时全部填写。
+普通追踪至少保留索引，以及正文中的 `status`、`effective`、`topic_id`、`proposal_revision`、决策门槛/状态、`owner`、`changed_by`、`scope`、`affected_scopes`、`intent_source_refs`、`intent_digest`、`intent_status`、`authority_surfaces`、`based_on`、依赖/冲突、运行暴露、历史保留级别、当前证据、拟议规则、验证/验收、回滚和开放问题；`medium`/`high` 条目另须保留 `raw_request`、`decomposition`、`fit_analysis`。下面的完整字段与矩阵只在用户明确要求正式审查或表单合规时全部填写。
 
 普通修复准备引入 adapter、全局 feature flag、dual-read/dual-write、平行真源或新抽象时，不需要补齐整份正式表单，但必须设为 `decision_gate: required`，并记录真实消费者/旧状态证据、最小修复不足的原因、唯一权威源、复杂度增量、负责人、可验证移除触发器和最晚复查日期。缺少这些信息时保持候选，不直接实现临时结构。
 
@@ -141,6 +142,12 @@
 - intent_traceability: <INT-YYYYMMDD-NNN -> RULE-... -> test:<path#anchor> -> VER-YYYYMMDD-NNN；多个链用 ; 分隔>
 
 `confirmed` 表示用户或权威决策方确认了这份提炼；`source-derived` 表示可从稳定来源逐项追溯但尚未额外确认；`inferred` 表示模型推断；`mixed` 必须在 `intent_digest` 标明哪些内容来自来源、哪些仍是推断。来源更新或提炼发生实质变化时递增 `proposal_revision`，重新核对决策门槛。
+
+### 需求拆解与融入分析（medium/high 必填；simple 不要求）
+
+- raw_request: <用户原始请求的稳定引用或一句忠实转述；不粘贴长对话>
+- decomposition: <拆解出的功能点/工作项；每项一行>
+- fit_analysis: <对照根 logic_readme.md 的功能意图与用户流程：复用/替代/新增哪个 INT-*，插入哪条 FLOW-* 的哪一步，是否触碰 UXI-*；说不清位置时列入 user_intent_gap 并按核心原则 5 澄清>
 
 ### 必要理由与来源
 

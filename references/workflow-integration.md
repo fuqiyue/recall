@@ -45,6 +45,19 @@ Recall 的根文档模型默认适合单人或低并发小团队。`logic_change
 7. `TOPIC-ID` 结束时，在最后一个相关 CHG 的 `VER-*` 保存共享背景、约束、讨论引用和最终结论，再从活跃账本移除主题。
 8. 外部来源或依赖更新属于事件复查信号；同时用 `interval`/`due` 让规则具备可计算的新鲜度。只有真实重新核验后才更新 `last_verified`，不得靠编辑动作续期。
 
+## Plan 模式对接
+
+各家代理的计划模式（Claude Code plan mode、Codex plan 等）共同特征：只读探索 → 产出计划 → 用户批准 → 执行，计划本身是一次性产物，会话结束即丢。Recall 是计划的输入源和产出归宿：
+
+| Plan 模式环节 | Recall 对应物 |
+|---|---|
+| 规划前的只读探索 | 默认上下文读取：`logic_readme.md`（含功能意图与用户流程）→ `logic_change.md` → 代码/测试 |
+| 计划中的需求拆解与影响范围 | 中等/高风险通道要求的修改计划；CHG 的 `raw_request` / `decomposition` / `fit_analysis` |
+| 用户批准计划 | 该 CHG 当前 `proposal_revision` 的决策确认（`decision_ref: plan-approved:YYYY-MM-DD`） |
+| 计划执行完成 | 更新 `logic_readme.md` 受影响章节；`compact`/`full` 固化 `VER-*` |
+
+时序约束：规划阶段只读，不写 `logic_change.md`；批准后、动代码前，按通道落盘——`simple` 直接实施不留痕，`medium`/`high` 先把计划的拆解结论写入 CHG 再实施。批准的 plan 是决策确认的载体，不是当前制度；会话结束后能追溯的只有 CHG/VER 中的提炼。
+
 ## 典型组合
 
 ```text

@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-08-11
+- last_updated: 2026-08-16
 - owner: self
 
 ## 关于逻辑回档
@@ -40,6 +40,7 @@
 | VER-20260811-001 | logic_version-20260811-001-git-auto-sync | 2026-08-11 | effective | ., scripts/, tests/, references/ | RULE-010, RULE-011 | none | Git 自动同步：初始化默认配置、提交后 hook、显式脏工作区提交与手动 sync | [logic_version-20260811-001-git-auto-sync.md](records/logic_version-20260811-001-git-auto-sync.md) |
 | VER-20260811-002 | logic_version-20260811-002-cli-interface-repair | 2026-08-11 | effective | ., scripts/, tests/, references/ | RULE-011, RULE-012 | none | CLI 胶水层接口修复：recall new 断裂、记录命名统一（RULE-012）、CHG 冲突检测失灵、脏工作区不阻断已提交历史同步 | [logic_version-20260811-002-cli-interface-repair.md](records/logic_version-20260811-002-cli-interface-repair.md) |
 | VER-20260811-003 | logic_version-20260811-003-auto-save-sync | 2026-08-11 | effective | ., scripts/, tests/ | RULE-011, RULE-013 | none | 默认自动保存上传（recall.autoCommit，--manual 切手动）与决策记录 after_commit 自动回填、hook 递归防护 | [logic_version-20260811-003-auto-save-sync.md](records/logic_version-20260811-003-auto-save-sync.md) |
+| VER-20260816-001 | logic_version-20260816-001-feature-intent-layer | 2026-08-16 | effective | ., references/ | RULE-014 | none | 功能级"功能意图与用户流程"层（INT/FLOW/UXI 模块化条目）、CHG 需求拆解与融入分析字段、plan 模式批准后按通道落盘 | [logic_version-20260816-001-feature-intent-layer.md](records/logic_version-20260816-001-feature-intent-layer.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 

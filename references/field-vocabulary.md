@@ -53,7 +53,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 `decision_gate` `decision_record` `confirmed_proposal_revision` `reserved_version_id` `version_slug` `runtime_state` `runtime_environments` `feature_flag` `history_retention` `intent_source_refs` `intent_traceability` `docs_impact` `governance_execution_ref`
 
-`intent_traceability` 维护 `INT-* -> RULE-* -> test:<path#anchor> -> VER-*` 链，连接可审计意图、现行规则、验证义务和关闭记录。只对保留历史的中等/高风险变更要求，简单修复不建链。
+`intent_traceability` 维护 `INT-* -> RULE-* -> test:<path#anchor> -> VER-*` 链，连接可审计意图、现行规则、验证义务和关闭记录。只对保留历史的中等/高风险变更要求，简单修复不建链。`INT-*` 的登记正文位于根 `logic_readme.md` 的"功能意图登记"表，两处共用同一编号空间。
 
 `effective: false` 只表示尚未成为当前制度。实际合并、部署、开关暴露用 `runtime_state`、`runtime_environments`、`feature_flag` 表达；已合并未部署、灰度部署和制度生效是三件不同的事。
 
