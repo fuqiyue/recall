@@ -70,13 +70,63 @@ class GitSyncTests(unittest.TestCase):
         return code, calls
 
     def test_autocommit_default_commits_dirty_worktree(self):
-        """自动保存默认开启：脏工作区被自动提交后同步（RULE-011）。"""
+        """自动保存默认开启：脏工作区的已跟踪变更被自动提交后同步（RULE-011）。"""
         code, calls = self._sync_calls(dirty=True, autocommit_config=None)
         self.assertEqual(code, 0)
-        self.assertIn(["add", "-A"], calls)
+        self.assertIn(["add", "-u"], calls)
+        self.assertNotIn(["add", "-A"], calls)
         self.assertIn(["commit", "-m", git_sync.AUTOCOMMIT_MESSAGE], calls)
         self.assertIn(["pull", "--rebase", "--autostash", "origin", "main"], calls)
         self.assertIn(["push", "--set-upstream", "origin", "main"], calls)
+
+    def _sync_with_status(self, status_output, include_new=False, quiet=True):
+        """跑一次 sync（status --porcelain 返回给定输出），返回 (code, calls, stdout)。"""
+        root = Path("D:/recall-test")
+        calls = []
+
+        def fake_run_git(args, cwd=None, timeout=60):
+            calls.append(list(args))
+            if args[0] == "status":
+                return True, status_output, ""
+            if args[0] == "ls-remote":
+                return True, "abc\trefs/heads/main", ""
+            if args[:2] == ["config", "--bool"]:
+                return False, "", ""
+            return True, "", ""
+
+        buffer = io.StringIO()
+        with patch.object(git_sync, "_git_root", return_value=root), patch.object(
+            git_sync, "_remote_config", return_value="origin"
+        ), patch.object(
+            git_sync, "_remote_url", return_value="https://example.invalid/recall.git"
+        ), patch.object(git_sync, "_current_branch", return_value="main"), patch.object(
+            git_sync, "run_git", side_effect=fake_run_git
+        ):
+            with contextlib.redirect_stdout(buffer):
+                code = git_sync.sync_repository(
+                    root, quiet=quiet, include_new=include_new
+                )
+        return code, calls, buffer.getvalue()
+
+    def test_autosave_excludes_untracked_files_by_default(self):
+        """自动保存默认排除未跟踪新文件（RULE-011）：自动化不上传用户未明确要求的文件。"""
+        code, calls, output = self._sync_with_status(
+            " M tracked.md\n?? private.txt", quiet=False
+        )
+        self.assertEqual(code, 0)
+        self.assertIn(["add", "-u"], calls)
+        self.assertNotIn(["add", "-A"], calls)
+        self.assertIn("private.txt", output)
+        self.assertIn("--include-new", output)
+
+    def test_include_new_opts_untracked_files_in(self):
+        """--include-new 是用户的明确要求：未跟踪新文件纳入本次提交。"""
+        code, calls, _ = self._sync_with_status(
+            " M tracked.md\n?? wanted.txt", include_new=True
+        )
+        self.assertEqual(code, 0)
+        self.assertIn(["add", "-A"], calls)
+        self.assertIn(["commit", "-m", git_sync.AUTOCOMMIT_MESSAGE], calls)
 
     def test_manual_mode_dirty_worktree_not_committed_but_still_syncs(self):
         """手动模式（recall.autoCommit=false）：不自动提交，但不阻断已提交历史。"""
@@ -283,7 +333,7 @@ class GitSyncTests(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            template = ROOT / "references" / "logic-version-git-template.md"
+            template = ROOT / "references" / "logic-version-template.md"
             records_dir = root / "logic_version" / "records"
 
             buffer = io.StringIO()
@@ -406,7 +456,7 @@ class GitSyncTests(unittest.TestCase):
                 0,
             )
 
-        self.assertIn(["add", "-A"], calls)
+        self.assertIn(["add", "-u"], calls)
         self.assertIn(["commit", "-m", 'docs: "sync"'], calls)
         self.assertIn(["push", "--set-upstream", "origin", "main"], calls)
 

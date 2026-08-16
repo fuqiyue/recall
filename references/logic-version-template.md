@@ -1,8 +1,151 @@
-# logic_version 不可变决策记录模板
+# logic_version 不可变决策记录模板（唯一模板）
 
-每个已结束且需要保留设计原因的变更生成一份不可变文件，集中放在项目根 `logic_version/records/`。机器 ID 固定为 `VER-YYYYMMDD-NNN`；文件 slug 固定为 `logic_version-YYYYMMDD-NNN-<scope>`。完成后不可静默改写。`immutable: true` 表示追加式规则；实际防改写由 Git/受保护发布或外部存档提供，并通过治理引用和结果提交留痕。
+每个已结束且需要保留设计原因的变更生成一份不可变文件，集中放在项目根
+`logic_version/records/`。机器 ID 固定为 `VER-YYYYMMDD-NNN`；文件 slug 固定为
+`logic_version-YYYYMMDD-NNN-<scope>`。完成后语义内容不可静默改写（INV-003：
+唯一合法变更是受管理 hook 对 `after_commit` 占位符的一次性回填，RULE-013）。
 
-对使用过 `decision_gate: required` 或 `history_retention: full` 的 CHG，本文必须保留关闭前的完整决策逻辑，而不是只保留一句摘要：请求来源引用、可审计意图提炼、最终议案快照、确认的是哪一版、方案取舍、影响、兼容/迁移、验证、代码语义审查和回滚都应可在单个记录中恢复。对 `history_retention: compact` 的中等变更，保留同一结构但可把不适用的决策字段标为 `not-required`；仍必须用简短内容说明来源、意图、影响面、基线、前后行为、验证和回滚，使关闭后的 CHG 不会失去 Recall 来源。
+本文件是决策记录字段名的**唯一权威来源**（RULE-009）：`scripts/create_ver.py`
+从下方"快速模板"生成记录，`scripts/validate.py` 按同一字段名校验。曾存在的
+`logic-version-git-template.md` 已并入本文件（2026-08-16，见 VER-20260816-005）。
+
+**核心原则**：
+- **代码变化交给 Git** - 不在此记录代码快照
+- **文字说明记录原因** - 为什么改、背景、决策过程
+- **通过 commit hash 关联** - 文档 ↔ 代码双向追溯
+
+---
+
+## 快速模板
+
+`personal` 治理模式（个人/小团队）的默认记录结构。
+本块内不要嵌套 ``` 代码围栏：`scripts/create_ver.py` 以第一个独立的 ``` 行为块结束标记。
+
+```markdown
+# VER-YYYYMMDD-NNN: <变更标题>
+
+## 记录控制
+
+- version_id: VER-YYYYMMDD-NNN
+- version_slug: logic_version-YYYYMMDD-NNN-<scope>
+- status: effective
+- date: YYYY-MM-DD
+- change_id: none
+- before_commit: <before-commit-hash>
+- after_commit: _待填写_
+
+## 为什么做这个决策？
+
+**背景**：
+<为什么需要这次修改？遇到了什么问题？>
+
+**用户需求/反馈**：
+<来自用户的具体诉求，引用原话或 issue>
+
+**需求拆解（归档时从 CHG 原样搬入；无 CHG 的记录填 none）**：
+- raw_request: <用户原始请求的稳定引用或一句忠实转述>
+- decomposition: <拆解出的功能点/工作项>
+- fit_analysis: <复用/替代/新增哪个 INT-*，插入哪条 FLOW-* 的哪一步，是否触碰 UXI-*>
+
+## 决策过程
+
+**方案 A**：<描述>（优点 / 缺点 / 复杂度：低-中-高）
+
+**方案 B**：<描述>（优点 / 缺点 / 复杂度：低-中-高）
+
+**选中方案与原因**：
+<为什么选这个方案？权衡了什么？>
+
+## 影响范围
+
+**修改的文件/模块**：
+- `path/to/file1.py` - 修改了什么
+
+**破坏性变更**：是/否（如是，说明向后兼容策略）
+
+## 验证方式
+
+<如何验证这次修改成功？测试命令与结果。
+代码差异用 git 查看：git show <commit>；git log --follow -- <file-path>>
+
+## 回滚方式
+
+<如何撤销：git revert <commit>，或说明配置回退步骤与回滚风险>
+
+## 经验与教训
+
+<可复用的原则与注意事项；没有填 none>
+
+## 关联
+
+- current_logic: logic_readme.md#RULE-XXX
+- proposal_id: none
+- code/tests: <相关文件>
+```
+
+---
+
+## 使用指南
+
+### 1. 创建决策记录
+
+```bash
+# 推荐：用 CLI 自动取号并按模板生成
+recall new "添加暗色模式支持" "add-dark-mode"
+
+# 生成 logic_version/records/logic_version-20260808-001-add-dark-mode.md
+```
+
+### 2. 实施并提交
+
+提交时在 commit message 中引用决策记录（`Ref: logic_version/records/<filename>.md`）。
+提交后无需手动操作：post-commit hook 解析 Ref 行（或同一提交内的规范命名记录），
+把 `- after_commit: _待填写_` 占位符自动回填为提交哈希（RULE-013）。
+`before_commit` 由 `recall new` 在创建时填入当时的 HEAD。
+
+### 3. 归档议案
+
+归档语义见 RULE-014（需求保全与落选方案归档）；操作步骤见
+[变更与决策生命周期](change-lifecycle.md) 第 7-9 步。
+
+---
+
+## 字段说明（最小集）
+
+### 必填字段
+
+| 字段 | 说明 | 示例 |
+|------|------|------|
+| version_id | VER-YYYYMMDD-NNN 格式 | VER-20260808-001 |
+| date | 归档日期 | 2026-08-08 |
+| status | effective/rejected/cancelled/rolled-back/correction | effective |
+| before_commit | 变更前基线 commit（recall new 自动填入） | b8db894 |
+| after_commit | 实施提交的 hash（hook 自动回填 `_待填写_` 占位符） | beb24d6 |
+| ## 为什么做这个决策？ | 为什么要改 | 用户反馈... |
+| raw_request / decomposition / fit_analysis | 需求拆解三字段；有 CHG（change_id != none）时必须在归档时从 CHG 原样搬入，无 CHG 填 none | 见 logic-change-template.md |
+| ## 影响范围 | 改了什么文件/功能 | 修改了样式系统 |
+| ## 验证方式 | 如何验证修改成功 | 测试命令与结果 |
+| ## 回滚方式 | 如何撤销 | git revert ... |
+
+非生效状态（rejected/cancelled/rolled-back）的记录登记进 `logic_version/index.md`
+即可，不进 `logic_readme.md` 的有效决策索引（validate 会对反向登记告警）。
+
+### 可选字段
+
+| 字段 | 说明 | 何时使用 |
+|------|------|----------|
+| change_id | 原始议案 ID | 高风险修改 |
+| 决策过程 | 考虑了哪些方案，为什么选这个 | 有多个候选方案时 |
+| 破坏性变更 | 是否不兼容 | API/数据结构变化 |
+| 迁移步骤 | 如何升级 | 需要用户操作时 |
+| 经验与教训 | 可复用的知识 | 有通用价值时 |
+
+---
+
+## 扩展 schema（collaborative/compliance 模式）
+
+团队协作或正式审计场景在快速模板之上追加以下字段（分层见
+[字段词汇分层](field-vocabulary.md)、[治理模式](governance-modes.md)）。
 
 ~~~markdown
 # VER-YYYYMMDD-NNN: <变更标题>
@@ -64,8 +207,6 @@
 - intent_distilled_by: <从最终 CHG 复制的责任信息>
 - intent_distilled_at: YYYY-MM-DD
 - intent_traceability: <INT-YYYYMMDD-NNN -> RULE-... -> test:<path#anchor> -> VER-YYYYMMDD-NNN；多个链用 ; 分隔>
-
-原始聊天、自动记忆、模型输出和逐步推理不进入本记录。若外部 Plan、Spec 或 Steering 后续变化，本记录仍保留当时实际采纳的提炼和来源引用；新的解释通过新 CHG/VER/ADR 表达，不回写历史。
 
 ## 决策确认与最终议案
 
@@ -136,13 +277,12 @@
 - issue/commit/release: ...
 ~~~
 
-维护规则：
+## 维护规则
 
 - 每次结束事件单独建文件，不把所有历史追加到一份巨型台账。
 - `decision_record: required` 时，`decision_state: confirmed` 必须绑定 `proposal_revision`，并且代码语义审查必须 `passed`；未实施即拒绝/取消时可以标记 `not-confirmed` 或 `not-applicable`，但要在最终议案快照说明原因。
 - `decision_record: required` 时，`intent_source_refs`、`intent_digest`、`intent_status`、`intent_distilled_by` 和 `intent_distilled_at` 必须可审计；`inferred` 或 `mixed` 不可写成用户已确认的要求。
-- `governance_mode: personal` 允许 `semantic_reviewed_by: self`，但 `governance_ref` 与 `after_commit`/发布证据必须能追溯。`collaborative` 的有效高风险记录必须有非 `changed_by` 的通过性语义审查人，并让 `governance_ref` 指向实际 PR/CI、分支保护、CODEOWNERS 或外部审批控制；模板和审计只能核对证据，不能替代该平台的权限执行。
-- `governance_evidence`、`governance_verification` 和 `governance_verified_at` 记录关闭时对外部控制的核验；`verified` 是带日期的责任人证据，不是平台权限的永久证明。`collaborative` 的有效高风险记录必须有非 `changed_by` 的通过性语义审查人、执行级 PR/CI/审批引用和可追溯治理证据。
+- `governance_mode: personal` 允许 `semantic_reviewed_by: self`，但 `governance_ref` 与 `after_commit`/发布证据必须能追溯。`collaborative` 的有效高风险记录必须有非 `changed_by` 的通过性语义审查人、执行级 PR/CI/审批引用和可追溯治理证据；模板和审计只能核对证据，不能替代该平台的权限执行。
 - `topic_id` 非 none 时，四个 `topic_*` 字段必须完整保存主题共享背景、约束、讨论来源和最终结论，不能只留下 TOPIC-ID。
 - `intent_traceability` 使用稳定的 `INT -> RULE -> test -> VER` 四段链；它是复杂变更的追踪索引，不保存原始提示词或隐藏推理。
 - `recall_route` 保留本次采用的分析深度。高风险记录应列出全部 `promoted_rule_ids`，使后续从现行规则可以反向找到本记录；普通局部改动可填 `none`。

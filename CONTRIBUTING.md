@@ -113,8 +113,7 @@ Ref: logic_version/records/<record-file>.md
 - [ ] 更新了相关文档（README, CLAUDE.md 等）
 - [ ] 添加/更新了测试（如适用）
 - [ ] Commit messages 遵循规范
-- [ ] 创建了对应的 VER 记录（重要修改）
-- [ ] 更新了 CHANGELOG.md
+- [ ] 创建了对应的 VER 记录（重要修改；历史索引见 logic_version/index.md）
 - [ ] PR 描述清楚说明了：
   - 做了什么修改
   - 为什么需要这个修改

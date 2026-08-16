@@ -109,7 +109,8 @@ def print_help():
 
 📚 更多信息:
   - 文档: README.md
-  - Git 集成: references/git-workflow-integration.md
+  - 使用方式与原则: SKILL.md
+  - 现行规则与代码地图: logic_readme.md
   - 工作流程: CLAUDE.md
 
 💡 提示:

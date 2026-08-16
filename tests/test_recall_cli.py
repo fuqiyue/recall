@@ -36,8 +36,8 @@ class TempProject:
         refs = self.root / "references"
         refs.mkdir()
         shutil.copy(
-            ROOT / "references" / "logic-version-git-template.md",
-            refs / "logic-version-git-template.md",
+            ROOT / "references" / "logic-version-template.md",
+            refs / "logic-version-template.md",
         )
         os.chdir(self.root)
         return self.root

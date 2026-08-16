@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 from datetime import date
 from dataclasses import asdict, dataclass
@@ -5114,6 +5115,63 @@ def registered_child_readme_paths(root: Path) -> set[str]:
     return allowed
 
 
+def audit_root_doc_coverage(root: Path) -> dict:
+    """对账：git 跟踪的 Markdown 顶层入口必须被 owned_paths ∪ unmapped_paths 覆盖。
+
+    平行真源检测只认 logic_readme/logic_change 命名模式；改名换姓的制度
+    副本（历史事故：README 重述三条通道、SUMMARY 类总结文档）只能靠登记
+    对账发现（INV-001 / RULE-019）。只对 .md 文件做顶层归属检查；git 不可用、
+    非 git 仓库或根文档未声明 owned_paths 时跳过（checked=False，不影响门）。
+    """
+    skipped = {"checked": False, "unregistered": []}
+    text, error = read_text(root / "logic_readme.md")
+    if error:
+        return skipped
+    owned_match = re.search(r'^\s*-\s*owned_paths\s*[：:]\s*(.+)$', text, re.MULTILINE)
+    if not owned_match:
+        return skipped
+    unmapped_match = re.search(
+        r'^\s*-\s*unmapped_paths\s*[：:]\s*(.+)$', text, re.MULTILINE
+    )
+
+    def parse_entries(value: str) -> set[str]:
+        entries: set[str] = set()
+        for raw in re.split(r'[,;，；]', value):
+            item = re.sub(r'[（(][^）)]*[）)]', '', raw).strip().strip('/').strip()
+            if item and item.lower() != 'none':
+                entries.add(item.casefold())
+        return entries
+
+    registered = parse_entries(owned_match.group(1))
+    if unmapped_match:
+        registered |= parse_entries(unmapped_match.group(1))
+
+    try:
+        proc = subprocess.run(
+            ["git", "-c", "core.quotepath=false", "ls-files", "--", "*.md"],
+            cwd=root,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=15,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return skipped
+    if proc.returncode != 0:
+        return skipped
+
+    unregistered: set[str] = set()
+    for line in (proc.stdout or "").splitlines():
+        rel = line.strip().strip('"')
+        if not rel:
+            continue
+        top = rel.split('/', 1)[0]
+        if top.casefold() not in registered:
+            unregistered.add(top)
+    return {"checked": True, "unregistered": sorted(unregistered)}
+
+
 def find_nonroot_current_documents(
     root: Path, excludes: set[str], allowed_child_readmes: set[str] | None = None
 ) -> list[str]:
@@ -5630,6 +5688,31 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
                 if lines > limit:
                     issues.append(f"{filename}:exceeds-hard-limit:{lines}>{limit}")
 
+    # RULE-018：已登记的 readme-only 子文档与根文档同受行数上限约束，
+    # 否则拆分后的子文档成为无上限的膨胀区
+    root_readme_text, root_readme_error = read_text(root / "logic_readme.md")
+    if not root_readme_error:
+        child_limit = LIMITS["logic_readme.md"]
+        for row in markdown_table_rows(root_readme_text, "范围登记表"):
+            policy = (row.get("doc_policy") or "").strip().strip("`").lower()
+            membership = (row.get("membership") or "").strip().strip("`").lower()
+            scope_raw = (row.get("scope_path") or "").strip().strip("`")
+            if policy != "readme-only" or membership != "in-system":
+                continue
+            scope_norm = normalize_scope_path(scope_raw)
+            if not scope_norm or scope_norm == ".":
+                continue
+            child = root / scope_norm / "logic_readme.md"
+            if child.exists():
+                text, error = read_text(child)
+                if not error:
+                    lines = text.count('\n') + 1
+                    if lines > child_limit:
+                        issues.append(
+                            f"{scope_norm}/logic_readme.md:"
+                            f"exceeds-hard-limit:{lines}>{child_limit}"
+                        )
+
     # Check individual CHG density in logic_change.md
     change_path = root / "logic_change.md"
     if change_path.exists():
@@ -5901,6 +5984,7 @@ def collect_audit(args: argparse.Namespace) -> dict:
         root, audits, module_routes, all_dirs=args.all_dirs
     )
     density = audit_density(root, audits)
+    root_doc_coverage = audit_root_doc_coverage(root)
     formal_review = (
         audit_formal_review(root, test_inventory, temp_working)
         if args.formal_review
@@ -5948,6 +6032,7 @@ def collect_audit(args: argparse.Namespace) -> dict:
         any(current_integrity.values())
         or bool(nonroot_current_documents)
         or bool(parallel_current)
+        or bool(root_doc_coverage["unregistered"])
         or any(entry["exists"] and entry["issues"] for entry in entrypoints)
         or bool(private_knowledge)
         or bool(missing_required_entries)
@@ -6069,6 +6154,7 @@ def collect_audit(args: argparse.Namespace) -> dict:
         "misplaced_decision_records": misplaced_decisions,
         "parallel_current_candidates": parallel_current,
         "current_state_nonroot_documents": nonroot_current_documents,
+        "root_doc_coverage": root_doc_coverage,
         "misplaced_logic_temp": misplaced_temp,
         "scattered_backup_candidates": scattered_backups,
         "agent_entrypoints": entrypoints,
@@ -6177,6 +6263,14 @@ def print_text(report: dict) -> None:
         print("\nNon-root current documents:")
         for path in report["current_state_nonroot_documents"]:
             print(f"  - {path}")
+
+    if report["root_doc_coverage"]["unregistered"]:
+        print(
+            "\nUnregistered top-level Markdown entries"
+            " (add to owned_paths or unmapped_paths, or archive):"
+        )
+        for name in report["root_doc_coverage"]["unregistered"]:
+            print(f"  - {name}")
 
     if not current_profile and report["missing_map_candidates"]:
         print("\nMissing-map candidates (review boundaries before creating files):")

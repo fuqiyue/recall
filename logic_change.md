@@ -40,6 +40,6 @@
 当需要追踪修改时，在此文件中创建 CHG 条目。完成后：
 1. 更新 `logic_readme.md`（如规则变化）
 2. 归档到 `logic_version/records/`（如为高风险）
-3. 把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 搬入 VER 记录（需求保全），再从本文件删除 CHG 条目；同议题落选方案的需求原文与否决原因并入胜出 VER 的方案分析，曾独立立案的落选 CHG 建 `status: rejected` 的 VER 并同样搬运三字段
+3. 把 CHG 的需求拆解三字段搬入 VER 记录后再删除 CHG 条目（需求保全与落选方案归档的语义见 logic_readme.md RULE-014；操作步骤见 references/change-lifecycle.md 第 7-9 步）
 
 **记住**：logic_change.md 是临时的工作记录，不是长期真相源。

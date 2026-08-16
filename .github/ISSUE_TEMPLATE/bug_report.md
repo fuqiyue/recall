@@ -29,7 +29,7 @@ assignees: ''
 - **操作系统**: [如 Windows 11, Ubuntu 22.04, macOS 14]
 - **Python 版本**: [运行 `python --version`]
 - **Git 版本**: [运行 `git --version`]
-- **Recall 版本**: [运行 `./recall.sh --version` 或查看 CHANGELOG.md]
+- **Recall 版本**: [运行 `git log --oneline -1` 提供当前提交]
 
 ## 错误日志
 

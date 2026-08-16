@@ -44,6 +44,7 @@
 | VER-20260816-002 | logic_version-20260816-002-traceability-repair | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-011, RULE-013, RULE-014, RULE-015 | none | 追溯链断裂修复：recall new 回填链路、自动保存文件清单与回填双通道、INT 编号统一、validate 三处对账与漂移哨兵 | [logic_version-20260816-002-traceability-repair.md](records/logic_version-20260816-002-traceability-repair.md) |
 | VER-20260816-003 | logic_version-20260816-003-semantic-link | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-014, RULE-015, RULE-016 | none | 需求↔架构语义链路补全：模块化项目接入流程、需求三字段归档搬入 VER、INT 代码锚点与 query intent 反向查询 | [logic_version-20260816-003-semantic-link.md](records/logic_version-20260816-003-semantic-link.md) |
 | VER-20260816-004 | logic_version-20260816-004-handoff-hierarchy | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-014, RULE-017, RULE-018 | none | 会话默认延续原则、层级化子 logic 文档（readme-only 登记拆分）与舍弃方案归档 | [logic_version-20260816-004-handoff-hierarchy.md](records/logic_version-20260816-004-handoff-hierarchy.md) |
+| VER-20260816-005 | logic_version-20260816-005-audit-remediation | 2026-08-16 | effective | ., references/, scripts/, tests/, logic_version/ | RULE-011, RULE-015, RULE-018, RULE-019 | none | 审查整改：自动保存排除未跟踪新文件、rejected 记录豁免有效索引、子文档纳入检查、漂移度量、脱管文档归档与根目录覆盖对账、双模板合并、引用纪律 | [logic_version-20260816-005-audit-remediation.md](records/logic_version-20260816-005-audit-remediation.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 
@@ -73,6 +74,6 @@
 **新增记录步骤**：
 
 1. 在 `records/` 目录创建 `logic_version-YYYYMMDD-NNN-<scope>.md`
-2. 在上方"不可变决策记录"表中添加索引行
-3. 在 `logic_readme.md` 的"有效决策索引"中登记，并让相关 key 规则链接该记录
-4. 把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 搬入记录（需求保全），再从 `logic_change.md` 删除该 CHG 条目
+2. 在上方"不可变决策记录"表中添加索引行（`rejected`/`cancelled`/`rolled-back` 记录只登记到这里，不进有效决策索引）
+3. 在 `logic_readme.md` 的"有效决策索引"中登记生效记录，并让相关 key 规则链接该记录
+4. 把 CHG 的需求拆解三字段搬入记录后再删除 CHG 条目（语义见 RULE-014，步骤见 references/change-lifecycle.md §7）

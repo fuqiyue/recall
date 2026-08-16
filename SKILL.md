@@ -11,20 +11,14 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 
 ## Git 自动同步
 
-首次运行 `recall init` 时默认启用 Git 自动同步：脚本会写入仓库级 Git 同步策略，
-安装受管理的 `post-commit` hook，并在配置完成后尝试同步当前分支。hook 先执行
-`git pull --rebase --autostash`，再执行 `git push`；远端不可用或发生冲突时只发出
-警告，不阻断已经完成的本地提交。
-
-`recall sync` 默认自动保存：工作区有未提交变更时先以自动保存消息提交，再拉取
-变基并推送（`recall.autoCommit`，默认开启）。用户选择手动时运行
-`recall sync --manual`，此后仅在提供 `--commit-message "<message>"` 时才提交；
-`recall sync --auto` 恢复自动保存。自动保存提交前列出将上传的文件清单，未跟踪
-的新文件单独提示（排除私人文件用 .gitignore）。post-commit hook 场景永不自动
-提交其他脏文件，只回填决策记录的 `after_commit` 占位符后同步（Ref 行指向的记
-录，或与代码同一提交内的记录），保护部分提交工作流。
-没有远端时，先配置 `git remote add origin <url>`，再运行 `recall sync`。可用
-`recall init --no-auto-sync` 或 `recall sync --disable` 完全关闭。
+`recall init` 默认启用自动同步（受管理 `post-commit` hook：`pull --rebase
+--autostash` 后 `push`，失败只告警、不阻断本地提交）。`recall sync` 默认自动
+保存已跟踪文件的变更后拉取变基并推送；**未跟踪的新文件默认排除**，仅
+`recall sync --include-new` 或用户先 `git add` 时纳入（自动化不上传用户未明确
+要求的文件；私人文件加入 .gitignore）。`--manual` 切手动（仅
+`--commit-message` 时提交）、`--auto` 恢复、`--disable` 完全关闭；无远端时先
+`git remote add origin <url>`。hook 场景永不提交其他脏文件，只回填
+`after_commit` 占位符。语义正文见 logic_readme.md 的 RULE-010/011/013（RULE-019）。
 
 ## 项目接入（文档初稿从哪来）
 
@@ -39,7 +33,7 @@ AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目�
 
 1. 遵守用户的当前授权。未经授权不修改代码、制度或议案
 2. 严格分离状态：`logic_readme.md` 是当前已生效制度；`logic_change.md` 是尚未生效的活跃议案；`logic_version/records/` 是关闭后的不可变决策记录。目标环境一旦实际启用新行为，必须在同一发布变更中更新 `logic_readme.md`、固化所需 `VER-*` 并关闭对应 CHG
-3. 发布态以项目根这一对现行文档为总规章。子模块复杂到值得独立正文时，可经用户确认拆分出子 `logic_readme.md`（位于模块目录、以 `doc_policy: readme-only` 登记在根范围登记表），根文档保留全局规则、跨模块契约与范围路由，根规章优先于子文档；`logic_change.md` 与 `logic_version/` 全项目始终唯一。禁止创建 `logic_readme-v2.md` 或任何未登记的平行正文
+3. 发布态以项目根这一对现行文档为总规章；复杂子模块经用户确认可拆分已登记的子 `logic_readme.md`，根规章优先（语义见 RULE-018）；`logic_change.md` 与 `logic_version/` 全项目始终唯一。禁止创建 `logic_readme-v2.md` 或任何未登记的平行正文
 4. `logic_version/` 只在当前文档直接引用、需要解释冲突或追溯兼容性时按 ID 读取。历史记录保存设计逻辑（为什么、取舍、影响），而非代码快照；目的是避免上下文膨胀
 5. 新请求与现行规则、活跃议案或已确认意图存在实质矛盾，或模糊点会改变范围/语义/兼容/数据安全/方案选择时，先列明新旧来源、具体矛盾、可行选项、主要影响和建议，再向当前用户或授权决策方请求明确选择；确认前不得实施受影响部分。新增或调整用户可见功能时，还须对照 `logic_readme.md` 的功能意图与用户流程说明其流程位置和与相邻功能的关系；说不清位置视为此类模糊点
 6. 每次代码改动都判断 `docs_impact`：当前规则、契约、稳定代码锚点、代码地图、验证入口或活跃议案实际变化时，在同一获授权变更中更新相应根文档；确无影响时说明 `none + 原因`
@@ -89,7 +83,7 @@ AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目�
     `-- backups/                 # 受控快照和 manifest
 ```
 
-`logic_readme.md` 优先用范围登记、稳定锚点和章节组织模块；文件过长时先压缩失效细节、把已结束内容归档到 `logic_version/`。子模块复杂度达标时，由 AI 提出拆分建议、经用户确认后拆出子文档 `<模块目录>/logic_readme.md` 并在根范围登记表登记为 `readme-only`（流程见[项目接入流程](references/project-onboarding.md)的模块拆分章节）。涉及子模块的修改先读根文档再读该模块子文档，跨模块变更读取并在同一变更中更新全部相关子文档；根规章优先于子文档。禁止复制出第二套未登记的当前制度。
+`logic_readme.md` 优先用范围登记、稳定锚点和章节组织模块；文件过长时先压缩失效细节、把已结束内容归档到 `logic_version/`。子文档拆分的语义见 RULE-018，操作流程见[项目接入流程](references/project-onboarding.md)的模块拆分章节；涉及子模块的修改先读根后读子，跨模块变更在同一变更中更新全部相关子文档。规范的语义正文只存在于 logic_readme 的规则行，其他文档只保留指针与操作步骤（RULE-019）；禁止复制出第二套未登记的当前制度。
 
 ### logic_readme.md（唯一现行制度）
 
@@ -157,11 +151,12 @@ python scripts/audit_logic_map.py <project-root> --formal-review
 - [治理模式](references/governance-modes.md)
 - [logic_readme 模板](references/logic-readme-template.md)
 - [logic_change 模板](references/logic-change-template.md)
-- [logic_version 模板](references/logic-version-template.md)
+- [logic_version 模板](references/logic-version-template.md)（唯一决策记录模板，含扩展 schema）
 - [ADR 模板](references/decision-record-template.md)
 - [Recall Brief 模板](references/recall-brief-template.md)
 - [外部工作流适配](references/workflow-integration.md)
 - [代理入口模板](references/agent-entry-template.md)
+- 内部模板（脚本/流程使用，一般无需直接阅读）：[logic_version 索引模板](references/logic-version-index-template.md)、[logic_temp 模板](references/logic-temp-template.md)、[备份清单模板](references/backup-manifest-template.md)
 
 ## 代理入口
 

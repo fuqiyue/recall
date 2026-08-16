@@ -21,9 +21,10 @@ python scripts/init_recall.py
 6. ✅ 创建 .gitignore 文件
 7. ✅ 创建初始提交
 
-`recall sync` 默认自动保存并同步（`--manual` 切手动，`--auto` 恢复，`--disable`
-完全关闭）。语义的权威描述只在 `logic_readme.md` 的 RULE-011/RULE-013 与
-`SKILL.md`，本文件不重复正文，避免平行真源。
+`recall sync` 默认自动保存已跟踪变更并同步；未跟踪新文件默认排除，
+`--include-new` 纳入（`--manual` 切手动，`--auto` 恢复，`--disable` 完全关闭）。
+语义的权威描述只在 `logic_readme.md` 的 RULE-011/RULE-013 与 `SKILL.md`，
+本文件不重复正文，避免平行真源（RULE-019）。
 
 **为什么需要 Git？**
 - Recall 使用 Git 管理代码变化（what changed）

@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 创建版本决策记录的辅助工具
-使用 Git 集成模板快速创建新的决策记录
+按唯一模板 references/logic-version-template.md 的"快速模板"块生成记录
 
 文件名遵循 references/logic-version-template.md 的规范：
 logic_version-YYYYMMDD-NNN-<scope>.md。validate.py / link_ver_git.py /
@@ -112,7 +112,7 @@ def create_ver_record(title, scope, template_path=None, output_dir=None):
     """创建版本决策记录。返回退出码：0 成功，1 失败。"""
     root = find_project_root()
     if template_path is None:
-        template_path = root / "references" / "logic-version-git-template.md"
+        template_path = root / "references" / "logic-version-template.md"
     if output_dir is None:
         output_dir = root / "logic_version" / "records"
 

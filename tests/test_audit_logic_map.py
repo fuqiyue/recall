@@ -1974,5 +1974,136 @@ class RootOnlyAuditTests(unittest.TestCase):
         self.assertTrue(self.fails(report, formal=True))
 
 
+REGISTRY_HEADER = (
+    "| module_id | scope_path | membership | scope_type/layer | doc_policy "
+    "| logic_readme | logic_change | owner | status |\n"
+    "|---|---|---|---|---|---|---|---|---|\n"
+)
+
+
+class RootDocCoverageTests(unittest.TestCase):
+    """RULE-019：git 跟踪的顶层 Markdown 入口必须被 owned/unmapped 登记覆盖。"""
+
+    @staticmethod
+    def _init_repo(root: Path) -> None:
+        for args in (
+            ["init"],
+            ["config", "user.email", "test@example.invalid"],
+            ["config", "user.name", "Recall Test"],
+        ):
+            subprocess.run(
+                ["git", *args], cwd=root, capture_output=True, text=True
+            )
+
+    @staticmethod
+    def _readme(owned: str, unmapped: str | None = None) -> str:
+        unmapped_line = f"- unmapped_paths: {unmapped}\n" if unmapped else ""
+        return (
+            "# Root\n\n## 范围登记与归属\n\n"
+            f"- owned_paths: {owned}\n{unmapped_line}"
+        )
+
+    def test_unregistered_top_level_markdown_is_reported(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._init_repo(root)
+            (root / "logic_readme.md").write_text(
+                self._readme("logic_readme.md, references/"), encoding="utf-8"
+            )
+            (root / "SUMMARY_COPY.md").write_text("# stale\n", encoding="utf-8")
+            (root / "references").mkdir()
+            (root / "references" / "tpl.md").write_text("# tpl\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "--", "."], cwd=root, capture_output=True
+            )
+            result = AUDIT.audit_root_doc_coverage(root)
+
+        self.assertTrue(result["checked"])
+        self.assertIn("SUMMARY_COPY.md", result["unregistered"])
+        self.assertNotIn("references", result["unregistered"])
+        self.assertNotIn("logic_readme.md", result["unregistered"])
+
+    def test_unmapped_registration_and_annotations_pass(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._init_repo(root)
+            (root / "logic_readme.md").write_text(
+                self._readme(
+                    "logic_readme.md",
+                    "docs/ (教学材料、非真源), CONTRIBUTING.md (社区文档)",
+                ),
+                encoding="utf-8",
+            )
+            (root / "docs").mkdir()
+            (root / "docs" / "guide.md").write_text("# guide\n", encoding="utf-8")
+            (root / "CONTRIBUTING.md").write_text("# c\n", encoding="utf-8")
+            subprocess.run(
+                ["git", "add", "--", "."], cwd=root, capture_output=True
+            )
+            result = AUDIT.audit_root_doc_coverage(root)
+
+        self.assertTrue(result["checked"])
+        self.assertEqual(result["unregistered"], [])
+
+    def test_without_git_or_owned_paths_check_is_skipped(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "logic_readme.md").write_text(
+                "# Root without owned_paths\n", encoding="utf-8"
+            )
+            result = AUDIT.audit_root_doc_coverage(root)
+
+        self.assertFalse(result["checked"])
+        self.assertEqual(result["unregistered"], [])
+
+
+class ChildReadmeDensityTests(unittest.TestCase):
+    """RULE-018：已登记 readme-only 子文档与根文档同受行数硬上限。"""
+
+    def test_oversized_registered_child_readme_reports_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "logic_readme.md").write_text(
+                "# Root\n\n### 范围登记表\n\n"
+                + REGISTRY_HEADER
+                + README_ONLY_APP_ROW
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "src").mkdir()
+            (root / "src" / "logic_readme.md").write_text(
+                "line\n" * 450, encoding="utf-8"
+            )
+            issues = AUDIT.audit_density(root, [])["issues"]
+
+        self.assertTrue(
+            any(
+                issue.startswith("src/logic_readme.md:exceeds-hard-limit")
+                for issue in issues
+            ),
+            issues,
+        )
+
+    def test_child_readme_within_limit_is_silent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "logic_readme.md").write_text(
+                "# Root\n\n### 范围登记表\n\n"
+                + REGISTRY_HEADER
+                + README_ONLY_APP_ROW
+                + "\n",
+                encoding="utf-8",
+            )
+            (root / "src").mkdir()
+            (root / "src" / "logic_readme.md").write_text(
+                "line\n" * 100, encoding="utf-8"
+            )
+            issues = AUDIT.audit_density(root, [])["issues"]
+
+        self.assertFalse(
+            [issue for issue in issues if issue.startswith("src/logic_readme.md")]
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

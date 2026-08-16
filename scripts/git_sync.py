@@ -289,39 +289,54 @@ def _list_dirty_files(project_root: Path) -> list:
     return entries
 
 
-def _print_commit_plan(entries: list) -> None:
-    """打印将被打包进同步提交的文件清单；未跟踪的新文件单独提示。
+def _print_commit_plan(entries: list, excluded: list = None) -> None:
+    """打印将被打包进同步提交的文件清单与被排除的未跟踪新文件。
 
-    自动保存用 ``git add -A`` 收集一切脏文件，用户必须能看到会上传什么；
-    不想上传的文件应先加入 .gitignore（UXI-003 的透明性要求）。
+    自动化默认只收集已跟踪文件的变更；未跟踪的新文件默认不上传，
+    需要用户明确要求（--include-new 或先 git add）才纳入——非交互
+    环境下事后警告拦不住已经推上远端的文件（RULE-011 / UXI-003）。
     """
-    if not entries:
-        return
-    print(f"ℹ️  即将提交 {len(entries)} 个文件:")
-    shown = entries[:20]
-    for status, path in shown:
-        marker = "  ← 新文件（此前未跟踪）" if status == "??" else ""
-        print(f"   {status.strip() or '·'} {path}{marker}")
-    if len(entries) > len(shown):
-        print(f"   … 其余 {len(entries) - len(shown)} 个")
-    if any(status == "??" for status, _ in entries):
-        print("   ⚠️  含未跟踪的新文件；不想上传的文件请先加入 .gitignore 再运行 recall sync")
+    if entries:
+        print(f"ℹ️  即将提交 {len(entries)} 个文件:")
+        shown = entries[:20]
+        for status, path in shown:
+            marker = "  ← 新文件（此前未跟踪）" if status == "??" else ""
+            print(f"   {status.strip() or '·'} {path}{marker}")
+        if len(entries) > len(shown):
+            print(f"   … 其余 {len(entries) - len(shown)} 个")
+    if excluded:
+        print(f"ℹ️  已排除 {len(excluded)} 个未跟踪的新文件（自动保存默认不上传新文件）:")
+        for _, path in excluded[:20]:
+            print(f"   ?? {path}")
+        if len(excluded) > 20:
+            print(f"   … 其余 {len(excluded) - 20} 个")
+        print(
+            "   需要上传时运行 recall sync --include-new 或先 git add <file>；"
+            "私人文件请加入 .gitignore"
+        )
 
 
 def _commit_dirty_worktree(
-    project_root: Path, message: str, quiet: bool = False
+    project_root: Path, message: str, quiet: bool = False, include_new: bool = False
 ) -> Tuple[bool, bool]:
-    """Commit all dirty files for an explicit or auto-save synchronization.
+    """Commit dirty files for an explicit or auto-save synchronization.
 
-    Returns ``(ok, committed)``. Callers decide whether staging is allowed:
-    an explicit ``--commit-message`` or the auto-save mode of ``recall sync``.
-    The post-commit hook never reaches this function.
+    Returns ``(ok, committed)``. Untracked new files are excluded unless
+    ``include_new`` is set: automation must never publish files the user has
+    not explicitly asked to upload (RULE-011). Callers decide whether staging
+    is allowed: an explicit ``--commit-message`` or the auto-save mode of
+    ``recall sync``. The post-commit hook never reaches this function.
     """
     if not _is_dirty(project_root):
         return True, False
+    entries = _list_dirty_files(project_root)
+    untracked = [entry for entry in entries if entry[0] == "??"]
+    included = entries if include_new else [e for e in entries if e[0] != "??"]
+    excluded = [] if include_new else untracked
     if not quiet:
-        _print_commit_plan(_list_dirty_files(project_root))
-    ok, _, stderr = run_git(["add", "-A"], cwd=project_root)
+        _print_commit_plan(included, excluded)
+    add_args = ["add", "-A"] if include_new else ["add", "-u"]
+    ok, _, stderr = run_git(add_args, cwd=project_root)
     if not ok:
         print(f"❌ 添加待同步文件失败: {stderr}")
         return False, False
@@ -489,12 +504,14 @@ def sync_repository(
     quiet: bool = False,
     autocommit: bool = True,
     drift_check: bool = False,
+    include_new: bool = False,
 ) -> int:
     """Synchronize changes with a configured remote.
 
     ``autocommit=True``（手动运行 recall sync）且 ``recall.autoCommit`` 开启时，
-    脏工作区先以自动保存消息提交再同步；``autocommit=False``（post-commit hook）
-    绝不提交别的脏文件，只回填 after_commit 并同步已提交历史。
+    脏工作区先以自动保存消息提交再同步；未跟踪新文件默认排除，仅
+    ``include_new=True``（--include-new）时纳入；``autocommit=False``
+    （post-commit hook）绝不提交别的脏文件，只回填 after_commit 并同步已提交历史。
 
     Pull uses rebase and autostash when the remote branch already exists. Push
     sets the upstream on first use. A non-zero result means synchronization did
@@ -513,14 +530,19 @@ def sync_repository(
         return 2
 
     if commit_message:
-        ok, _ = _commit_dirty_worktree(project_root, commit_message, quiet=quiet)
+        ok, _ = _commit_dirty_worktree(
+            project_root, commit_message, quiet=quiet, include_new=include_new
+        )
         if not ok:
             return 1
     elif _is_dirty(project_root):
         if autocommit and _autocommit_enabled(project_root):
-            # 自动保存（RULE-011）：默认把工作区变更提交后同步，避免
-            # 未提交窗口期的工作丢失；recall sync --manual 可切换回手动。
-            ok, _ = _commit_dirty_worktree(project_root, AUTOCOMMIT_MESSAGE, quiet=quiet)
+            # 自动保存（RULE-011）：默认把已跟踪文件的变更提交后同步，
+            # 避免未提交窗口期的工作丢失；未跟踪新文件默认排除
+            # （--include-new 纳入）；recall sync --manual 可切换回手动。
+            ok, _ = _commit_dirty_worktree(
+                project_root, AUTOCOMMIT_MESSAGE, quiet=quiet, include_new=include_new
+            )
             if not ok:
                 return 1
         else:
@@ -582,6 +604,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--root", type=Path, help=argparse.SUPPRESS)
     parser.add_argument("--remote", default=None, help="远端名称，默认使用 recall.syncRemote 或 origin")
     parser.add_argument("--commit-message", help="用指定消息提交当前工作区后再同步（替代自动保存消息）")
+    parser.add_argument(
+        "--include-new",
+        action="store_true",
+        help="把未跟踪的新文件也纳入本次提交（默认排除：自动化不上传用户未明确要求的新文件）",
+    )
     parser.add_argument("--no-pull", action="store_true", help="只推送，不先拉取远端")
     parser.add_argument("--no-push", action="store_true", help="只拉取并变基，不推送")
     parser.add_argument("--auto", action="store_true", help="启用自动保存：sync 时脏工作区自动提交（默认）")
@@ -637,6 +664,7 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         autocommit=not args.post_commit,
         # 漂移哨兵只看 hook 场景的新鲜用户提交；手动 sync 的 HEAD 可能是旧提交
         drift_check=args.post_commit,
+        include_new=args.include_new,
     )
     if args.post_commit and code == 2:
         return 0

@@ -33,13 +33,20 @@ UNFILLED_PLACEHOLDER_RE = re.compile(
 # 归档时必须搬入 VER 记录（需求保全：CHG 删除后需求拆解不得只剩 git 考古可查）
 CHG_REQUIRED_ANALYSIS_FIELDS = ('raw_request', 'decomposition', 'fit_analysis')
 
+# 非生效状态的记录不进"有效决策索引"（RULE-014 落选方案归档会产生 rejected 记录；
+# 强制登记会把被否决的方案说成有效决策）。index.md 仍须登记全部记录。
+INACTIVE_RECORD_STATUSES = {'rejected', 'cancelled', 'rolled-back'}
+
+# 漂移度量（RULE-015）：纯代码/自动保存提交累积超过阈值时告警
+DRIFT_WARNING_THRESHOLD = 10
+
 # commit 关联的几种写法，按 references/ 下两个模板的实际格式
 COMMIT_PATTERNS = (
     # 统一 schema 的实施提交字段: - after_commit: abc123（hook 回填）
     r'^\s*-\s*after_commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
-    # logic-version-git-template.md: - **关联 Commit**: `abc123`
+    # 旧记录格式兼容: - **关联 Commit**: `abc123`
     r'关联\s*Commit\*{0,2}\s*[：:]\s*`?([0-9a-f]{7,40})`?',
-    # logic-version-template.md 的 based_on: ... code: commit:abc123
+    # logic-version-template.md 扩展 schema 的 based_on: ... code: commit:abc123
     r'\bcode\s*:\s*commit\s*:\s*`?([0-9a-f]{7,40})`?',
     # 旧快速模板的独立控制字段: - commit: abc123
     r'^\s*-\s*commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
@@ -146,13 +153,41 @@ def markdown_section(content: str, heading: str) -> str:
     return match.group(1) if match else ''
 
 
+def find_registered_child_readmes(
+    readme_content: str, root: Path
+) -> Tuple[List[Path], List[str]]:
+    """范围登记表中 readme-only 行对应的子文档路径（RULE-018）。
+
+    返回 (存在的子文档, 登记了但文件缺失的 scope 列表)。子文档与根文档
+    共用同一 RULE/INT 编号空间，必须纳入同一套一致性检查，否则拆分后
+    的模块进入无检查区。
+    """
+    paths: List[Path] = []
+    missing: List[str] = []
+    for line in readme_content.splitlines():
+        stripped = line.strip()
+        if not stripped.startswith('|'):
+            continue
+        cells = [cell.strip() for cell in stripped.strip('|').split('|')]
+        if len(cells) >= 5 and cells[2] == 'in-system' and cells[4] == 'readme-only':
+            scope = cells[1].strip().strip('/').replace('\\', '/')
+            candidate = root / scope / 'logic_readme.md'
+            if candidate.exists():
+                paths.append(candidate)
+            else:
+                missing.append(scope)
+    return paths, missing
+
+
 def check_intent_layer(
-    content: str, rule_ids: set, result: 'ValidationResult', root: Path = None
+    content: str, rule_ids: set, result: 'ValidationResult', root: Path = None,
+    doc_label: str = 'logic_readme.md', seen_int_ids: set = None
 ) -> None:
     """校验功能意图与用户流程层（RULE-014）：编号格式、唯一性、引用有效性。
 
     传入 root 时同时检查登记表"代码锚点"列的路径存在性——反向查询
     （recall query intent）依赖这一列，锚点悬空会让 INT→代码静默断链。
+    传入 seen_int_ids 时跨文档累计编号（RULE-018：根与子文档共用编号空间）。
     没有该小节时静默跳过（尚未启用此层的项目不受影响）。
     """
     section = markdown_section(content, '功能意图与用户流程')
@@ -176,8 +211,11 @@ def check_intent_layer(
                 f"功能意图登记 {intent_id}: 编号须为 INT-YYYYMMDD-NNN 完整格式"
                 "（短编号不被审计与追溯链识别）"
             )
-        if intent_id in int_ids:
-            result.add_error(f"功能意图登记 {intent_id}: intent_id 重复")
+        if intent_id in int_ids or (seen_int_ids and intent_id in seen_int_ids):
+            result.add_error(
+                f"功能意图登记 {intent_id}: intent_id 重复（{doc_label}；"
+                "编号空间全项目唯一，含子文档）"
+            )
         int_ids.add(intent_id)
 
     # 解析用户流程：每条 FLOW 的最大步骤号
@@ -239,9 +277,13 @@ def check_intent_layer(
             if token not in int_ids:
                 result.add_error(f"操作直觉约束引用了未登记的 {token}")
 
+    if seen_int_ids is not None:
+        seen_int_ids.update(int_ids)
+
     if int_ids:
         result.add_info(
-            f"功能意图层: {len(int_ids)} 个 INT、{len(flow_steps)} 条 FLOW 校验完成"
+            f"功能意图层（{doc_label}）: {len(int_ids)} 个 INT、"
+            f"{len(flow_steps)} 条 FLOW 校验完成"
         )
 
 
@@ -268,6 +310,20 @@ def check_ver_registrations(
         if len(names) > 1:
             result.add_error(f"{ver_id} 撞号：多个记录文件共用同一编号: {', '.join(names)}")
 
+    # 记录状态：非生效记录（rejected/cancelled/rolled-back）豁免有效决策索引登记
+    record_status: Dict[str, str] = {}
+    for record_path in version_records:
+        match = RECORD_NAME_RE.match(record_path.name)
+        if not match:
+            continue
+        ver_id = f"VER-{match.group(1)}-{match.group(2)}"
+        status_match = re.search(
+            r'^\s*-\s*status\s*[：:]\s*(\S+)', record_path.read_text(encoding='utf-8'),
+            re.MULTILINE,
+        )
+        if status_match:
+            record_status[ver_id] = status_match.group(1).strip('`').lower()
+
     index_vers = set()
     if index_path.exists():
         index_vers = set(VER_ROW_RE.findall(index_path.read_text(encoding='utf-8')))
@@ -276,8 +332,14 @@ def check_ver_registrations(
     for ver_id in sorted(file_vers):
         if index_path.exists() and ver_id not in index_vers:
             result.add_warning(f"{ver_id} 未登记到 logic_version/index.md")
-        if ver_id not in readme_vers:
+        inactive = record_status.get(ver_id) in INACTIVE_RECORD_STATUSES
+        if ver_id not in readme_vers and not inactive:
             result.add_warning(f"{ver_id} 未登记到 logic_readme.md 的有效决策索引")
+        if ver_id in readme_vers and inactive:
+            result.add_warning(
+                f"{ver_id} 状态为 {record_status.get(ver_id)}，"
+                "不应登记在 logic_readme.md 的有效决策索引（index.md 登记即可）"
+            )
     for ver_id in sorted(index_vers - set(file_vers)):
         result.add_error(f"logic_version/index.md 登记的 {ver_id} 没有对应记录文件")
     for ver_id in sorted(readme_vers - set(file_vers)):
@@ -454,6 +516,44 @@ def is_valid_git_commit(commit_hash: str) -> bool:
         return False
     return result.returncode == 0 and 'commit' in (result.stdout or '')
 
+def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
+    """漂移度量（RULE-015）：统计自上次触及 logic 文档以来累积的提交数。
+
+    post-commit 哨兵只打一行非阻断提醒，自动化运行时无人阅读；这里把
+    漂移变成可观测数字：纯代码/自动保存提交累积超过阈值时升级为警告。
+    """
+    logic_pathspecs = [
+        'logic_change.md', 'logic_version', ':(glob)**/logic_readme.md'
+    ]
+
+    def _git(args: List[str]) -> str:
+        try:
+            proc = subprocess.run(
+                ['git'] + args,
+                capture_output=True, text=True, encoding='utf-8',
+                errors='replace', cwd=root, timeout=10,
+            )
+        except (OSError, subprocess.SubprocessError):
+            return ''
+        return (proc.stdout or '').strip() if proc.returncode == 0 else ''
+
+    last_logic = _git(['rev-list', '-1', 'HEAD', '--'] + logic_pathspecs)
+    if not last_logic:
+        return  # 非 git 仓库、无提交或从未提交过 logic 文档：不做判断
+    count_output = _git(['rev-list', '--count', f'{last_logic}..HEAD'])
+    if not count_output.isdigit():
+        return
+    count = int(count_output)
+    if count > DRIFT_WARNING_THRESHOLD:
+        result.add_warning(
+            f"自上次触及 logic 文档以来已累积 {count} 个提交"
+            "（漂移风险：请核对 logic_readme.md 是否仍反映当前代码，"
+            "medium/high 变更应使用带 Ref 行的语义提交）"
+        )
+    elif count > 0:
+        result.add_info(f"自上次触及 logic 文档以来累积 {count} 个提交")
+
+
 def validate_recall() -> ValidationResult:
     """执行完整的验证流程"""
     result = ValidationResult()
@@ -477,22 +577,56 @@ def validate_recall() -> ValidationResult:
     readme_content = readme_path.read_text(encoding='utf-8')
 
     # 1. 提取规则定义（只有定义行算数；正文/索引/意图层的引用不算重复）
-    rule_defs = extract_rule_definitions(readme_path)
-    unique_rules = set(rid for rid, _ in rule_defs)
-    result.add_info(f"在 logic_readme.md 中找到 {len(unique_rules)} 条规则定义")
+    # RULE-018：已登记的 readme-only 子文档与根文档共用编号空间，一并检查
+    child_readmes, missing_children = find_registered_child_readmes(
+        readme_content, root
+    )
+    for scope in missing_children:
+        result.add_error(
+            f"范围登记表登记了 readme-only 子文档但文件不存在: {scope}/logic_readme.md"
+        )
 
-    rule_counts: Dict[str, List[int]] = {}
-    for rid, line_num in rule_defs:
-        rule_counts.setdefault(rid, []).append(line_num)
+    labeled_defs: List[Tuple[str, str, int]] = [
+        ('logic_readme.md', rid, line)
+        for rid, line in extract_rule_definitions(readme_path)
+    ]
+    for child in child_readmes:
+        label = child.relative_to(root).as_posix()
+        labeled_defs.extend(
+            (label, rid, line) for rid, line in extract_rule_definitions(child)
+        )
 
-    for rid, lines in rule_counts.items():
-        if len(lines) > 1:
+    unique_rules = set(rid for _, rid, _ in labeled_defs)
+    result.add_info(
+        f"找到 {len(unique_rules)} 条规则定义"
+        + (f"（含 {len(child_readmes)} 份已登记子文档）" if child_readmes else "")
+    )
+
+    rule_counts: Dict[str, List[str]] = {}
+    for label, rid, line_num in labeled_defs:
+        rule_counts.setdefault(rid, []).append(f"{label}:{line_num}")
+
+    for rid, locations in rule_counts.items():
+        if len(locations) > 1:
             result.add_error(
-                f"{rid} 被定义多次 (行号: {', '.join(map(str, lines))})"
+                f"{rid} 被定义多次 ({', '.join(locations)})"
+                "（RULE-018：编号空间全项目唯一，含子文档）"
             )
 
-    # 1b. 功能意图与用户流程层（RULE-014，含代码锚点存在性）
-    check_intent_layer(readme_content, unique_rules, result, root)
+    # 1b. 功能意图与用户流程层（RULE-014，含代码锚点存在性；子文档同查）
+    seen_int_ids: set = set()
+    check_intent_layer(
+        readme_content, unique_rules, result, root, seen_int_ids=seen_int_ids
+    )
+    for child in child_readmes:
+        check_intent_layer(
+            child.read_text(encoding='utf-8'),
+            unique_rules,
+            result,
+            root,
+            doc_label=child.relative_to(root).as_posix(),
+            seen_int_ids=seen_int_ids,
+        )
 
     # 2. 提取所有 CHG-ID
     chg_records = extract_chg_ids(change_path)
@@ -541,6 +675,9 @@ def validate_recall() -> ValidationResult:
     check_ver_registrations(
         version_records, version_dir / "index.md", readme_content, result
     )
+
+    # 3c. 漂移度量（RULE-015）：文档是代码理解的缓存，量化缓存的"新鲜度"
+    check_doc_drift(root, result)
 
     # 4. 检查 Git 仓库状态
     try:
