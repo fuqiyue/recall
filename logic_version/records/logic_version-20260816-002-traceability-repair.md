@@ -20,7 +20,7 @@
 
 **背景**：
 系统排查发现三处 P0 级断裂：(1) `recall new` 用的快速模板 commit 字段是
-`- commit: <git-commit-hash>`，而 hook 回填只精确匹配 `- after_commit: _待填写_`，
+`- commit: <git-commit-hash>`，而 hook 回填只精确匹配 `- after_commit: fa1fbd5`，
 官方推荐路径创建的记录**永远无法被回填**——RULE-013 对默认流程完全失效；
 (2) 自动保存提交无 Ref 行（回填只读 Ref），且 `git add -A` 会把用户私人文件
 （如未跟踪的个人笔记）无提示打包并推上公开远端；(3) 功能意图登记表用短编号
