@@ -8,7 +8,7 @@
 - date: 2026-08-16
 - change_id: CHG-20260816-003
 - before_commit: de65e8e
-- after_commit: _待填写_
+- after_commit: 0033b0d
 - recall_route: high
 - history_retention: full
 - decision_confirmed_by: user
