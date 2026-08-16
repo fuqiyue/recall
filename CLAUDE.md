@@ -21,12 +21,9 @@ python scripts/init_recall.py
 6. ✅ 创建 .gitignore 文件
 7. ✅ 创建初始提交
 
-`recall sync` 默认自动保存：工作区有未提交变更时自动创建保存提交，再拉取变基
-并推送，用户无需手写 commit。用户选择手动上传时运行 `recall sync --manual`，
-此后仅在显式 `recall sync --commit-message "<message>"` 时提交；`recall sync --auto`
-恢复自动保存。post-commit hook 永不自动提交其他脏文件，只回填提交所引用决策
-记录的 `after_commit` 后同步。没有远端时初始化不会失败，添加 `origin` 后运行
-`recall sync` 即可。使用 `recall sync --disable` 可完全关闭自动同步。
+`recall sync` 默认自动保存并同步（`--manual` 切手动，`--auto` 恢复，`--disable`
+完全关闭）。语义的权威描述只在 `logic_readme.md` 的 RULE-011/RULE-013 与
+`SKILL.md`，本文件不重复正文，避免平行真源。
 
 **为什么需要 Git？**
 - Recall 使用 Git 管理代码变化（what changed）

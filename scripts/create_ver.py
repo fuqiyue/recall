@@ -11,6 +11,7 @@ recall status 都按这个名字发现记录，任何一方改名都会让记录
 """
 
 import re
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -44,6 +45,24 @@ def find_project_root(start=None):
             return current
         current = current.parent
     return Path(__file__).resolve().parent.parent
+
+
+def head_short_hash(cwd):
+    """返回当前 HEAD 短哈希；无 Git/无提交时返回 None（argv 列表，RULE-006）。"""
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    value = (result.stdout or "").strip()
+    return value if result.returncode == 0 and value else None
 
 
 def get_next_ver_number(records_dir, today_str):
@@ -123,6 +142,9 @@ def create_ver_record(title, scope, template_path=None, output_dir=None):
     content = content.replace("<变更标题>", title)
     content = content.replace("<scope>", scope)
     content = content.replace("YYYY-MM-DD", today_iso)
+    # before_commit 记录创建时的基线；after_commit 留占位符由 hook 回填（RULE-013）
+    content = content.replace("<before-commit-hash>", head_short_hash(root) or "none")
+    # 旧版模板兼容：`- commit: <git-commit-hash>` 字段仍替换为占位符
     content = content.replace("<git-commit-hash>", "_待填写_")
 
     try:
@@ -149,7 +171,7 @@ def create_ver_record(title, scope, template_path=None, output_dir=None):
     print(f"      git commit -m 'feat: {title}'")
     print(f"      git commit -m '...'")
     print(f"      git commit -m 'Ref: logic_version/records/{filename}'")
-    print("   4. 更新决策记录中的 commit hash")
+    print("   4. after_commit 由 post-commit hook 自动回填（RULE-013），无需手动更新")
     return 0
 
 

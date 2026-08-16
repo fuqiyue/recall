@@ -161,10 +161,17 @@ def format_conflict_report(
     """格式化冲突报告"""
     report = []
 
+    limitation = (
+        "ℹ️  本检测为关键词级启发式：只识别对立表述 + 共同主题的组合，"
+        "误报和漏报都可能存在；不覆盖功能意图层（INT/FLOW/UXI）的语义冲突。"
+        "语义级矛盾仍须按 SKILL.md 核心原则 5 由用户澄清裁决。"
+    )
+
     if not rule_conflicts and not change_conflicts:
-        return "✅ 未检测到明显冲突"
+        return f"✅ 未检测到明显冲突\n\n{limitation}"
 
     report.append("⚠️  检测到潜在冲突\n")
+    report.append(limitation + "\n")
 
     if rule_conflicts:
         report.append("## 规则间冲突\n")

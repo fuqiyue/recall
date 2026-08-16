@@ -12,7 +12,7 @@
 - governance_evidence: git:https://github.com/fuqiyue/recall@main
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
-- last_updated: 2026-08-08
+- last_updated: 2026-08-16
 - active_changes: none
 
 ## 议案规则

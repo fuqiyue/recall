@@ -20,10 +20,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-08-07
-- last_verified: 2026-08-08
+- last_verified: 2026-08-16
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -59,10 +59,11 @@
 | RULE-008 | ordinary | CLI 必须可非交互运行，且重定向下不崩 | CI、容器和 AI 代理环境没有 tty；Windows 重定向后 stdout 走 ANSI 代码页 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | 空 stdin 与重定向实测 | valid | 2026-08-08 | self |
 | RULE-009 | ordinary | 校验脚本的字段名以 references/ 模板为准 | schema 漂移会让检查静默失效或报假错误 | [VER-20260808-002](logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | validate.py 记录发现测试 | valid | 2026-08-08 | self |
 | RULE-010 | key | `recall init` 默认启用仓库级 Git 自动同步并安装受管理的 post-commit hook | 让已提交的 Recall 逻辑和代码及时进入配置的远端，减少本地历史与远端漂移 | [VER-20260811-001](logic_version/records/logic_version-20260811-001-git-auto-sync.md) | 用户要求 | git_sync.py + hook 集成测试 | valid | 2026-08-11 | self |
-| RULE-011 | key | `recall sync` 默认自动保存：脏工作区自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；post-commit hook 场景绝不自动提交其他脏文件 | 用户要求默认自动保存上传，消除未提交窗口期的丢失风险；hook 侧不提交以保护部分提交工作流 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | git_sync.py 单元测试 | valid | 2026-08-11 | self |
+| RULE-011 | key | `recall sync` 默认自动保存：脏工作区自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；提交前列出文件清单并对未跟踪新文件单独提示（排除私人文件用 .gitignore）；post-commit hook 场景绝不自动提交其他脏文件 | 用户要求默认自动保存上传；`git add -A` 会打包一切脏文件，用户必须先看到会上传什么，避免私人文件被推上远端 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 用户要求 | git_sync.py 单元测试 | valid | 2026-08-16 | self |
 | RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
-| RULE-013 | ordinary | 提交后同步流程自动回填决策记录的 after_commit：解析 commit message 的 Ref 行，把占位符替换为提交哈希并以内部提交落盘；内部提交通过环境变量防止 hook 递归 | 手工回填常被遗忘，记录到提交方向的追溯链会静默断裂 | [VER-20260811-003](logic_version/records/logic_version-20260811-003-auto-save-sync.md) | 用户要求 | tests/test_git_sync.py | valid | 2026-08-11 | self |
-| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis）；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图，融洽性分析不可复用 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) | 用户确认 | 本文件"功能意图与用户流程"节 + references/ 模板 | valid | 2026-08-16 | self |
+| RULE-013 | key | 提交后自动回填决策记录的 after_commit，双通道定位记录：commit message 的 Ref 行 + 本次提交内规范命名的记录文件；识别新旧两种占位符（`- after_commit:`/`- commit:`），无法回填时打印警告而非静默跳过；内部提交通过环境变量防止 hook 递归 | 只认 Ref 行时自动保存提交（无 Ref）永不触发回填，占位符精确匹配失败曾静默断链；识别不了必须让用户看见 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 复现验证 | tests/test_git_sync.py（含端到端） | valid | 2026-08-16 | self |
+| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis）；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；短编号与追溯链/审计格式互不相认曾造成悬空引用 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py | valid | 2026-08-16 | self |
+| RULE-015 | ordinary | `recall validate` 覆盖一致性对账：VER 三处登记（records/、index.md、有效决策索引）与撞号、INT/FLOW/UXI 引用有效性、medium/high CHG 三字段、字段行占位符未回填、RULE 重复仅按定义行判定；post-commit hook 对"含代码变更但未触及 logic 文档"的提交打印非阻断漂移提醒 | 文档是代码理解的持久缓存，缓存腐烂与登记缺失此前无任何检测，静默失效是本系统反复出现的失败模式 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 复现验证 | scripts/validate.py + tests/test_git_sync.py | valid | 2026-08-16 | self |
 
 ## 代码地图
 
@@ -128,28 +129,31 @@
 
 | intent_id | 功能入口 | intent（服务的用户目标） | 流程位置 | 关联规则/锚点 | last_verified |
 |---|---|---|---|---|---|
-| INT-001 | recall init | 一条命令完成 Git + Recall 接入，无需手动配置 | FLOW-001#1 | RULE-010 | 2026-08-16 |
-| INT-002 | 文档三件套阅读（SKILL/logic_readme/logic_change） | AI 在修改前恢复设计上下文，不从代码反推意图 | FLOW-002#1 | RULE-001..004 | 2026-08-16 |
-| INT-003 | recall new | 修改前留下"为什么改"的决策记录骨架 | FLOW-002#3 | RULE-003, RULE-012 | 2026-08-16 |
-| INT-004 | recall sync | 一条命令保存并同步全部进度，无需手写 Git 序列 | FLOW-001#3, FLOW-002#5 | RULE-011, RULE-013 | 2026-08-16 |
-| INT-005 | recall status / recall list | 快速了解系统当前状态与最近决策 | FLOW-003#1 | RULE-012 | 2026-08-16 |
-| INT-006 | recall query file/commit | 从代码定位"当初为什么这么改" | FLOW-003#2 | RULE-013 | 2026-08-16 |
-| INT-007 | recall validate | 确认文档、记录与 Git 状态一致 | FLOW-003#3 | RULE-009 | 2026-08-16 |
-| INT-008 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | none | 2026-08-16 |
+| INT-20260816-001 | logic_readme 功能意图与用户流程层 | AI 从文档恢复功能级产品逻辑与用户流程，无需重扫代码库 | FLOW-002#1 | RULE-014 | 2026-08-16 |
+| INT-20260816-002 | recall init | 一条命令完成 Git + Recall 接入，无需手动配置 | FLOW-001#1 | RULE-010 | 2026-08-16 |
+| INT-20260816-003 | 文档三件套阅读（SKILL/logic_readme/logic_change） | AI 在修改前恢复设计上下文，不从代码反推意图 | FLOW-002#1 | RULE-001..004 | 2026-08-16 |
+| INT-20260816-004 | recall new | 修改前留下"为什么改"的决策记录骨架 | FLOW-002#3 | RULE-003, RULE-012 | 2026-08-16 |
+| INT-20260816-005 | recall sync | 一条命令保存并同步全部进度，无需手写 Git 序列 | FLOW-001#3, FLOW-002#5 | RULE-011, RULE-013 | 2026-08-16 |
+| INT-20260816-006 | recall status / recall list | 快速了解系统当前状态与最近决策 | FLOW-003#1 | RULE-012 | 2026-08-16 |
+| INT-20260816-007 | recall query file/commit | 从代码定位"当初为什么这么改" | FLOW-003#2 | RULE-013 | 2026-08-16 |
+| INT-20260816-008 | recall validate | 确认文档、记录与 Git 状态一致 | FLOW-003#3 | RULE-009 | 2026-08-16 |
+| INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | none | 2026-08-16 |
+
+编号使用 `INT-YYYYMMDD-NNN`，与 CHG/VER 的 `intent_traceability` 链共用同一编号空间与格式（登记日期为条目首次登记日）。
 
 ### 用户流程
 
-- FLOW-001 首次接入：1. recall init → INT-001；2. 配置远端（可选）；3. recall sync → INT-004
-- FLOW-002 日常修改：1. 读文档 → INT-002；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-003；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-004
-- FLOW-003 追溯审查：1. recall status/list → INT-005；2. recall query → INT-006；3. recall validate → INT-007
-- FLOW-004 冲突澄清：1. recall conflicts → INT-008；2. 在 logic_change.md 标注；3. 用户裁决后按通道实施
+- FLOW-001 首次接入：1. recall init → INT-20260816-002；2. 配置远端（可选）；3. recall sync → INT-20260816-005
+- FLOW-002 日常修改：1. 读文档 → INT-20260816-001, INT-20260816-003；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-20260816-004；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-20260816-005
+- FLOW-003 追溯审查：1. recall status/list → INT-20260816-006；2. recall query → INT-20260816-007；3. recall validate → INT-20260816-008
+- FLOW-004 冲突澄清：1. recall conflicts → INT-20260816-009；2. 在 logic_change.md 标注；3. 用户裁决后按通道实施
 
 ### 操作直觉约束
 
-- UXI-001: 用户不手写 commit message，sync 自动保存；来源：VER-20260811-003；影响：INT-004
-- UXI-002: 一条命令完成一个用户目标，不要求用户记忆多步 Git 序列；来源：用户确认 2026-08-07；影响：INT-001, INT-004
-- UXI-003: hook 与自动化绝不提交用户未提交的其他文件；来源：VER-20260811-003；影响：INT-004
-- UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：INT-001..008
+- UXI-001: 用户不手写 commit message，sync 自动保存；来源：VER-20260811-003；影响：INT-20260816-005
+- UXI-002: 一条命令完成一个用户目标，不要求用户记忆多步 Git 序列；来源：用户确认 2026-08-07；影响：INT-20260816-002, INT-20260816-005
+- UXI-003: hook 与自动化绝不提交用户未提交的其他文件；自动保存提交前列出文件清单，未跟踪文件单独提示；来源：VER-20260811-003；影响：INT-20260816-005
+- UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：全部 INT 条目
 
 ## 责任记录约定
 
@@ -249,7 +253,8 @@ AI 更新 logic_readme.md（如规则变化）
 | runtime | RULE-008 非交互可用（三种无输入形式） | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive` | 三者均退出 0 | 终端输出 |
 | runtime | RULE-008 重定向不崩 | `recall help > out.txt`；`recall status > out.txt` | 退出码 0，无 UnicodeEncodeError | 输出文件 |
 | unit | RULE-009 决策记录字段名与模板一致 | `python tests/test_audit_logic_map.py` | 记录 schema 检查通过 | unittest 输出 |
-| unit | RULE-010/RULE-011/RULE-013 自动同步、自动保存与回填 | `python -m unittest tests.test_git_sync` | 12 tests OK；配置、hook、pull/push、自动保存提交、手动模式、hook 不提交脏文件、递归防护、after_commit 回填 | unittest 输出 |
+| unit | RULE-010/RULE-011/RULE-013 自动同步、自动保存与回填 | `python -m unittest tests.test_git_sync` | 17 tests OK；配置、hook、pull/push、自动保存提交、手动模式、hook 不提交脏文件、递归防护、回填双通道（Ref 行/提交内记录）、旧占位符兼容、无占位符警告、漂移哨兵、recall new 端到端回填 | unittest 输出 |
+| integration | RULE-015 validate 一致性对账 | `python scripts/validate.py` | 三处登记对账、撞号、意图层引用、CHG 三字段、占位符检查出现且无假错误 | 验证报告 |
 | unit | RULE-012 CLI 胶水层接口一致性（new/status/conflicts/记录发现） | `python -m unittest tests.test_recall_cli` | 8 tests OK；记录命名、必填字段、CHG 标题提取、项目根查找通过 | unittest 输出 |
 | runtime | RULE-010 自动同步 CLI 可发现 | `python scripts/recall.py help`; `python scripts/git_sync.py --help` | 帮助包含 `sync`、`--auto`、`--manual`、`--no-auto-sync` 和 `--disable` | 终端输出 |
 
@@ -265,6 +270,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260811-002 | CLI 胶水层接口修复：recall new 断裂、记录命名统一、冲突检测失灵、脏工作区不阻断同步 | RULE-011..012 | [记录](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) |
 | VER-20260811-003 | 默认自动保存上传（--manual 可切手动）与 after_commit 自动回填 | RULE-011, RULE-013 | [记录](logic_version/records/logic_version-20260811-003-auto-save-sync.md) |
 | VER-20260816-001 | 功能级"功能意图与用户流程"层（INT/FLOW/UXI）、CHG 需求拆解字段与 plan 模式落盘约定 | RULE-014 | [记录](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) |
+| VER-20260816-002 | 追溯链断裂修复：recall new 回填链路、自动保存文件清单与回填双通道、INT 编号统一、validate 对账与漂移哨兵 | RULE-011, RULE-013..015 | [记录](logic_version/records/logic_version-20260816-002-traceability-repair.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 
@@ -279,6 +285,8 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 - 不提供实际权限控制（依赖 Git）
 - 归档需人工判断：`scripts/create_ver.py` 按模板生成记录骨架，但"为什么"必须手写
 - 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为
+- 功能意图层随功能数线性增长：接近行数上限（目标 250 / 硬 400）时按 scope 锚点压缩 FLOW 描述、合并同类 UXI，禁止另建第二现行文档（INV-001/002）
+- 自动保存提交（"自动保存本地修改"）无 Ref 行、不承载 why：积累过多会稀释追溯链，medium/high 变更应使用带 Ref 行的语义提交；`recall conflicts` 为关键词级启发式，语义冲突仍需人工澄清
 
 ## 修改检查清单
 

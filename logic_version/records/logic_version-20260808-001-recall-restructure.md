@@ -11,6 +11,7 @@
 - linked_rule_ids: RULE-001, RULE-002, RULE-003, RULE-004
 - confirmed_revision: 1
 - immutable: true
+- after_commit: 578cd5e
 
 ## 为什么做这个决策？
 

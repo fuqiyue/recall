@@ -41,6 +41,7 @@
 | VER-20260811-002 | logic_version-20260811-002-cli-interface-repair | 2026-08-11 | effective | ., scripts/, tests/, references/ | RULE-011, RULE-012 | none | CLI 胶水层接口修复：recall new 断裂、记录命名统一（RULE-012）、CHG 冲突检测失灵、脏工作区不阻断已提交历史同步 | [logic_version-20260811-002-cli-interface-repair.md](records/logic_version-20260811-002-cli-interface-repair.md) |
 | VER-20260811-003 | logic_version-20260811-003-auto-save-sync | 2026-08-11 | effective | ., scripts/, tests/ | RULE-011, RULE-013 | none | 默认自动保存上传（recall.autoCommit，--manual 切手动）与决策记录 after_commit 自动回填、hook 递归防护 | [logic_version-20260811-003-auto-save-sync.md](records/logic_version-20260811-003-auto-save-sync.md) |
 | VER-20260816-001 | logic_version-20260816-001-feature-intent-layer | 2026-08-16 | effective | ., references/ | RULE-014 | none | 功能级"功能意图与用户流程"层（INT/FLOW/UXI 模块化条目）、CHG 需求拆解与融入分析字段、plan 模式批准后按通道落盘 | [logic_version-20260816-001-feature-intent-layer.md](records/logic_version-20260816-001-feature-intent-layer.md) |
+| VER-20260816-002 | logic_version-20260816-002-traceability-repair | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-011, RULE-013, RULE-014, RULE-015 | none | 追溯链断裂修复：recall new 回填链路、自动保存文件清单与回填双通道、INT 编号统一、validate 三处对账与漂移哨兵 | [logic_version-20260816-002-traceability-repair.md](records/logic_version-20260816-002-traceability-repair.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 

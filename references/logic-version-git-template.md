@@ -26,7 +26,8 @@
 - status: effective
 - date: YYYY-MM-DD
 - change_id: none
-- commit: <git-commit-hash>
+- before_commit: <before-commit-hash>
+- after_commit: _待填写_
 
 ## 为什么做这个决策？
 
@@ -101,13 +102,14 @@ Ref: logic_version/records/logic_version-20260808-001-add-dark-mode.md"
 
 ### 3. 更新决策记录
 
-```bash
-# 获取刚才的 commit hash
-COMMIT=$(git rev-parse HEAD)
+提交后无需手动操作：post-commit hook 解析 commit message 的 Ref 行，
+把记录中的 `- after_commit: _待填写_` 占位符自动回填为提交哈希（RULE-013）。
+记录文件与代码在同一提交中时，即使没有 Ref 行也会按提交文件清单回填。
+`before_commit` 由 `recall new` 在创建时填入当时的 HEAD。
 
-# 在决策记录中填入 commit hash
-# 编辑 logic_version-20260808-001-add-dark-mode.md
-# - commit: $COMMIT
+```bash
+# 仅在 hook 未启用时才需要手动回填：
+git rev-parse --short HEAD   # 填入 - after_commit: <hash>
 ```
 
 ### 4. 归档议案
@@ -129,7 +131,8 @@ COMMIT=$(git rev-parse HEAD)
 | version_id | VER-YYYYMMDD-NNN 格式 | VER-20260808-001 |
 | date | 归档日期 | 2026-08-08 |
 | status | effective/rejected/cancelled | effective |
-| commit | Git commit hash（完整或短版） | abc123def456 |
+| before_commit | 变更前基线 commit（recall new 自动填入） | b8db894 |
+| after_commit | 实施提交的 hash（hook 自动回填 `_待填写_` 占位符） | beb24d6 |
 | ## 为什么做这个决策？ | 为什么要改 | 用户反馈... |
 | ## 影响范围 | 改了什么文件/功能 | 修改了样式系统 |
 | ## 验证方式 | 如何验证修改成功 | 测试命令与结果 |

@@ -9,8 +9,9 @@ The sync policy is intentionally small and explicit:
   generated message before pulling and pushing (``recall.autoCommit``, default
   on; switch off with ``recall sync --manual``).
 * The hook never stages files: it only backfills ``after_commit`` placeholders
-  referenced by the fresh commit, then synchronizes existing commits. This
-  keeps partial-commit workflows safe.
+  in records referenced by the fresh commit's ``Ref:`` lines or contained in
+  the commit itself, then synchronizes existing commits. This keeps
+  partial-commit workflows safe.
 * Network failures are reported but do not make a completed local commit fail.
 
 All Git commands are passed as argv lists so commit messages and remote URLs are
@@ -37,6 +38,21 @@ DEFAULT_COMMIT_MESSAGE = "chore: synchronize Recall changes"
 AUTOCOMMIT_MESSAGE = "chore(recall): 自动保存本地修改"
 BACKFILL_MESSAGE = "chore(recall): 回填决策记录 after_commit"
 AFTER_COMMIT_PLACEHOLDER = "- after_commit: _待填写_"
+# 可回填的占位符（按优先级）：完整模板的 after_commit 与旧快速模板的 commit 字段。
+# 占位符必须精确匹配；识别不了时打印警告而非静默跳过（RULE-013）。
+BACKFILL_PLACEHOLDERS = (
+    ("- after_commit: _待填写_", "- after_commit: "),
+    ("- commit: _待填写_", "- commit: "),
+)
+# 已填写的 after_commit/commit 字段（before_commit 不算）
+COMMIT_FIELD_RE = re.compile(
+    r"^\s*-\s*(?:after_)?commit\s*[：:]\s*(\S+)", re.MULTILINE
+)
+HEX_HASH_RE = re.compile(r"^[0-9a-f]{7,40}$", re.IGNORECASE)
+# 规范命名的决策记录相对路径（RULE-012）
+RECORD_REL_RE = re.compile(
+    r"^logic_version/records/logic_version-\d{8}-\d{3}-.+\.md$", re.IGNORECASE
+)
 # commit message 里的 `Ref: logic_version/records/<file>.md` 行
 REF_LINE_RE = re.compile(r"Ref:\s*(logic_version/records/\S+?\.md)", re.IGNORECASE)
 # 内部提交（自动保存/回填）触发的嵌套 post-commit hook 必须直接退出，
@@ -257,6 +273,38 @@ def _run_git_internal_commit(args: Iterable[str], project_root: Path) -> Tuple[b
         os.environ.pop(INTERNAL_COMMIT_ENV, None)
 
 
+def _list_dirty_files(project_root: Path) -> list:
+    """返回 ``(状态, 路径)`` 列表，供自动保存前向用户展示提交范围。"""
+    ok, output, _ = run_git(["status", "--porcelain"], cwd=project_root)
+    if not ok:
+        return []
+    entries = []
+    for line in output.splitlines():
+        if len(line) < 4:
+            continue
+        entries.append((line[:2], line[3:].strip().strip('"')))
+    return entries
+
+
+def _print_commit_plan(entries: list) -> None:
+    """打印将被打包进同步提交的文件清单；未跟踪的新文件单独提示。
+
+    自动保存用 ``git add -A`` 收集一切脏文件，用户必须能看到会上传什么；
+    不想上传的文件应先加入 .gitignore（UXI-003 的透明性要求）。
+    """
+    if not entries:
+        return
+    print(f"ℹ️  即将提交 {len(entries)} 个文件:")
+    shown = entries[:20]
+    for status, path in shown:
+        marker = "  ← 新文件（此前未跟踪）" if status == "??" else ""
+        print(f"   {status.strip() or '·'} {path}{marker}")
+    if len(entries) > len(shown):
+        print(f"   … 其余 {len(entries) - len(shown)} 个")
+    if any(status == "??" for status, _ in entries):
+        print("   ⚠️  含未跟踪的新文件；不想上传的文件请先加入 .gitignore 再运行 recall sync")
+
+
 def _commit_dirty_worktree(
     project_root: Path, message: str, quiet: bool = False
 ) -> Tuple[bool, bool]:
@@ -268,6 +316,8 @@ def _commit_dirty_worktree(
     """
     if not _is_dirty(project_root):
         return True, False
+    if not quiet:
+        _print_commit_plan(_list_dirty_files(project_root))
     ok, _, stderr = run_git(["add", "-A"], cwd=project_root)
     if not ok:
         print(f"❌ 添加待同步文件失败: {stderr}")
@@ -284,39 +334,83 @@ def _commit_dirty_worktree(
     return False, False
 
 
-def backfill_after_commit(project_root: Path, quiet: bool = False) -> bool:
-    """把 HEAD 提交引用的决策记录里的 after_commit 占位符回填为提交哈希。
+def _head_commit_files(project_root: Path) -> list:
+    """返回 HEAD 提交涉及的文件相对路径列表。"""
+    ok, output, _ = run_git(
+        ["log", "-1", "--format=", "--name-only"], cwd=project_root
+    )
+    if not ok or not output:
+        return []
+    return [line.strip() for line in output.splitlines() if line.strip()]
 
-    只处理 commit message 中 ``Ref: logic_version/records/*.md`` 指向、且
-    仍含占位符的记录；回填后以内部提交落盘（只 add 被回填的文件，绝不
-    ``add -A``，避免把无关脏文件卷进来）。失败只告警，不阻断同步。
+
+def _fill_placeholder(text: str, short_hash: str) -> Tuple[str, bool]:
+    """把新旧两种占位符之一回填为提交哈希，返回 ``(新文本, 是否回填)``。"""
+    for placeholder, prefix in BACKFILL_PLACEHOLDERS:
+        if placeholder in text:
+            return text.replace(placeholder, f"{prefix}{short_hash}", 1), True
+    return text, False
+
+
+def _has_filled_commit_field(text: str) -> bool:
+    """记录里的 after_commit/commit 字段是否已填有效哈希（before_commit 不算）。"""
+    return any(
+        HEX_HASH_RE.match(match.group(1))
+        for match in COMMIT_FIELD_RE.finditer(text)
+    )
+
+
+def backfill_after_commit(project_root: Path, quiet: bool = False) -> bool:
+    """把 HEAD 提交关联的决策记录里的 after_commit 占位符回填为提交哈希。
+
+    双通道定位记录：commit message 中 ``Ref: logic_version/records/*.md``
+    指向的记录，以及本次提交文件清单里规范命名的记录（记录与代码同一
+    提交时无需 Ref 行——自动保存提交正是这种情形）。识别新旧两种占位符；
+    Ref 显式指向的记录既无占位符也无已填哈希时打印警告而非静默跳过。
+    回填后以内部提交落盘（只 add 被回填的文件，绝不 ``add -A``，避免把
+    无关脏文件卷进来）。失败只告警，不阻断同步。
     """
     ok, output, _ = run_git(["log", "-1", "--format=%h%n%B"], cwd=project_root)
     if not ok or not output:
         return True
     short_hash, _, body = output.partition("\n")
     refs = REF_LINE_RE.findall(body)
-    if not refs:
+    committed_records = [
+        path
+        for path in (f.replace("\\", "/") for f in _head_commit_files(project_root))
+        if RECORD_REL_RE.match(path)
+    ]
+    # 保序去重：Ref 显式引用优先，其后是提交内的记录文件
+    candidates = list(dict.fromkeys([*refs, *committed_records]))
+    if not candidates:
         return True
 
     filled = []
-    for ref in refs:
+    for ref in candidates:
+        explicit_ref = ref in refs
         record_path = (project_root / Path(ref)).resolve()
         try:
             record_path.relative_to(project_root)
         except ValueError:
             continue  # Ref 指向项目外，不碰
         if not record_path.is_file():
+            if explicit_ref and not quiet:
+                print(f"⚠️  Ref 指向的记录不存在，无法回填 after_commit: {ref}")
             continue
         try:
             text = record_path.read_text(encoding="utf-8")
         except (OSError, UnicodeError):
             continue
-        if AFTER_COMMIT_PLACEHOLDER not in text:
+        text, matched = _fill_placeholder(text, short_hash)
+        if not matched:
+            # 已填哈希是正常状态（同一记录被后续提交再次引用）；
+            # 既无占位符也无哈希才是断链，必须让用户看见
+            if explicit_ref and not quiet and not _has_filled_commit_field(text):
+                print(
+                    f"⚠️  记录缺少可回填的占位符（应含 `{AFTER_COMMIT_PLACEHOLDER}`），"
+                    f"after_commit 未回填: {ref}"
+                )
             continue
-        text = text.replace(
-            AFTER_COMMIT_PLACEHOLDER, f"- after_commit: {short_hash}", 1
-        )
         try:
             record_path.write_text(text, encoding="utf-8")
         except OSError as exc:
@@ -343,6 +437,40 @@ def backfill_after_commit(project_root: Path, quiet: bool = False) -> bool:
     return True
 
 
+def _is_doc_like_path(path: str) -> bool:
+    """漂移哨兵用的文档类文件判定（.md/.txt 等不算代码变更）。"""
+    name = path.rsplit("/", 1)[-1].lower()
+    if name.startswith(".git"):
+        return True
+    if name in ("license", "notice", "claude.md", "agents.md"):
+        return True
+    return name.endswith((".md", ".markdown", ".rst", ".txt"))
+
+
+def warn_missing_logic_docs(project_root: Path, quiet: bool = False) -> None:
+    """漂移哨兵：HEAD 提交含代码变更但未触及 logic 文档时打印非阻断提醒。
+
+    logic_readme 是代码理解的持久缓存；代码变了而文档没动，缓存就在
+    静默腐烂。简单通道的提交可以忽略这行提醒，它不阻断任何操作。
+    """
+    if quiet:
+        return
+    files = [f.replace("\\", "/") for f in _head_commit_files(project_root)]
+    if not files:
+        return
+    logic_touched = any(
+        f in ("logic_readme.md", "logic_change.md") or f.startswith("logic_version/")
+        for f in files
+    )
+    if logic_touched:
+        return
+    if any(not _is_doc_like_path(f) for f in files):
+        print(
+            "ℹ️  本次提交包含代码变更但未更新 logic 文档"
+            "（简单通道可忽略；涉及规则或用户可见行为请更新 logic_readme.md）"
+        )
+
+
 def sync_repository(
     project_root: Path,
     remote: Optional[str] = None,
@@ -351,6 +479,7 @@ def sync_repository(
     push: bool = True,
     quiet: bool = False,
     autocommit: bool = True,
+    drift_check: bool = False,
 ) -> int:
     """Synchronize changes with a configured remote.
 
@@ -391,6 +520,10 @@ def sync_repository(
             # 常见场景。pull 侧由 --autostash 保护未提交变更。
             if not quiet:
                 print("ℹ️  工作区有未提交变更；仅同步已提交历史（提交当前文件请用 --commit-message）")
+
+    # 漂移哨兵先看用户的原始提交；回填的内部提交会改变 HEAD，必须在其之前
+    if drift_check:
+        warn_missing_logic_docs(project_root, quiet=quiet)
 
     # 提交完成后回填决策记录的 after_commit（RULE-013）；失败只告警
     backfill_after_commit(project_root, quiet=quiet)
@@ -493,6 +626,8 @@ def main(argv: Optional[Iterable[str]] = None) -> int:
         push=not args.no_push,
         # hook 场景绝不自动提交其他脏文件，保护部分提交工作流
         autocommit=not args.post_commit,
+        # 漂移哨兵只看 hook 场景的新鲜用户提交；手动 sync 的 HEAD 可能是旧提交
+        drift_check=args.post_commit,
     )
     if args.post_commit and code == 2:
         return 0
