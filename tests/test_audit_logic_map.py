@@ -55,6 +55,73 @@ RECALL_AGENT_CONFIG_ROOT: <project-root>/{config_root}
 """
 
 
+INHERITED_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | inherited | [app policy](logic_readme.md#scope-mod-app) | [changes](logic_change.md) | self | active |"
+
+README_ONLY_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | readme-only | [app policy](src/logic_readme.md) | none | self | active |"
+
+PAIRED_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | paired | [app policy](src/logic_readme.md) | [changes](src/logic_change.md) | self | active |"
+
+
+def child_readme(policy: str = "readme-only") -> str:
+    return f"""# App module logic
+
+## 文档控制
+
+- doc_id: LOGIC-DEMO-APP
+- module_id: MOD-APP
+- scope: src
+- scope_path: src
+- parent: ../logic_readme.md
+- parent_module_id: MOD-ROOT
+- membership: in-system
+- scope_type: module
+- layer: runtime-code
+- module_doc_policy: {policy}
+- status: active
+- owner: self
+- governance_mode: personal
+- governance_ref: git:demo-repository
+- governance_evidence: git:demo-repository
+- governance_verification: recorded
+- governance_verified_at: 2026-07-22
+- effective_from: 2026-07-22
+- last_verified: 2026-07-22
+- review_trigger: interval:90d; event:release
+- source_of_truth: src/app.py
+- source_decisions: none
+- intent_summary: keep the app module logic discoverable
+- intent_sources: user-confirmed:2026-07-22
+- decision_validity: valid
+- validity_evidence: user-confirmed:2026-07-22
+
+## 范围登记与归属
+
+- canonical_readme: src/logic_readme.md
+- canonical_change: none
+- owned_paths: src
+- child_policy: inherit
+- data_owner: none
+- registry_status: registered
+
+## 当前制度
+
+| rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
+|---|---|---|---|---|---|---|---|---|---|
+| RULE-APP-OUTPUT | ordinary | Keep the module output stable. | Callers rely on the current shape. | none | user-confirmed:2026-07-22 | src/app.py | valid | 2026-07-22 | self |
+
+## 代码地图
+
+| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|
+| src/app.py | source/runtime-code | application | input | output | code | yes | none |
+
+## 活跃议案入口
+
+- 唯一入口：[logic_change.md](../logic_change.md)
+- 相关 CHG-ID：none
+"""
+
+
 def root_readme(
     *,
     full: bool,
@@ -865,6 +932,70 @@ class RootOnlyAuditTests(unittest.TestCase):
             )
             report = self.collect(root)
 
+        self.assertTrue(self.fails(report))
+
+    def test_registered_readme_only_child_document_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            readme_path = root / "logic_readme.md"
+            text = readme_path.read_text(encoding="utf-8")
+            self.assertIn(INHERITED_APP_ROW, text)
+            readme_path.write_text(
+                text.replace(INHERITED_APP_ROW, README_ONLY_APP_ROW),
+                encoding="utf-8",
+            )
+            (root / "src" / "logic_readme.md").write_text(
+                child_readme(), encoding="utf-8"
+            )
+            change_path = root / "logic_change.md"
+            proposal = change_path.read_text(encoding="utf-8")
+            change_path.write_text(
+                proposal.replace(
+                    "- related_modules: [MOD-APP](logic_readme.md#scope-mod-app)",
+                    "- related_modules: MOD-APP",
+                ),
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        self.assertNotIn(
+            "src/logic_readme.md", report["current_state_nonroot_documents"]
+        )
+        self.assertFalse(
+            [
+                issue
+                for issue in report["module_routes"]["route_issues"]
+                if issue.startswith("mod-app:")
+            ]
+        )
+        self.assertFalse(self.fails(report))
+
+    def test_nonroot_paired_registration_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            readme_path = root / "logic_readme.md"
+            text = readme_path.read_text(encoding="utf-8")
+            readme_path.write_text(
+                text.replace(INHERITED_APP_ROW, PAIRED_APP_ROW),
+                encoding="utf-8",
+            )
+            (root / "src" / "logic_readme.md").write_text(
+                child_readme(policy="paired"), encoding="utf-8"
+            )
+            (root / "src" / "logic_change.md").write_text(
+                "# module changes\n", encoding="utf-8"
+            )
+            report = self.collect(root)
+
+        self.assertIn(
+            "mod-app:paired-policy-root-only",
+            report["module_routes"]["route_issues"],
+        )
+        self.assertIn(
+            "src/logic_change.md", report["current_state_nonroot_documents"]
+        )
         self.assertTrue(self.fails(report))
 
     def test_agent_private_current_document_is_rejected(self) -> None:

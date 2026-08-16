@@ -85,6 +85,14 @@
 | module_id | scope_path | membership | scope_type/layer | doc_policy | logic_readme | logic_change | owner | status |
 |---|---|---|---|---|---|---|---|---|
 | MOD-ROOT | . | in-system | root/runtime-code | paired | [logic_readme.md](logic_readme.md) | [logic_change.md](logic_change.md) | ... | active |
+
+`doc_policy` 取值：根行固定 `paired`；非根模块默认 `inherited`（正文在根文档的
+`<a id="scope-...">` 锚点小节，`logic_readme` 列链接根文档带锚点）；经用户确认拆分的
+复杂模块用 `readme-only`（RULE-018）——子文档 `<scope_path>/logic_readme.md` 承载模块
+正文（不含 root-only 字段与范围登记表，`canonical_change: none`），该行 `logic_readme`
+列直接链接子文档（无需锚点）、`logic_change` 列填 `none`。非根 `paired` 违规：
+`logic_change.md` 全项目只有根一份（INV-002）。尚未补全文档的存量模块登记
+`status: pending-docs`（见项目接入流程）。
 | MOD-... | path/to/module | in-system | module/runtime-code | inherited | [root policy](logic_readme.md#scope-mod-example) | [active changes](logic_change.md) | ... | active |
 | EXT-... | path/to/vendor | dependency | dependency | inherited | none | none | ... | active |
 

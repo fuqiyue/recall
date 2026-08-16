@@ -122,6 +122,8 @@ git rev-parse --short HEAD   # 填入 - after_commit: <hash>
 ```bash
 # 先把 CHG 的 raw_request/decomposition/fit_analysis 搬入本记录（需求保全，
 # 否则删除 CHG 后需求拆解只剩 git 考古可查），再从 logic_change.md 移除该 CHG
+# 同议题落选方案：把其需求原文与否决原因并入本记录"决策过程"的方案分析；
+# 曾独立立案的落选 CHG 另建 status: rejected 的精简 VER 并同样搬运三字段
 # 更新 logic_readme.md（如规则变化）
 # 在 logic_version/index.md 中添加索引行
 ```

@@ -2808,10 +2808,10 @@ def audit_module_routes(root: Path, audits: list[ModuleAudit]) -> dict:
             root_rows += 1
             if membership != "in-system" or doc_policy != "paired":
                 route_issues.append("root-route-must-be-in-system-paired")
-        elif membership == "in-system" and doc_policy != "inherited":
-            route_issues.append(
-                f"{module_id}:root-only-model-requires-inherited-policy"
-            )
+        elif membership == "in-system" and doc_policy == "paired":
+            # 非根模块可 inherited（默认）或 readme-only（经确认拆分的子文档）。
+            # paired 仅限根：logic_change 全项目唯一（INV-002）。
+            route_issues.append(f"{module_id}:paired-policy-root-only")
 
         local_readme = scope_dir / "logic_readme.md"
         local_change = scope_dir / "logic_change.md"
@@ -2900,6 +2900,7 @@ def audit_module_routes(root: Path, audits: list[ModuleAudit]) -> dict:
                 column == "logic_readme"
                 and scope_value != "."
                 and membership == "in-system"
+                and doc_policy == "inherited"
             ):
                 if not fragment:
                     route_issues.append(
@@ -5091,8 +5092,33 @@ def find_parallel_current_candidates(root: Path, excludes: set[str]) -> list[str
     return sorted(set(candidates))
 
 
-def find_nonroot_current_documents(root: Path, excludes: set[str]) -> list[str]:
+def registered_child_readme_paths(root: Path) -> set[str]:
+    """Casefolded relative paths of child readmes registered as readme-only.
+
+    只有根范围登记表中 in-system + readme-only 的行才使子文档
+    `<scope_path>/logic_readme.md` 合法（RULE-018）；logic_change 永不豁免。
+    """
+    text, error = read_text(root / "logic_readme.md")
+    if error:
+        return set()
+    allowed: set[str] = set()
+    for row in markdown_table_rows(text, "范围登记表"):
+        policy = (row.get("doc_policy") or "").strip().strip("`").lower()
+        membership = (row.get("membership") or "").strip().strip("`").lower()
+        scope_raw = (row.get("scope_path") or "").strip().strip("`")
+        if policy != "readme-only" or membership != "in-system":
+            continue
+        scope_norm = normalize_scope_path(scope_raw)
+        if scope_norm and scope_norm != ".":
+            allowed.add(f"{scope_norm}/logic_readme.md".casefold())
+    return allowed
+
+
+def find_nonroot_current_documents(
+    root: Path, excludes: set[str], allowed_child_readmes: set[str] | None = None
+) -> list[str]:
     """Find duplicate current-truth files outside the project root."""
+    allowed = allowed_child_readmes or set()
     candidates: list[str] = []
     scan_excludes = excludes - {
         CURRENT_HISTORY_ROOT,
@@ -5115,7 +5141,13 @@ def find_nonroot_current_documents(root: Path, excludes: set[str]) -> list[str]:
             continue
         for name in file_names:
             if name.casefold() in {"logic_readme.md", "logic_change.md"}:
-                candidates.append((current / name).relative_to(root).as_posix())
+                relative = (current / name).relative_to(root).as_posix()
+                if (
+                    name.casefold() == "logic_readme.md"
+                    and relative.casefold() in allowed
+                ):
+                    continue
+                candidates.append(relative)
     return sorted(set(candidates))
 
 
@@ -5844,7 +5876,9 @@ def collect_audit(args: argparse.Namespace) -> dict:
     else:
         misplaced_versions, misplaced_decisions = find_misplaced_records(root, excludes)
     parallel_current = find_parallel_current_candidates(root, excludes)
-    nonroot_current_documents = find_nonroot_current_documents(root, excludes)
+    nonroot_current_documents = find_nonroot_current_documents(
+        root, excludes, registered_child_readme_paths(root)
+    )
     misplaced_temp = find_misplaced_temp_records(root, excludes)
     entrypoints, private_knowledge, private_candidates = audit_agent_entrypoints(root)
     required_entry_names: set[str] = set()

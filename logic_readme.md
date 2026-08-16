@@ -23,7 +23,7 @@
 - last_verified: 2026-08-16
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -62,9 +62,11 @@
 | RULE-011 | key | `recall sync` 默认自动保存：脏工作区自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；提交前列出文件清单并对未跟踪新文件单独提示（排除私人文件用 .gitignore）；post-commit hook 场景绝不自动提交其他脏文件 | 用户要求默认自动保存上传；`git add -A` 会打包一切脏文件，用户必须先看到会上传什么，避免私人文件被推上远端 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 用户要求 | git_sync.py 单元测试 | valid | 2026-08-16 | self |
 | RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
 | RULE-013 | key | 提交后自动回填决策记录的 after_commit，双通道定位记录：commit message 的 Ref 行 + 本次提交内规范命名的记录文件；识别新旧两种占位符（`- after_commit:`/`- commit:`）且只按整个字段行匹配（叙述文字中引用的占位符不回填）；无法回填时打印警告而非静默跳过；内部提交通过环境变量防止 hook 递归 | 只认 Ref 行时自动保存提交（无 Ref）永不触发回填；裸子串替换曾把记录叙述文字里引用的占位符改成哈希，污染不可变记录正文 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 复现验证 | tests/test_git_sync.py（含端到端与字段行锚定） | valid | 2026-08-16 | self |
-| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查 | [VER-20260816-003](logic_version/records/logic_version-20260816-003-semantic-link.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py | valid | 2026-08-16 | self |
+| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；同议题多方案竞争时，落选方案连同其需求原文与否决原因随胜出 VER 的方案分析归档，已独立立案的落选 CHG 建 `status: rejected` 的 VER 记录并同样搬运三字段；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查，落选方案直接删除亦然 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py | valid | 2026-08-16 | self |
 | RULE-015 | ordinary | `recall validate` 覆盖一致性对账：VER 三处登记（records/、index.md、有效决策索引）与撞号、INT/FLOW/UXI 引用有效性与代码锚点存在性、medium/high CHG 三字段、VER 需求保全三字段（change_id != none 时）、字段行占位符未回填、RULE 重复仅按定义行判定；post-commit hook 对"含代码变更但未触及 logic 文档"的提交打印非阻断漂移提醒 | 文档是代码理解的持久缓存，缓存腐烂与登记缺失此前无任何检测，静默失效是本系统反复出现的失败模式 | [VER-20260816-003](logic_version/records/logic_version-20260816-003-semantic-link.md) | 复现验证 | scripts/validate.py + tests/test_git_sync.py | valid | 2026-08-16 | self |
 | RULE-016 | key | 项目接入采用模块化渐进：接入时只建根骨架（文档控制、范围登记表、代码地图顶层入口、访谈式 INT/FLOW 初稿），存量模块登记 `pending-docs`；此后仅在新项目开始使用时或用户单独要求时补全对应模块；AI 代码扫描产出标 `code-derived`，意图层必须经用户确认后落盘 | `recall init` 只建 Git 管道，文档内容从哪来此前无流程；一次性全量扫描在存量项目不可行，未经确认的 AI 推断意图会污染真源 | [VER-20260816-003](logic_version/records/logic_version-20260816-003-semantic-link.md) | 用户确认 | references/project-onboarding.md + SKILL.md 接入章节 | valid | 2026-08-16 | self |
+| RULE-017 | key | 会话默认延续：新会话或上下文压缩后以现行 logic 文档与活跃议案为准继续（新会话视作新人接手，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度；模糊点先按现行逻辑分析并给出建议再咨询（SKILL 原则 5/11） | 协作协议此前只活在对话历史，每次压缩后用户被迫重讲元规则，正是 Recall 要消灭的 rescan | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | SKILL.md 核心原则 11 | valid | 2026-08-16 | self |
+| RULE-018 | key | 层级化子文档：根 logic_readme 为总规章与路由中台；子模块复杂度达标时由 AI 提出拆分建议、经用户确认后在模块目录建 `logic_readme.md` 并以 `doc_policy: readme-only` 登记进范围登记表；修改子模块先读根再读子文档，跨模块变更在同一变更中更新全部相关文档；根规章优先于子文档；logic_change 与 logic_version 全项目唯一；未登记子文档仍为平行真源违规 | 单文件+锚点适合小项目，大项目全量阅读低效；按需分批披露上下文，但未经登记的拆分会重演平行真源失败模式 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | scripts/audit_logic_map.py 范围路由 + tests/test_audit_logic_map.py | valid | 2026-08-16 | self |
 
 ## 代码地图
 
@@ -80,7 +82,7 @@
 | recall.sh | source/runtime-code | Linux/macOS CLI 入口；同上 | 命令行参数 | 子命令输出与退出码 | recall.sh | yes | none |
 | .gitattributes | source/runtime-config | 固定 *.bat 为 CRLF、*.sh 为 LF | Git 检出 | 换行符 | .gitattributes | yes | none |
 | scripts/recall.py | source/runtime-code | CLI 调度器；转发到各子命令 | 子命令与参数 | 退出码 | 脚本文件 | yes | tests/test_recall_cli.py |
-| scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
+| scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度与范围路由（含 readme-only 子文档） | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
 | scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态 | 项目根路径 | 验证报告 | 脚本文件 | yes | none |
 | scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交 | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
 | scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、自动保存提交、回填 after_commit、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
@@ -140,6 +142,7 @@
 | INT-20260816-008 | recall validate | 确认文档、记录与 Git 状态一致 | FLOW-003#3 | RULE-009 | scripts/validate.py | 2026-08-16 |
 | INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | none | scripts/detect_conflicts.py | 2026-08-16 |
 | INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建根骨架，按触发时机逐模块补全 | FLOW-005#2 | RULE-016 | references/project-onboarding.md | 2026-08-16 |
+| INT-20260816-011 | 层级化子文档拆分（RULE-018） | 大项目按模块分批披露上下文：改哪个模块读哪份子文档，跨模块才读全量 | FLOW-005#4 | RULE-018 | references/project-onboarding.md; scripts/audit_logic_map.py | 2026-08-16 |
 
 编号使用 `INT-YYYYMMDD-NNN`，与 CHG/VER 的 `intent_traceability` 链共用同一编号空间与格式（登记日期为条目首次登记日）。"代码锚点"列支撑反向查询 `recall query intent <INT-ID>`（意图 → 规则 → 决策记录 → 文件）；validate 检查锚点路径存在性。
 
@@ -149,7 +152,7 @@
 - FLOW-002 日常修改：1. 读文档 → INT-20260816-001, INT-20260816-003；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-20260816-004；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-20260816-005
 - FLOW-003 追溯审查：1. recall status/list → INT-20260816-006；2. recall query → INT-20260816-007；3. recall validate → INT-20260816-008
 - FLOW-004 冲突澄清：1. recall conflicts → INT-20260816-009；2. 在 logic_change.md 标注；3. 用户裁决后按通道实施
-- FLOW-005 项目接入（文档初稿）：1. recall init → INT-20260816-002；2. 建根骨架 + 意图访谈（存量模块登记 pending-docs）→ INT-20260816-010；3. 按触发时机（新项目使用时/用户单独要求时）逐模块补全 → INT-20260816-010
+- FLOW-005 项目接入（文档初稿）：1. recall init → INT-20260816-002；2. 建根骨架 + 意图访谈（存量模块登记 pending-docs）→ INT-20260816-010；3. 按触发时机（新项目使用时/用户单独要求时）逐模块补全 → INT-20260816-010；4. 模块复杂度达标时 AI 建议拆分子文档、用户确认后登记 readme-only → INT-20260816-011
 
 ### 操作直觉约束
 
@@ -157,6 +160,7 @@
 - UXI-002: 一条命令完成一个用户目标，不要求用户记忆多步 Git 序列；来源：用户确认 2026-08-07；影响：INT-20260816-002, INT-20260816-005
 - UXI-003: hook 与自动化绝不提交用户未提交的其他文件；自动保存提交前列出文件清单，未跟踪文件单独提示；来源：VER-20260811-003；影响：INT-20260816-005
 - UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：全部 INT 条目
+- UXI-005: 新会话默认延续：用户不需要重述项目哲学与背景，文档即交接；现行规则仅在用户明确否定时才修改；来源：VER-20260816-004；影响：INT-20260816-001, INT-20260816-003
 
 ## 责任记录约定
 
@@ -220,8 +224,8 @@ AI 更新 logic_readme.md（如规则变化）
 
 ## 不可破坏约束
 
-- INV-001: logic_readme.md 必须唯一，禁止创建 logic_readme-v2.md；来源：SKILL.md 核心原则；验证：文件系统检查
-- INV-002: logic_change.md 必须唯一，禁止创建副本；来源：SKILL.md 核心原则；验证：文件系统检查
+- INV-001: 现行 logic_readme 每 scope 唯一：根文档唯一；子文档必须以 readme-only 登记在根范围登记表且经用户确认拆分后才可存在（RULE-018）；禁止 logic_readme-v2.md 等未登记平行正文；来源：SKILL.md 核心原则；验证：审计静态门（nonroot/parallel 检测 + 范围路由对账）
+- INV-002: logic_change.md 必须唯一（不随子文档拆分，全项目仅根一份），禁止创建副本；来源：SKILL.md 核心原则；验证：文件系统检查
 - INV-003: logic_version/records/ 中的 VER-* 记录不可修改，只能追加；来源：不可变决策记录原则；验证：Git 历史
 - INV-004: 历史记录不保存代码快照，只保存设计逻辑；来源：逻辑回档原则；验证：VER-* 内容审查
 
@@ -247,7 +251,7 @@ AI 更新 logic_readme.md（如规则变化）
 
 | test_level | 规则/不变量 | 当前验证命令/检查 | expected | authoritative_evidence |
 |---|---|---|---|---|
-| unit | 审计脚本行为（含 INV-001/INV-002 平行真源检测） | `python tests/test_audit_logic_map.py` | 62 tests OK | unittest 输出 |
+| unit | 审计脚本行为（含 INV-001/INV-002 平行真源检测、RULE-018 子文档路由：已登记 readme-only 放行、未登记与非根 paired 拦截） | `python tests/test_audit_logic_map.py` | 64 tests OK | unittest 输出 |
 | contract | INV-001/INV-002 单一现行文档 | `python scripts/audit_logic_map.py . --current-state` | 无 parallel-current 或 nonroot-current 报告 | 审计报告 + 退出码 |
 | contract | RULE-007 嵌套项目根不计入审计 | `python scripts/audit_logic_map.py . --current-state` | 夹具不出现在 Non-root current documents | 审计报告 |
 | integration | RULE-009 校验字段名与模板一致 | `python scripts/validate.py` | 决策记录被发现且无假缺失字段 | 验证报告 |
@@ -275,6 +279,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260816-001 | 功能级"功能意图与用户流程"层（INT/FLOW/UXI）、CHG 需求拆解字段与 plan 模式落盘约定 | RULE-014 | [记录](logic_version/records/logic_version-20260816-001-feature-intent-layer.md) |
 | VER-20260816-002 | 追溯链断裂修复：recall new 回填链路、自动保存文件清单与回填双通道、INT 编号统一、validate 对账与漂移哨兵 | RULE-011, RULE-013..015 | [记录](logic_version/records/logic_version-20260816-002-traceability-repair.md) |
 | VER-20260816-003 | 需求↔架构语义链路补全：模块化项目接入流程、CHG 三字段归档搬入 VER（需求保全）、INT 代码锚点与 query intent 反向查询 | RULE-014..016 | [记录](logic_version/records/logic_version-20260816-003-semantic-link.md) |
+| VER-20260816-004 | 会话默认延续原则、层级化子 logic 文档（readme-only 登记拆分）与舍弃方案归档 | RULE-014, RULE-017..018 | [记录](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 
@@ -289,7 +294,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 - 不提供实际权限控制（依赖 Git）
 - 归档需人工判断：`scripts/create_ver.py` 按模板生成记录骨架，但"为什么"必须手写
 - 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为
-- 功能意图层随功能数线性增长：接近行数上限（目标 250 / 硬 400）时按 scope 锚点压缩 FLOW 描述、合并同类 UXI，禁止另建第二现行文档（INV-001/002）
+- 功能意图层随功能数线性增长：接近行数上限（目标 250 / 硬 400）时先按 scope 锚点压缩 FLOW 描述、合并同类 UXI；压缩仍不足且模块复杂度达标时按 RULE-018 经用户确认拆分子文档，禁止未登记的第二现行文档（INV-001/002）
 - 自动保存提交（"自动保存本地修改"）无 Ref 行、不承载 why：积累过多会稀释追溯链，medium/high 变更应使用带 Ref 行的语义提交；`recall conflicts` 为关键词级启发式，语义冲突仍需人工澄清
 
 ## 修改检查清单
