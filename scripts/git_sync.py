@@ -40,9 +40,12 @@ BACKFILL_MESSAGE = "chore(recall): 回填决策记录 after_commit"
 AFTER_COMMIT_PLACEHOLDER = "- after_commit: _待填写_"
 # 可回填的占位符（按优先级）：完整模板的 after_commit 与旧快速模板的 commit 字段。
 # 占位符必须精确匹配；识别不了时打印警告而非静默跳过（RULE-013）。
+# 占位符只按整个字段行匹配（MULTILINE 锚定行首行尾）：裸子串替换曾把
+# 记录叙述文字里引用的 `- after_commit: _待填写_` 一并改成提交哈希，
+# 污染不可变记录正文——与 validate 占位符检查误报同源的老病。
 BACKFILL_PLACEHOLDERS = (
-    ("- after_commit: _待填写_", "- after_commit: "),
-    ("- commit: _待填写_", "- commit: "),
+    re.compile(r"^(\s*-\s*after_commit\s*[：:]\s*)_待填写_[ \t]*$", re.MULTILINE),
+    re.compile(r"^(\s*-\s*commit\s*[：:]\s*)_待填写_[ \t]*$", re.MULTILINE),
 )
 # 已填写的 after_commit/commit 字段（before_commit 不算）
 COMMIT_FIELD_RE = re.compile(
@@ -345,10 +348,16 @@ def _head_commit_files(project_root: Path) -> list:
 
 
 def _fill_placeholder(text: str, short_hash: str) -> Tuple[str, bool]:
-    """把新旧两种占位符之一回填为提交哈希，返回 ``(新文本, 是否回填)``。"""
-    for placeholder, prefix in BACKFILL_PLACEHOLDERS:
-        if placeholder in text:
-            return text.replace(placeholder, f"{prefix}{short_hash}", 1), True
+    """把新旧两种占位符之一回填为提交哈希，返回 ``(新文本, 是否回填)``。
+
+    只匹配独立的字段行；叙述文字中引用的占位符字符串不回填。
+    """
+    for pattern in BACKFILL_PLACEHOLDERS:
+        new_text, count = pattern.subn(
+            lambda m: f"{m.group(1)}{short_hash}", text, count=1
+        )
+        if count:
+            return new_text, True
     return text, False
 
 

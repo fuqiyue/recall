@@ -210,6 +210,23 @@ class GitSyncTests(unittest.TestCase):
             self.assertIn(["add", "--", record_rel], calls)
             self.assertNotIn(["add", "-A"], calls)
 
+    def test_fill_placeholder_only_matches_field_lines(self):
+        """叙述文字里引用的占位符字符串不得被回填（曾污染不可变记录正文）。"""
+        text = (
+            "hook 只精确匹配 `- after_commit: _待填写_` 这个占位符。\n"
+            "- after_commit: _待填写_\n"
+        )
+        new_text, filled = git_sync._fill_placeholder(text, "abc1234")
+        self.assertTrue(filled)
+        self.assertIn("- after_commit: abc1234\n", new_text)
+        self.assertIn("`- after_commit: _待填写_`", new_text)
+
+        # 只有叙述引用、没有字段行时：不回填、文本不变
+        prose_only = "正文提到 `- after_commit: _待填写_`，但无字段行。\n"
+        unchanged, filled = git_sync._fill_placeholder(prose_only, "abc1234")
+        self.assertFalse(filled)
+        self.assertEqual(unchanged, prose_only)
+
     def test_backfill_supports_legacy_commit_placeholder(self):
         """旧快速模板的 `- commit: _待填写_` 占位符同样被回填。"""
         with tempfile.TemporaryDirectory() as tmp:
