@@ -42,7 +42,7 @@
 - semantic_review_ref: tests:test_audit_logic_map.py + test_recall_cli + test_git_sync；audit:current-state PASS
 - semantic_reviewed_at: 2026-08-16
 - before_commit: b8db894
-- after_commit: <pending-backfill>
+- after_commit: beb24d6
 - supersedes: none
 - corrects: none
 
