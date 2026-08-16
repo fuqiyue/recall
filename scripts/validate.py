@@ -29,7 +29,8 @@ FLOW_DEF_RE = re.compile(r'\bFLOW-(\d{3})\b')
 UNFILLED_PLACEHOLDER_RE = re.compile(
     r'^\s*-\s*\w+\s*[：:]\s*_待填写_\s*$', re.MULTILINE
 )
-# medium/high CHG 必填的需求拆解字段（RULE-014）
+# medium/high CHG 必填的需求拆解字段（RULE-014）；
+# 归档时必须搬入 VER 记录（需求保全：CHG 删除后需求拆解不得只剩 git 考古可查）
 CHG_REQUIRED_ANALYSIS_FIELDS = ('raw_request', 'decomposition', 'fit_analysis')
 
 # commit 关联的几种写法，按 references/ 下两个模板的实际格式
@@ -145,9 +146,13 @@ def markdown_section(content: str, heading: str) -> str:
     return match.group(1) if match else ''
 
 
-def check_intent_layer(content: str, rule_ids: set, result: 'ValidationResult') -> None:
+def check_intent_layer(
+    content: str, rule_ids: set, result: 'ValidationResult', root: Path = None
+) -> None:
     """校验功能意图与用户流程层（RULE-014）：编号格式、唯一性、引用有效性。
 
+    传入 root 时同时检查登记表"代码锚点"列的路径存在性——反向查询
+    （recall query intent）依赖这一列，锚点悬空会让 INT→代码静默断链。
     没有该小节时静默跳过（尚未启用此层的项目不受影响）。
     """
     section = markdown_section(content, '功能意图与用户流程')
@@ -208,6 +213,22 @@ def check_intent_layer(content: str, rule_ids: set, result: 'ValidationResult') 
         for rule_id in re.findall(r'\bRULE-\d{3}\b', rules_cell):
             if rule_id not in rule_ids:
                 result.add_error(f"{intent_id}: 关联规则 {rule_id} 未在当前制度中定义")
+        # 代码锚点列（第 6 列，可选）：路径必须存在
+        if root is not None and len(cells) >= 7:
+            anchors_cell = cells[5]
+            if anchors_cell and anchors_cell.lower() != 'none':
+                for anchor in re.split(r'[;，,]', anchors_cell):
+                    anchor = anchor.strip().strip('`')
+                    if not anchor:
+                        continue
+                    # 只检查路径形态的锚点；符号/路由锚点无法静态验证
+                    if '/' not in anchor and '.' not in anchor:
+                        continue
+                    if not (root / anchor).exists():
+                        result.add_warning(
+                            f"{intent_id}: 代码锚点 {anchor} 不存在"
+                            "（文件改名/移动后请更新功能意图登记表）"
+                        )
 
     # 操作直觉约束中引用的 INT 必须已登记
     uxi_section = re.search(
@@ -287,6 +308,39 @@ def check_chg_analysis_fields(change_path: Path, result: 'ValidationResult') -> 
                 f"{chg_id} (recall_route: {route.group(1)}) 缺少需求拆解字段: "
                 f"{', '.join(missing)}（RULE-014 要求实施前填写）"
             )
+
+def check_record_requirement_fields(
+    record_text: str, record_name: str, result: 'ValidationResult'
+) -> None:
+    """需求保全：来自 CHG 的记录（change_id != none）必须搬入需求拆解三字段。
+
+    CHG 归档后即从 logic_change.md 删除；三字段不落入不可变记录，
+    需求拆解就只剩 git 考古可查，违反"recall 而非 rescan"的立项目的。
+    只检查规则生效日（2026-08-16，RULE-014 需求保全条款）之后的记录：
+    历史记录缺字段不构成当前状态审查失败（SKILL.md 调用模式约定）。
+    """
+    name_match = RECORD_NAME_RE.match(record_name)
+    if name_match and name_match.group(1) < '20260816':
+        return
+    change_id = re.search(
+        r'^\s*-\s*change_id\s*[：:]\s*(\S+)', record_text, re.MULTILINE
+    )
+    if not change_id:
+        return
+    value = change_id.group(1).strip('`')
+    if value.lower() in ('none', 'n/a') or value.startswith('<'):
+        return
+    missing = [
+        field
+        for field in CHG_REQUIRED_ANALYSIS_FIELDS
+        if not re.search(rf'^\s*-\s*{field}\s*[：:]\s*\S', record_text, re.MULTILINE)
+    ]
+    if missing:
+        result.add_warning(
+            f"{record_name} 关联 {value} 但缺少需求拆解字段: {', '.join(missing)}"
+            "（归档时应从 CHG 原样搬入，否则需求原文随 CHG 删除而丢失）"
+        )
+
 
 def extract_chg_ids(change_path: Path) -> List[Dict]:
     """从 logic_change.md 提取所有 CHG-ID 及状态"""
@@ -437,8 +491,8 @@ def validate_recall() -> ValidationResult:
                 f"{rid} 被定义多次 (行号: {', '.join(map(str, lines))})"
             )
 
-    # 1b. 功能意图与用户流程层（RULE-014）
-    check_intent_layer(readme_content, unique_rules, result)
+    # 1b. 功能意图与用户流程层（RULE-014，含代码锚点存在性）
+    check_intent_layer(readme_content, unique_rules, result, root)
 
     # 2. 提取所有 CHG-ID
     chg_records = extract_chg_ids(change_path)
@@ -465,6 +519,10 @@ def validate_recall() -> ValidationResult:
             result.add_error(f"{record_path.name} 缺少必填字段: {', '.join(missing)}")
 
         record_text = record_path.read_text(encoding='utf-8')
+
+        # 需求保全（RULE-014）：来自 CHG 的记录必须带需求拆解三字段
+        check_record_requirement_fields(record_text, record_path.name, result)
+
         if UNFILLED_PLACEHOLDER_RE.search(record_text):
             result.add_warning(
                 f"{record_path.name} 的 after_commit 占位符尚未回填"

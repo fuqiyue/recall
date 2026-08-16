@@ -6,6 +6,8 @@
 本文件只做接口级断言，不追求覆盖业务分支。
 """
 
+import contextlib
+import io
 import os
 import shutil
 import tempfile
@@ -119,6 +121,115 @@ class DetectConflictsTests(unittest.TestCase):
         changes = detect_conflicts.extract_changes(content)
         self.assertEqual(len(changes), 1)
         self.assertEqual(changes[0]["id"], "CHG-20260811-002")
+
+
+README_WITH_INTENT_LAYER = """# test
+
+## 当前制度
+
+| rule_id | 规则等级 | 当前有效规则/行为 | why | 决策记录 |
+|---|---|---|---|---|
+| RULE-001 | key | 示例规则正文 | 示例原因 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-demo.md) |
+
+## 功能意图与用户流程
+
+### 功能意图登记
+
+| intent_id | 功能入口 | intent | 流程位置 | 关联规则 | 代码锚点 | last_verified |
+|---|---|---|---|---|---|---|
+| INT-20260816-001 | demo 命令 | 示例用户目标 | FLOW-001#1 | RULE-001 | src/app.py | 2026-08-16 |
+
+### 用户流程
+
+- FLOW-001 示例：1. 运行 demo → INT-20260816-001
+"""
+
+
+class QueryIntentTests(unittest.TestCase):
+    def _make_project(self, root):
+        (root / "logic_readme.md").write_text(
+            README_WITH_INTENT_LAYER, encoding="utf-8"
+        )
+        (root / "src").mkdir()
+        (root / "src" / "app.py").write_text("pass\n", encoding="utf-8")
+        records_dir = root / "logic_version" / "records"
+        records_dir.mkdir(parents=True)
+        (records_dir / "logic_version-20260816-001-demo.md").write_text(
+            "# VER-20260816-001: 示例记录\n\n- version_id: VER-20260816-001\n"
+            "- date: 2026-08-16\n- after_commit: abc1234\n\n"
+            "- intent_traceability: INT-20260816-001 -> RULE-001 -> "
+            "test:src/app.py -> VER-20260816-001\n",
+            encoding="utf-8",
+        )
+
+    def test_query_intent_resolves_rules_anchors_and_records(self):
+        """反向查询：INT → 规则正文 → 代码锚点存在性 → 相关决策记录。"""
+        with TempProject() as root:
+            self._make_project(root)
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exit_code = link_ver_git.query_intent("int-20260816-001")
+            output = buffer.getvalue()
+            self.assertEqual(exit_code, 0)
+            self.assertIn("示例规则正文", output)
+            self.assertIn("✅ src/app.py", output)
+            self.assertIn("VER-20260816-001", output)
+
+    def test_query_intent_unknown_id_fails_with_listing(self):
+        with TempProject() as root:
+            self._make_project(root)
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                exit_code = link_ver_git.query_intent("INT-20260816-999")
+            self.assertEqual(exit_code, 1)
+            self.assertIn("INT-20260816-001", buffer.getvalue())
+
+
+class ValidateSemanticChecksTests(unittest.TestCase):
+    def test_record_from_chg_without_requirement_fields_warns(self):
+        """需求保全（RULE-014）：change_id != none 的新记录缺三字段必须发声。"""
+        result = validate.ValidationResult()
+        validate.check_record_requirement_fields(
+            "- change_id: CHG-20260816-001\n",
+            "logic_version-20260816-009-x.md",
+            result,
+        )
+        self.assertEqual(len(result.warnings), 1)
+        self.assertIn("raw_request", result.warnings[0])
+
+    def test_record_requirement_check_skips_legacy_and_filled(self):
+        result = validate.ValidationResult()
+        # 规则生效日之前的历史记录不检查
+        validate.check_record_requirement_fields(
+            "- change_id: CHG-20260808-001\n",
+            "logic_version-20260808-001-x.md",
+            result,
+        )
+        # 三字段齐全的记录通过
+        validate.check_record_requirement_fields(
+            "- change_id: CHG-20260816-002\n- raw_request: 原话\n"
+            "- decomposition: 拆解\n- fit_analysis: 融入\n",
+            "logic_version-20260816-009-x.md",
+            result,
+        )
+        self.assertEqual(result.warnings, [])
+
+    def test_intent_anchor_existence_checked_against_root(self):
+        """INT 代码锚点悬空必须发声（文件改名后反向查询会静默断链）。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            readme = README_WITH_INTENT_LAYER.replace("src/app.py", "src/gone.py")
+            result = validate.ValidationResult()
+            validate.check_intent_layer(readme, {"RULE-001"}, result, root)
+            self.assertTrue(any("src/gone.py" in w for w in result.warnings))
+            # 锚点存在时无警告
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("pass\n", encoding="utf-8")
+            result_ok = validate.ValidationResult()
+            validate.check_intent_layer(
+                README_WITH_INTENT_LAYER, {"RULE-001"}, result_ok, root
+            )
+            self.assertEqual(result_ok.warnings, [])
 
 
 class ProjectRootTests(unittest.TestCase):

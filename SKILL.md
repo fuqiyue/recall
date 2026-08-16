@@ -26,6 +26,15 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 没有远端时，先配置 `git remote add origin <url>`，再运行 `recall sync`。可用
 `recall init --no-auto-sync` 或 `recall sync --disable` 完全关闭。
 
+## 项目接入（文档初稿从哪来）
+
+`recall init` 只建 Git 管道，不生成文档内容。文档采用**模块化渐进接入**：
+接入时只建根骨架（文档控制、范围登记表、代码地图顶层入口、访谈式提取的
+INT/FLOW 初稿），存量模块登记为 `pending-docs`；此后仅在新项目开始使用时
+或用户单独要求时补全对应模块，修改触及未登记模块时按核心原则 6 顺带补齐。
+AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目区分。
+详见[项目接入流程](references/project-onboarding.md)。
+
 ## 核心原则（10 条）
 
 1. 遵守用户的当前授权。未经授权不修改代码、制度或议案
@@ -140,6 +149,7 @@ python scripts/audit_logic_map.py <project-root> --formal-review
 需要创建或更新文档时按需读取：
 
 - [逻辑回档 vs 代码回档](references/logic-vs-code-recall.md)
+- [项目接入流程](references/project-onboarding.md)
 - [字段词汇分层](references/field-vocabulary.md)
 - [变更与决策生命周期](references/change-lifecycle.md)
 - [治理模式](references/governance-modes.md)

@@ -78,6 +78,11 @@ def print_help():
     查询 Git 提交的详细信息和相关决策记录
     示例: recall query commit abc123f
 
+  query intent <INT-ID>
+    反向查询：从功能意图定位关联规则、决策记录和代码锚点
+    （"我要改功能 X，会涉及哪些规则和文件"）
+    示例: recall query intent INT-20260816-005
+
   list [数量]
     列出最近的决策记录（默认 10 条）
     示例: recall list
@@ -161,9 +166,10 @@ def cmd_query(args):
     """查询命令"""
     if len(args) < 1:
         print("❌ 错误: 缺少查询类型")
-        print("用法: recall query <file|commit> <参数>")
+        print("用法: recall query <file|commit|intent> <参数>")
         print("示例: recall query file src/main.py")
         print("示例: recall query commit abc123f")
+        print("示例: recall query intent INT-20260816-005")
         return 1
 
     query_type = args[0].lower()
@@ -185,9 +191,16 @@ def cmd_query(args):
                 return 1
             return link_ver_git.query_commit_details(args[1])
 
+        elif query_type == "intent":
+            if len(args) < 2:
+                print("❌ 错误: 缺少意图编号")
+                print("用法: recall query intent <INT-YYYYMMDD-NNN>")
+                return 1
+            return link_ver_git.query_intent(args[1])
+
         else:
             print(f"❌ 错误: 未知的查询类型 '{query_type}'")
-            print("支持的类型: file, commit")
+            print("支持的类型: file, commit, intent")
             return 1
 
     except ImportError:

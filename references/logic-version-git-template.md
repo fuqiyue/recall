@@ -37,6 +37,11 @@
 **用户需求/反馈**：
 <来自用户的具体诉求，引用原话或 issue>
 
+**需求拆解（归档时从 CHG 原样搬入；无 CHG 的记录填 none）**：
+- raw_request: <用户原始请求的稳定引用或一句忠实转述>
+- decomposition: <拆解出的功能点/工作项>
+- fit_analysis: <复用/替代/新增哪个 INT-*，插入哪条 FLOW-* 的哪一步，是否触碰 UXI-*>
+
 ## 决策过程
 
 **方案 A**：<描述>（优点 / 缺点 / 复杂度：低-中-高）
@@ -115,7 +120,8 @@ git rev-parse --short HEAD   # 填入 - after_commit: <hash>
 ### 4. 归档议案
 
 ```bash
-# 从 logic_change.md 移除已完成的 CHG
+# 先把 CHG 的 raw_request/decomposition/fit_analysis 搬入本记录（需求保全，
+# 否则删除 CHG 后需求拆解只剩 git 考古可查），再从 logic_change.md 移除该 CHG
 # 更新 logic_readme.md（如规则变化）
 # 在 logic_version/index.md 中添加索引行
 ```
@@ -134,6 +140,7 @@ git rev-parse --short HEAD   # 填入 - after_commit: <hash>
 | before_commit | 变更前基线 commit（recall new 自动填入） | b8db894 |
 | after_commit | 实施提交的 hash（hook 自动回填 `_待填写_` 占位符） | beb24d6 |
 | ## 为什么做这个决策？ | 为什么要改 | 用户反馈... |
+| raw_request / decomposition / fit_analysis | 需求拆解三字段；有 CHG（change_id != none）时必须在归档时从 CHG 原样搬入，无 CHG 填 none | 见 logic-change-template.md |
 | ## 影响范围 | 改了什么文件/功能 | 修改了样式系统 |
 | ## 验证方式 | 如何验证修改成功 | 测试命令与结果 |
 | ## 回滚方式 | 如何撤销 | git revert ... |

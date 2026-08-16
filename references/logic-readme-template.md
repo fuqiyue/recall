@@ -105,11 +105,11 @@
 
 ### 功能意图登记
 
-| intent_id | 功能入口 | intent（服务的用户目标，一句话） | 流程位置 | 关联规则/锚点 | last_verified |
-|---|---|---|---|---|---|
-| INT-YYYYMMDD-NNN | <命令/界面/API/文档入口> | ... | FLOW-001#2 | RULE-.../path | YYYY-MM-DD |
+| intent_id | 功能入口 | intent（服务的用户目标，一句话） | 流程位置 | 关联规则 | 代码锚点 | last_verified |
+|---|---|---|---|---|---|---|
+| INT-YYYYMMDD-NNN | <命令/界面/API/文档入口> | ... | FLOW-001#2 | RULE-... | path/to/file; path/to/other | YYYY-MM-DD |
 
-`intent_id` 使用 `INT-YYYYMMDD-NNN` 格式（日期为条目首次登记日），与 `intent_traceability` 的 `INT-*` 共用同一编号空间和格式；需要追溯链的中等/高风险变更直接引用本表条目。不要使用无日期的短编号（如 INT-001），审计与追溯链只识别完整格式。
+`intent_id` 使用 `INT-YYYYMMDD-NNN` 格式（日期为条目首次登记日），与 `intent_traceability` 的 `INT-*` 共用同一编号空间和格式；需要追溯链的中等/高风险变更直接引用本表条目。不要使用无日期的短编号（如 INT-001），审计与追溯链只识别完整格式。"代码锚点"列填实现该功能的文件路径（多个用 `;` 分隔，可填 none），支撑反向查询 `recall query intent <INT-ID>`；validate 会检查路径存在性，文件改名/移动时同步更新本列。
 
 ### 用户流程
 

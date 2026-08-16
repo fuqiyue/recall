@@ -116,7 +116,7 @@ CHG 转为 `promoting` 状态，建立晋升检查清单。
 
 两者都更新 `logic_version/index.md`，长期跨范围约束按需创建 ADR。
 
-创建记录时复制最终 `intent_traceability`；若关闭的是主题最后一个 CHG，同时固化四个 `topic_*` 共享快照字段。
+创建记录时复制最终 `intent_traceability`，并把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 原样搬入记录（需求保全：CHG 关闭后即删除，需求拆解必须落在不可变记录中，否则只剩 git 考古可查）；若关闭的是主题最后一个 CHG，同时固化四个 `topic_*` 共享快照字段。
 
 协作治理还要记录已核验的控制证据和本次执行引用。
 

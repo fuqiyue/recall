@@ -40,6 +40,6 @@
 当需要追踪修改时，在此文件中创建 CHG 条目。完成后：
 1. 更新 `logic_readme.md`（如规则变化）
 2. 归档到 `logic_version/records/`（如为高风险）
-3. 从本文件删除 CHG 条目
+3. 把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 搬入 VER 记录（需求保全），再从本文件删除 CHG 条目
 
 **记住**：logic_change.md 是临时的工作记录，不是长期真相源。
