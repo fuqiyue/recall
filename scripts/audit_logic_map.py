@@ -1595,6 +1595,9 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
             "conflict_resolution": conflict_resolution,
             "authority_surfaces": authority_surfaces,
             "blocked_by": relationship_items(raw_values, "blocked_by"),
+            "unblock_condition": " ".join(
+                raw_values.get("unblock_condition", [])
+            ).strip(),
         }
 
     dependency_graph: dict[str, set[str]] = {change_id: set() for change_id in entries}
@@ -1617,9 +1620,17 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
                     f"{change_id}:blocked-dependency-needs-block-or-redecision:{target}"
                 )
             if status in implementation_statuses:
-                issues.append(
-                    f"{change_id}:active-dependency-needs-block-or-redecision:{target}"
+                # verifying + explicit unblock_condition = implementation landed and
+                # only joint acceptance / rebind-after-upstream-close remains; the
+                # re-verification commitment is carried by depends_on + unblock_condition.
+                # blocked stays reserved for "cannot implement".
+                acceptance_hold = status == "verifying" and bool(
+                    str(entry.get("unblock_condition", "")).strip()
                 )
+                if not acceptance_hold:
+                    issues.append(
+                        f"{change_id}:active-dependency-needs-block-or-redecision:{target}"
+                    )
 
     visiting: list[str] = []
     visited: set[str] = set()
