@@ -8,7 +8,7 @@
 - date: 2026-08-31
 - change_id: CHG-20260831-002
 - before_commit: 256e190
-- after_commit: _待填写_
+- after_commit: 33a8571
 
 ## 为什么做这个决策？
 
