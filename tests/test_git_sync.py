@@ -13,6 +13,11 @@ import sys
 sys.path.insert(0, str(ROOT / "scripts"))
 import git_sync
 
+# 平台无关的假仓库根。sync_repository 会先 resolve() 再与 _git_root 比较；
+# 曾用的 "D:/recall-test" 在 POSIX 上是相对路径，resolve 后不相等，
+# 导致本地（Windows）全绿而 CI（Linux）恒返 1。
+FAKE_ROOT = (Path(tempfile.gettempdir()) / "recall-test").resolve()
+
 
 class GitSyncTests(unittest.TestCase):
     def test_hook_block_is_managed_and_non_interactive(self):
@@ -23,7 +28,7 @@ class GitSyncTests(unittest.TestCase):
         self.assertIn("git_sync.py", block)
 
     def test_configure_sync_writes_safe_defaults_and_enables_hook(self):
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
         calls = []
 
         def fake_run_git(args, cwd=None, timeout=60):
@@ -46,7 +51,7 @@ class GitSyncTests(unittest.TestCase):
 
     def _sync_calls(self, dirty, autocommit_config, autocommit_param=True):
         """跑一次 sync_repository，返回 (exit_code, git 调用列表)。"""
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
         calls = []
 
         def fake_run_git(args, cwd=None, timeout=60):
@@ -81,7 +86,7 @@ class GitSyncTests(unittest.TestCase):
 
     def _sync_with_status(self, status_output, include_new=False, quiet=True):
         """跑一次 sync（status --porcelain 返回给定输出），返回 (code, calls, stdout)。"""
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
         calls = []
 
         def fake_run_git(args, cwd=None, timeout=60):
@@ -163,7 +168,7 @@ class GitSyncTests(unittest.TestCase):
             return True, "", ""
 
         with patch.object(
-            git_sync, "find_project_root", return_value=Path("D:/recall-test")
+            git_sync, "find_project_root", return_value=FAKE_ROOT
         ), patch.object(git_sync, "run_git", side_effect=fake_run_git):
             self.assertEqual(git_sync.main(["--manual"]), 0)
             self.assertEqual(git_sync.main(["--auto"]), 0)
@@ -373,7 +378,7 @@ class GitSyncTests(unittest.TestCase):
 
     def test_drift_sentinel_warns_on_code_only_commit(self):
         """漂移哨兵：提交含代码但未触及 logic 文档时提醒；触及则沉默。"""
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
 
         def make_fake(files):
             def fake_run_git(args, cwd=None, timeout=60):
@@ -403,7 +408,7 @@ class GitSyncTests(unittest.TestCase):
 
     def test_post_commit_mode_treats_soft_skip_as_success(self):
         """hook 场景下无远端/无分支（返回 2）不算失败；真实失败仍传播。"""
-        with patch.object(git_sync, "find_project_root", return_value=Path("D:/recall-test")):
+        with patch.object(git_sync, "find_project_root", return_value=FAKE_ROOT):
             with patch.object(git_sync, "sync_repository", return_value=2):
                 self.assertEqual(git_sync.main(["--post-commit"]), 0)
                 self.assertEqual(git_sync.main([]), 2)
@@ -411,7 +416,7 @@ class GitSyncTests(unittest.TestCase):
                 self.assertEqual(git_sync.main(["--post-commit"]), 1)
 
     def test_sync_rebases_then_pushes_current_branch(self):
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
         calls = []
 
         def fake_run_git(args, cwd=None, timeout=60):
@@ -433,7 +438,7 @@ class GitSyncTests(unittest.TestCase):
         self.assertIn(["push", "--set-upstream", "origin", "main"], calls)
 
     def test_explicit_commit_message_uses_argv_and_syncs(self):
-        root = Path("D:/recall-test")
+        root = FAKE_ROOT
         calls = []
 
         def fake_run_git(args, cwd=None, timeout=60):
