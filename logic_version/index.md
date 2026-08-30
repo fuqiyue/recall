@@ -45,6 +45,7 @@
 | VER-20260816-003 | logic_version-20260816-003-semantic-link | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-014, RULE-015, RULE-016 | none | 需求↔架构语义链路补全：模块化项目接入流程、需求三字段归档搬入 VER、INT 代码锚点与 query intent 反向查询 | [logic_version-20260816-003-semantic-link.md](records/logic_version-20260816-003-semantic-link.md) |
 | VER-20260816-004 | logic_version-20260816-004-handoff-hierarchy | 2026-08-16 | effective | ., references/, scripts/, tests/ | RULE-014, RULE-017, RULE-018 | none | 会话默认延续原则、层级化子 logic 文档（readme-only 登记拆分）与舍弃方案归档 | [logic_version-20260816-004-handoff-hierarchy.md](records/logic_version-20260816-004-handoff-hierarchy.md) |
 | VER-20260816-005 | logic_version-20260816-005-audit-remediation | 2026-08-16 | effective | ., references/, scripts/, tests/, logic_version/ | RULE-011, RULE-015, RULE-018, RULE-019 | none | 审查整改：自动保存排除未跟踪新文件、rejected 记录豁免有效索引、子文档纳入检查、漂移度量、脱管文档归档与根目录覆盖对账、双模板合并、引用纪律 | [logic_version-20260816-005-audit-remediation.md](records/logic_version-20260816-005-audit-remediation.md) |
+| VER-20260831-001 | logic_version-20260831-001-entry-slim-skill-front | 2026-08-31 | effective | SKILL.md, references/ | RULE-018, RULE-019 | none | 入口模板短路由化（保留 RECALL_* 标记与五条最小协议）、SKILL 首屏重排（路由一问 + 三通道前置）、跨仓库 RULE 指针改指本技能目录、personal 模式 ADR 可选显式化 | [logic_version-20260831-001-entry-slim-skill-front.md](records/logic_version-20260831-001-entry-slim-skill-front.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 

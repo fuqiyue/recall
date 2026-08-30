@@ -23,7 +23,7 @@
 - last_verified: 2026-08-16
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -283,6 +283,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260816-003 | 需求↔架构语义链路补全：模块化项目接入流程、CHG 三字段归档搬入 VER（需求保全）、INT 代码锚点与 query intent 反向查询 | RULE-014..016 | [记录](logic_version/records/logic_version-20260816-003-semantic-link.md) |
 | VER-20260816-004 | 会话默认延续原则、层级化子 logic 文档（readme-only 登记拆分）与舍弃方案归档 | RULE-014, RULE-017..018 | [记录](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) |
 | VER-20260816-005 | 审查整改：自动保存排除新文件、rejected 豁免、子文档检查覆盖、漂移度量、脱管归档与覆盖对账、双模板合并、引用纪律 | RULE-011, RULE-015, RULE-018..019 | [记录](logic_version/records/logic_version-20260816-005-audit-remediation.md) |
+| VER-20260831-001 | 入口模板短路由化、SKILL 首屏重排与 personal 模式 ADR 可选澄清 | RULE-018..019 | [记录](logic_version/records/logic_version-20260831-001-entry-slim-skill-front.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 
