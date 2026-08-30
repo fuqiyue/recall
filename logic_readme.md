@@ -23,7 +23,7 @@
 - last_verified: 2026-08-16
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -62,7 +62,7 @@
 | RULE-011 | key | `recall sync` 默认自动保存：脏工作区的**已跟踪变更**自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；**未跟踪新文件默认排除**，仅 `--include-new` 或用户先 `git add` 时纳入，提交前列出文件清单与被排除清单；post-commit hook 场景绝不自动提交其他脏文件 | 自动化不得上传用户未明确要求的文件：非交互环境下事后警告拦不住已推上远端的私人文件，默认必须是"新文件留在本地" | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md) | 用户确认 | git_sync.py 单元测试（默认排除/`--include-new` 双向用例） | valid | 2026-08-16 | self |
 | RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
 | RULE-013 | key | 提交后自动回填决策记录的 after_commit，双通道定位记录：commit message 的 Ref 行 + 本次提交内规范命名的记录文件；识别新旧两种占位符（`- after_commit:`/`- commit:`）且只按整个字段行匹配（叙述文字中引用的占位符不回填）；无法回填时打印警告而非静默跳过；内部提交通过环境变量防止 hook 递归 | 只认 Ref 行时自动保存提交（无 Ref）永不触发回填；裸子串替换曾把记录叙述文字里引用的占位符改成哈希，污染不可变记录正文 | [VER-20260816-002](logic_version/records/logic_version-20260816-002-traceability-repair.md) | 复现验证 | tests/test_git_sync.py（含端到端与字段行锚定） | valid | 2026-08-16 | self |
-| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；同议题多方案竞争时，落选方案连同其需求原文与否决原因随胜出 VER 的方案分析归档，已独立立案的落选 CHG 建 `status: rejected` 的 VER 记录并同样搬运三字段；plan 模式产出批准后、动代码前按通道落盘 | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查，落选方案直接删除亦然 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py | valid | 2026-08-16 | self |
+| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；同议题多方案竞争时，落选方案连同其需求原文与否决原因随胜出 VER 的方案分析归档，已独立立案的落选 CHG 建 `status: rejected` 的 VER 记录并同样搬运三字段；plan 模式产出批准后、动代码前按通道落盘；意图层维护深度按治理模式分档：personal 轻量档（INT 必维护、FLOW 可合并、UXI 按需），collaborative 及以上全量，档位定义见 references/governance-modes.md | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查，落选方案直接删除亦然；单人模式逐条维护三层的行数成本与收益不成比例 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py + references/governance-modes.md | valid | 2026-08-31 | self |
 | RULE-015 | ordinary | `recall validate` 覆盖一致性对账：VER 三处登记与撞号（`rejected`/`cancelled`/`rolled-back` 记录豁免有效决策索引、登记进 index.md 即可，反向登记告警）、INT/FLOW/UXI 引用有效性与代码锚点存在性、medium/high CHG 三字段、VER 需求保全三字段、字段行占位符未回填、RULE/INT 重复按定义行判定且**已登记子文档纳入同一套检查**（RULE-018）；漂移度量：统计自上次触及 logic 文档以来累积的提交数，超过 10 个升级为警告；post-commit hook 保留非阻断漂移提醒 | 文档是代码理解的持久缓存，缓存腐烂与登记缺失静默失效是本系统反复出现的失败模式；被否决的方案不得登记为"有效决策"，拆分后的子文档不得进入无检查区，无人阅读的提醒需要可观测数字 | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md) | 复现验证 | scripts/validate.py + tests/test_validate.py | valid | 2026-08-16 | self |
 | RULE-016 | key | 项目接入采用模块化渐进：接入时只建根骨架（文档控制、范围登记表、代码地图顶层入口、访谈式 INT/FLOW 初稿），存量模块登记 `pending-docs`；此后仅在新项目开始使用时或用户单独要求时补全对应模块；AI 代码扫描产出标 `code-derived`，意图层必须经用户确认后落盘 | `recall init` 只建 Git 管道，文档内容从哪来此前无流程；一次性全量扫描在存量项目不可行，未经确认的 AI 推断意图会污染真源 | [VER-20260816-003](logic_version/records/logic_version-20260816-003-semantic-link.md) | 用户确认 | references/project-onboarding.md + SKILL.md 接入章节 | valid | 2026-08-16 | self |
 | RULE-017 | key | 会话默认延续：新会话或上下文压缩后以现行 logic 文档与活跃议案为准继续（新会话视作新人接手，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度；模糊点先按现行逻辑分析并给出建议再咨询（SKILL 原则 5/11） | 协作协议此前只活在对话历史，每次压缩后用户被迫重讲元规则，正是 Recall 要消灭的 rescan | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | SKILL.md 核心原则 11 | valid | 2026-08-16 | self |
@@ -284,13 +284,14 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260816-004 | 会话默认延续原则、层级化子 logic 文档（readme-only 登记拆分）与舍弃方案归档 | RULE-014, RULE-017..018 | [记录](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) |
 | VER-20260816-005 | 审查整改：自动保存排除新文件、rejected 豁免、子文档检查覆盖、漂移度量、脱管归档与覆盖对账、双模板合并、引用纪律 | RULE-011, RULE-015, RULE-018..019 | [记录](logic_version/records/logic_version-20260816-005-audit-remediation.md) |
 | VER-20260831-001 | 入口模板短路由化、SKILL 首屏重排与 personal 模式 ADR 可选澄清 | RULE-018..019 | [记录](logic_version/records/logic_version-20260831-001-entry-slim-skill-front.md) |
+| VER-20260831-002 | 自身入口瘦身收尾、意图层按治理模式分档、create_ver 编码合规；Git 表面收缩立案待决 | RULE-008, RULE-014, RULE-019 | [记录](logic_version/records/logic_version-20260831-002-arch-simplify.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 
 ## 活跃议案入口
 
 - 唯一入口：[logic_change.md](logic_change.md)
-- 相关 CHG-ID：none
+- 相关 CHG-ID：CHG-20260831-002（Git 表面收缩，awaiting-decision）
 
 ## 当前限制
 
@@ -298,7 +299,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 - 不提供实际权限控制（依赖 Git）
 - 归档需人工判断：`scripts/create_ver.py` 按模板生成记录骨架，但"为什么"必须手写
 - 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为
-- 功能意图层随功能数线性增长：接近行数上限（目标 250 / 硬 400）时先按 scope 锚点压缩 FLOW 描述、合并同类 UXI；压缩仍不足且模块复杂度达标时按 RULE-018 经用户确认拆分子文档，禁止未登记的第二现行文档（INV-001/002）
+- 功能意图层随功能数线性增长：personal 模式先用轻量档（RULE-014 分档，见 references/governance-modes.md）；接近行数上限（目标 250 / 硬 400）时先按 scope 锚点压缩 FLOW 描述、合并同类 UXI；压缩仍不足且模块复杂度达标时按 RULE-018 经用户确认拆分子文档，禁止未登记的第二现行文档（INV-001/002）
 - 自动保存提交（"自动保存本地修改"）无 Ref 行、不承载 why：积累过多会稀释追溯链，medium/high 变更应使用带 Ref 行的语义提交（validate 的漂移度量会量化累积并在超过 10 个时告警，RULE-015）；`recall conflicts` 为关键词级启发式，语义冲突仍需人工澄清
 
 ## 修改检查清单

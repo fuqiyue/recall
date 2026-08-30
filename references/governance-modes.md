@@ -21,6 +21,8 @@ Recall 默认服务单人或低并发小团队，不把 Markdown 字段误称为
 
 **决策记录只用 `VER-*`**：personal 模式不要求 ADR，`logic_version/decisions/` 允许为空，空目录不是审查缺陷。仅当用户明确要求沉淀跨范围、跨议案的长期约束时才创建 ADR。
 
+**意图层轻量档**：`INT-*` 登记表必须维护（一行一功能，经用户确认）；`FLOW-*` 允许合并为一节主干流程概览；`UXI-*` 仅在用户明确表达操作直觉约束时登记。接近 logic_readme 行数上限时优先压缩本层。轻量是下限不是上限——单人项目自愿维护全量三层不违规。
+
 ## collaborative
 
 **适用**：小团队需要真实分工。
@@ -32,6 +34,7 @@ Recall 默认服务单人或低并发小团队，不把 Markdown 字段误称为
 - 高风险变更的通过性语义审查必须由非实施者完成
 - 用 `governance_evidence`、`governance_verification: verified` 和 `governance_verified_at` 记录责任人何时核验了哪项控制
 - 进入验证阶段的高风险 CHG 还要用 `governance_execution_ref` 指向本次 PR/CI/审批执行
+- 意图层维护全量三档：`INT-*`/`FLOW-*`/`UXI-*` 逐条维护并保持 `last_verified`
 
 **字段层级**：personal 层 8 个 + collaborative 层 9 个。
 

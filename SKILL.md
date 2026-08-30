@@ -106,7 +106,7 @@ python scripts/audit_logic_map.py <project-root> --formal-review
 - 只写已经生效且当前可执行的职责、边界、规则、公共契约、真实消费者、不变量、兼容策略、稳定代码锚点、验证入口和负责人
 - 每条规则保留一行可审计的 `why`、规则等级、决策记录链接和 `last_verified`。关键规则必须直接链接到不可变 `VER-*` 记录或有效 ADR（personal 模式默认只产出 `VER-*`，见[治理模式](references/governance-modes.md)）
 - 代码地图表需标注 `contract_class: public|persisted|security|internal` 以支持可判定的通道分类
-- 功能意图与用户流程层按条目模块化维护：`INT-*`（功能级用户目标）、`FLOW-*`（用户操作流程）、`UXI-*`（操作直觉约束），供需求拆解与融入分析对照；系统视角看代码地图，用户视角看本层
+- 功能意图与用户流程层按条目模块化维护：`INT-*`（功能级用户目标）、`FLOW-*`（用户操作流程）、`UXI-*`（操作直觉约束），供需求拆解与融入分析对照；系统视角看代码地图，用户视角看本层。维护深度按治理模式分档：`personal` 用轻量档（INT 必维护、FLOW 可合并、UXI 按需），`collaborative` 及以上全量维护，档位定义见[治理模式](references/governance-modes.md)
 - 未生效方案、讨论、开放问题不写入本文件
 
 ### logic_change.md（唯一活跃议案）
