@@ -130,7 +130,13 @@ python scripts/audit_logic_map.py <project-root> --formal-review
 `recall sync --include-new` 或用户先 `git add` 时纳入（自动化不上传用户未明确
 要求的文件；私人文件加入 .gitignore）。`--manual` 切手动（仅
 `--commit-message` 时提交）、`--auto` 恢复、`--disable` 完全关闭；无远端时先
-`git remote add origin <url>`。权威语义：本技能目录 logic_readme.md 的 RULE-010/011/013——这些编号属于 Recall 工具自身，与消费项目 logic_readme.md 里的同名编号无关。
+`git remote add origin <url>`。
+
+自动同步只在跑过 `recall init` 的仓库里生效。只接入了文档、没接管道的项目
+（`git config --get recall.autoSync` 为空或 `.git/hooks/post-commit` 不存在）不会
+自动推送，提交后必须自己推：`recall sync` 或 `git push`，收口前用 `git status -sb`
+确认首行不带 `ahead`。一批提交只推前几个，会让远端停在实现未进的中间提交上。
+权威语义：本技能目录 logic_readme.md 的 RULE-010/011/013——这些编号属于 Recall 工具自身，与消费项目 logic_readme.md 里的同名编号无关。
 
 ## 项目接入（文档初稿从哪来）
 

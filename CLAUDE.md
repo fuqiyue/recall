@@ -8,7 +8,7 @@
 4. 代码改动后更新并运行相关测试，报告结果与 `docs_impact`；现行规则、锚点、契约或验证入口实际变化时在同一变更中更新根 `logic_readme.md`
 5. 完整工作流语义在 recall 技能（SKILL.md）；`.claude/` 只放工具配置，不放业务制度、议案、ADR 或历史
 
-首次接入运行 `recall init`（建 Git 管道并默认启用自动同步）；日常命令见 `recall help`，语义权威在 logic_readme.md 的规则行与 SKILL.md（RULE-019）。
+首次接入运行 `recall init`（建 Git 管道并默认启用自动同步）；自动同步未启用的仓库，提交后须自行推送、不得让本地长期领先远端（RULE-010）。日常命令见 `recall help`，语义权威在 logic_readme.md 的规则行与 SKILL.md（RULE-019）。
 
 ## 机器可读标记
 
