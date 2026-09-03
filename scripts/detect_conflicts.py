@@ -42,6 +42,57 @@ def extract_rules(content: str) -> List[Dict[str, str]]:
     return rules
 
 
+def extract_rule_dates(content: str) -> Dict[str, str]:
+    """规则行的 last_reviewed（第 9 列）：用于判断规则是否在议案之后被修改。"""
+    dates: Dict[str, str] = {}
+    for line in content.splitlines():
+        if not line.strip().upper().startswith('| RULE-'):
+            continue
+        cells = [cell.strip() for cell in line.strip().strip('|').split('|')]
+        if len(cells) >= 9 and re.match(r'^\d{4}-\d{2}-\d{2}$', cells[8]):
+            dates[cells[0].upper()] = cells[8]
+    return dates
+
+
+def _change_field(change: Dict, key: str) -> str:
+    for line in change['content']:
+        m = re.match(rf'^\s*-\s*{key}\s*[：:]\s*(.+?)\s*$', line)
+        if m:
+            return m.group(1)
+    return ''
+
+
+def check_multi_proposal_conflicts(changes: List[Dict]) -> List[Tuple[str, str, str]]:
+    """一法多议案：两个活跃议案的 authority_surfaces 指向同一 RULE，却未互写 conflicts_with。"""
+    findings = []
+    parsed = []
+    for change in changes:
+        targets = set(t.upper() for t in re.findall(r'\bRULE-[A-Z0-9][A-Z0-9-]*', _change_field(change, 'authority_surfaces'), re.IGNORECASE))
+        conflicts = set(c.upper() for c in re.findall(r'\bCHG-[A-Z0-9][A-Z0-9-]*', _change_field(change, 'conflicts_with'), re.IGNORECASE))
+        parsed.append((change, targets, conflicts))
+    for i, (a, ta, ca) in enumerate(parsed):
+        for b, tb, cb in parsed[i + 1:]:
+            shared = sorted(ta & tb)
+            if shared and (b['id'].upper() not in ca or a['id'].upper() not in cb):
+                findings.append((a['id'], b['id'], f"同时指向 {', '.join(shared)}，但未互写 conflicts_with / conflict_resolution（一法多议案须显式裁定：merge / supersede / sequence-and-revalidate）"))
+    return findings
+
+
+def check_stale_baselines(changes: List[Dict], rule_dates: Dict[str, str]) -> List[Tuple[str, str, str]]:
+    """旧议案 vs 新法：目标规则的 last_reviewed 晚于议案的 created/last_status_change。"""
+    findings = []
+    for change in changes:
+        dates = [d for d in (_change_field(change, 'created'), _change_field(change, 'last_status_change')) if re.match(r'^\d{4}-\d{2}-\d{2}$', d)]
+        if not dates:
+            continue
+        change_date = max(dates)
+        for rule_id in sorted(set(t.upper() for t in re.findall(r'\bRULE-[A-Z0-9][A-Z0-9-]*', _change_field(change, 'authority_surfaces'), re.IGNORECASE))):
+            rule_date = rule_dates.get(rule_id, '')
+            if rule_date and rule_date > change_date:
+                findings.append((change['id'], rule_id, f"规则于 {rule_date} 修订，晚于议案 {change_date}；须重核 based_on 并递增 proposal_revision（生命周期第 3 步）"))
+    return findings
+
+
 def extract_changes(content: str) -> List[Dict[str, str]]:
     """从 logic_change.md 提取所有 CHG-* 议案"""
     changes = []
@@ -231,16 +282,32 @@ def main(argv=None):
         f"{len(changes)} 个活跃议案（{len(ledgers)} 份账本）\n"
     )
 
+    rule_dates = extract_rule_dates(readme_content)
+    for domain_readme in domain_readmes:
+        rule_dates.update(extract_rule_dates(domain_readme.read_text(encoding='utf-8')))
+
     # 检测冲突
     rule_conflicts = detect_keyword_conflicts(rules)
     change_conflicts = check_change_rule_conflicts(changes, rules)
+    multi_proposal = check_multi_proposal_conflicts(changes)
+    stale = check_stale_baselines(changes, rule_dates)
 
     # 输出报告
     report = format_conflict_report(rule_conflicts, change_conflicts)
     print(report)
+    if multi_proposal:
+        print("\n⚖️  一法多议案（同一规则被多个活跃议案指向，未显式裁定）：")
+        for a, b, reason in multi_proposal:
+            print(f"  • {a} ↔ {b}: {reason}")
+    if stale:
+        print("\n🕰️  旧议案 vs 新法（规则在议案之后被修订，基线可能失效）：")
+        for chg, rule, reason in stale:
+            print(f"  • {chg} → {rule}: {reason}")
+    if not multi_proposal and not stale:
+        print("\n⚖️  一法多议案 / 基线失效：未发现")
 
     # 如果检测到冲突，返回非零退出码
-    if rule_conflicts or change_conflicts:
+    if rule_conflicts or change_conflicts or multi_proposal or stale:
         return 2
 
     return 0

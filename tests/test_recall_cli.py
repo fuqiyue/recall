@@ -123,6 +123,106 @@ class DetectConflictsTests(unittest.TestCase):
         self.assertEqual(len(changes), 1)
         self.assertEqual(changes[0]["id"], "CHG-20260811-002")
 
+    # 一法多议案 / 旧议案 vs 新法（VER-20260904-001）
+
+    MULTI_PROPOSAL_LEDGER = (
+        "## CHG-20260901-001: 收紧输出契约\n"
+        "- created: 2026-01-01\n"
+        "- authority_surfaces: RULE-001\n"
+        "- conflicts_with: none\n"
+        "\n"
+        "## CHG-20260901-002: 放宽输出契约\n"
+        "- created: 2026-01-05\n"
+        "- last_status_change: 2026-01-20\n"
+        "- authority_surfaces: RULE-001, RULE-002\n"
+        "- conflicts_with: none\n"
+    )
+
+    def test_extract_rule_dates_reads_last_reviewed_column(self):
+        content = (
+            "| rule_id | 规则等级 | 当前有效规则/行为 | why | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |\n"
+            "|---|---|---|---|---|---|---|---|---|---|\n"
+            "| RULE-001 | key | 规则一 | 原因 | none | user | 证据 | valid | 2026-02-01 | self |\n"
+            "| RULE-002 | ordinary | 规则二 | 原因 | none | user | 证据 | valid | 2026-03-15 | self |\n"
+            "| RULE-003 | ordinary | 规则三 | 原因 | none | user | 证据 | valid | 待定 | self |\n"
+            "| RULE-004 | ordinary | 短行没有日期列 |\n"
+        )
+        self.assertEqual(
+            detect_conflicts.extract_rule_dates(content),
+            {"RULE-001": "2026-02-01", "RULE-002": "2026-03-15"},
+        )
+
+    def test_multi_proposal_conflict_without_reciprocal_conflicts_with(self):
+        changes = detect_conflicts.extract_changes(self.MULTI_PROPOSAL_LEDGER)
+        self.assertEqual([c["id"] for c in changes], ["CHG-20260901-001", "CHG-20260901-002"])
+        findings = detect_conflicts.check_multi_proposal_conflicts(changes)
+        self.assertEqual(len(findings), 1, findings)
+        self.assertEqual(findings[0][:2], ("CHG-20260901-001", "CHG-20260901-002"))
+        self.assertIn("RULE-001", findings[0][2])
+        self.assertNotIn("RULE-002", findings[0][2])
+
+    def test_multi_proposal_one_way_declaration_still_reported(self):
+        ledger = self.MULTI_PROPOSAL_LEDGER.replace(
+            "- conflicts_with: none\n\n", "- conflicts_with: CHG-20260901-002\n\n", 1
+        )
+        findings = detect_conflicts.check_multi_proposal_conflicts(
+            detect_conflicts.extract_changes(ledger)
+        )
+        self.assertEqual(len(findings), 1, findings)
+
+    def test_multi_proposal_reciprocal_declaration_is_clean(self):
+        ledger = self.MULTI_PROPOSAL_LEDGER.replace(
+            "- conflicts_with: none\n\n", "- conflicts_with: CHG-20260901-002\n\n", 1
+        ).replace(
+            "- authority_surfaces: RULE-001, RULE-002\n- conflicts_with: none\n",
+            "- authority_surfaces: RULE-001, RULE-002\n- conflicts_with: chg-20260901-001\n",
+        )
+        changes = detect_conflicts.extract_changes(ledger)
+        self.assertEqual(detect_conflicts.check_multi_proposal_conflicts(changes), [])
+
+    def test_multi_proposal_disjoint_targets_are_clean(self):
+        ledger = self.MULTI_PROPOSAL_LEDGER.replace(
+            "- authority_surfaces: RULE-001, RULE-002", "- authority_surfaces: RULE-002"
+        )
+        self.assertEqual(
+            detect_conflicts.check_multi_proposal_conflicts(
+                detect_conflicts.extract_changes(ledger)
+            ),
+            [],
+        )
+
+    def test_stale_baseline_when_rule_reviewed_after_proposal(self):
+        changes = detect_conflicts.extract_changes(self.MULTI_PROPOSAL_LEDGER)
+        findings = detect_conflicts.check_stale_baselines(changes, {"RULE-001": "2026-02-01"})
+        # 001 created 2026-01-01 < 2026-02-01 → 失效；002 最近变动 2026-01-20 < 2026-02-01 → 也失效
+        self.assertEqual(
+            [f[:2] for f in findings],
+            [("CHG-20260901-001", "RULE-001"), ("CHG-20260901-002", "RULE-001")],
+        )
+        self.assertIn("2026-02-01", findings[0][2])
+        self.assertIn("2026-01-01", findings[0][2])
+        self.assertIn("2026-01-20", findings[1][2])
+
+    def test_stale_baseline_uses_last_status_change_and_ignores_old_rules(self):
+        changes = detect_conflicts.extract_changes(self.MULTI_PROPOSAL_LEDGER)
+        # 规则在 002 最近变动之前、001 立案之后修订 → 只有 001 失效
+        findings = detect_conflicts.check_stale_baselines(changes, {"RULE-001": "2026-01-10"})
+        self.assertEqual([f[:2] for f in findings], [("CHG-20260901-001", "RULE-001")])
+        # 规则早于所有议案、或不在任何议案的 authority_surfaces 里 → 无发现
+        self.assertEqual(
+            detect_conflicts.check_stale_baselines(
+                changes, {"RULE-001": "2025-12-31", "RULE-999": "2026-09-01"}
+            ),
+            [],
+        )
+
+    def test_stale_baseline_skips_changes_without_dates(self):
+        ledger = "## CHG-20260901-003: 无日期\n- created: event-driven\n- authority_surfaces: RULE-001\n"
+        changes = detect_conflicts.extract_changes(ledger)
+        self.assertEqual(
+            detect_conflicts.check_stale_baselines(changes, {"RULE-001": "2026-02-01"}), []
+        )
+
 
 README_WITH_INTENT_LAYER = """# test
 
@@ -291,6 +391,22 @@ CONSTITUTION_WITH_DOMAINS = """# Constitution
 """
 
 
+CONSTITUTION_WITH_INTENTS = CONSTITUTION_WITH_DOMAINS + """
+## 功能意图与用户流程
+
+### 功能意图登记
+
+| intent_id | 功能入口 | intent | 流程位置 | 关联规则 | 代码锚点 | 来源 | last_verified |
+|---|---|---|---|---|---|---|---|
+| INT-20260904-001 | 开票命令 | 月末批量生成发票编号 | FLOW-001#1 | none | src/billing/invoice.py | user:2026-09-04 | 2026-09-04 |
+| INT-20260904-002 | 提交后推送 | 提交后自动推送远端 | FLOW-001#2 | RULE-SYNC-001 | none | inferred | 2026-09-04 |
+
+### 用户流程
+
+- FLOW-001 示例：1. 开票 → INT-20260904-001；2. 推送 → INT-20260904-002
+"""
+
+
 class RouteDocsTests(unittest.TestCase):
     """RULE-018 按需导入：宪法必读，命中职权或关键词的领域才进入读取清单。"""
 
@@ -367,6 +483,97 @@ class RouteDocsTests(unittest.TestCase):
         self.assertEqual(by_id["matched_domains"], ["logic_domains/sync"])
         self.assertEqual(both["matched_domains"], ["logic_domains/billing", "logic_domains/sync"])
         self.assertEqual(len(both["reading_order"]), 6)
+
+    # 按用户意图路由（宪法意图层 → 领域）
+
+    def _write_intent_project(self, root: Path) -> None:
+        self._write_project(root)
+        (root / "logic_readme.md").write_text(CONSTITUTION_WITH_INTENTS, encoding="utf-8")
+        sync_readme = root / "logic_domains" / "sync" / "logic_readme.md"
+        sync_readme.write_text(
+            sync_readme.read_text(encoding="utf-8")
+            + "\n| RULE-SYNC-001 | ordinary | 提交后自动推送 |\n",
+            encoding="utf-8",
+        )
+
+    def test_constitution_intents_parses_registry_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_intent_project(root)
+            intents = route_docs.constitution_intents(root)
+            self.assertEqual(route_docs.constitution_intents(root / "nowhere"), [])
+        self.assertEqual([i["intent_id"] for i in intents], ["INT-20260904-001", "INT-20260904-002"])
+        self.assertEqual(intents[0]["anchors"], ["src/billing/invoice.py"])
+        self.assertEqual(intents[0]["rules"], [])
+        self.assertEqual(intents[0]["source"], "user:2026-09-04")
+        self.assertEqual(intents[1]["anchors"], [])
+        self.assertEqual(intents[1]["rules"], ["RULE-SYNC-001"])
+        self.assertEqual(intents[1]["source"], "inferred")
+
+    def test_intent_id_target_routes_to_domain_by_code_anchor(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_intent_project(root)
+            plan = route_docs.build_plan(root, ["int-20260904-001"])
+        self.assertEqual(plan["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(len(plan["matched_intents"]), 1)
+        self.assertEqual(plan["matched_intents"][0]["intent_id"], "INT-20260904-001")
+        self.assertEqual(plan["matched_intents"][0]["source"], "user:2026-09-04")
+        self.assertEqual(
+            [item["path"] for item in plan["reading_order"]],
+            [
+                "logic_readme.md",
+                "logic_change.md",
+                "logic_domains/billing/logic_readme.md",
+                "logic_domains/billing/logic_change.md",
+            ],
+        )
+        reason = plan["reading_order"][2]["reason"]
+        self.assertIn("INT-20260904-001", reason)
+        self.assertIn("src/billing/invoice.py", reason)
+
+    def test_intent_id_target_routes_to_domain_by_rule_definition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_intent_project(root)
+            plan = route_docs.build_plan(root, ["INT-20260904-002"])
+        self.assertEqual(plan["matched_domains"], ["logic_domains/sync"])
+        self.assertEqual(plan["matched_intents"][0]["source"], "inferred")
+        self.assertIn("RULE-SYNC-001", plan["reading_order"][2]["reason"])
+
+    def test_keyword_in_intent_text_matches_intent_and_domain(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_intent_project(root)
+            by_intent_text = route_docs.build_plan(root, ["月末批量"])
+            by_entry = route_docs.build_plan(root, ["开票命令"])
+        self.assertEqual(
+            [i["intent_id"] for i in by_intent_text["matched_intents"]], ["INT-20260904-001"]
+        )
+        self.assertEqual(by_intent_text["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(
+            [i["intent_id"] for i in by_entry["matched_intents"]], ["INT-20260904-001"]
+        )
+        self.assertEqual(by_entry["matched_domains"], ["logic_domains/billing"])
+
+    def test_path_target_does_not_match_intents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_intent_project(root)
+            plan = route_docs.build_plan(root, ["src/billing/invoice.py"])
+            unknown = route_docs.build_plan(root, ["INT-20260904-999"])
+        self.assertEqual(plan["matched_intents"], [])
+        self.assertEqual(plan["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(unknown["matched_intents"], [])
+        self.assertEqual(unknown["matched_domains"], [])
+
+    def test_plan_without_intent_table_has_empty_matched_intents(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            plan = route_docs.build_plan(root, ["发票"])
+        self.assertEqual(plan["matched_intents"], [])
+        self.assertEqual(plan["matched_domains"], ["logic_domains/billing"])
 
     def test_estimate_tokens_counts_cjk_per_char(self):
         self.assertEqual(route_docs.estimate_tokens("abcd" * 10), 10)

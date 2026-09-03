@@ -25,7 +25,7 @@
 - last_verified: 2026-09-04
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002, VER-20260903-001, VER-20260903-002, VER-20260903-003, VER-20260903-004
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002, VER-20260903-001, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀；宪法必读、部门法按需导入
 - intent_sources: 用户访谈 2026-08-07；用户确认 2026-09-03（一二级拆分法）
 - decision_validity: valid
@@ -55,10 +55,10 @@
 | RULE-002 | key | logic_readme.md 只保留最新规则 | 删除已废弃内容，保持单一真相源 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | 当前文档 | valid | 2026-08-08 | self |
 | RULE-003 | key | 历史记录保存设计逻辑 | 记录为什么、取舍、影响，不记录代码快照 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | logic_version/ | valid | 2026-08-08 | self |
 | RULE-004 | ordinary | 三条通道分流修改 | 简单/中等/高风险，避免过度流程化 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 最佳实践 | SKILL.md | valid | 2026-08-08 | self |
-| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询；意图层只在宪法维护，领域文档不重复）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；同议题多方案竞争时，落选方案连同其需求原文与否决原因随胜出 VER 的方案分析归档，已独立立案的落选 CHG 建 `status: rejected` 的 VER 记录并同样搬运三字段；plan 模式产出批准后、动代码前按通道落盘；意图层维护深度按治理模式分档：personal 轻量档（INT 必维护、FLOW 可合并、UXI 按需），collaborative 及以上全量，档位定义见 references/governance-modes.md | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查，落选方案直接删除亦然；单人模式逐条维护三层的行数成本与收益不成比例 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | 本文件"功能意图与用户流程"节 + scripts/validate.py + references/governance-modes.md | valid | 2026-09-04 | self |
+| RULE-014 | key | logic_readme 维护功能级"功能意图与用户流程"层（INT/FLOW/UXI 按条目模块化，intent_id 统一 `INT-YYYYMMDD-NNN` 完整格式，登记表含代码锚点列支撑反向查询，含 `来源` 列区分用户表述与 AI 推断——`user:` / `user-confirmed:` 才可驱动实施，`code-derived` / `inferred` 由 validate 告警；意图层只在宪法维护，领域文档不重复；用户新表述先落意图层再做领域工作）；medium/high CHG 在实施前记录需求拆解与融入分析（raw_request/decomposition/fit_analysis），归档时三字段原样搬入 VER 记录（需求保全）；同议题多方案竞争时，落选方案连同其需求原文与否决原因随胜出 VER 的方案分析归档，已独立立案的落选 CHG 建 `status: rejected` 的 VER 记录并同样搬运三字段；plan 模式产出批准后、动代码前按通道落盘；意图层维护深度按治理模式分档：personal 轻量档（INT 必维护、FLOW 可合并、UXI 按需），collaborative 及以上全量，档位定义见 references/governance-modes.md | 功能级产品逻辑此前无处沉淀，AI 每会话从代码反推意图；CHG 归档即删除，三字段不搬入不可变记录则需求拆解只剩 git 考古可查，落选方案直接删除亦然；单人模式逐条维护三层的行数成本与收益不成比例 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md)；[VER-20260904-001](logic_version/records/logic_version-20260904-001-intent-provenance-conflicts.md) | 用户确认；来源列为 2026-09-04 用户确认（"用户的思路就是宪法"） | 本文件"功能意图与用户流程"节 + scripts/validate.py `check_intent_layer` 来源检查 + references/governance-modes.md | valid | 2026-09-04 | self |
 | RULE-016 | key | 项目接入采用模块化渐进：接入时只建根骨架（文档控制、范围登记表、至少一个领域、访谈式 INT/FLOW 初稿），存量模块登记 `pending-docs`；此后仅在新项目开始使用时或用户单独要求时补全对应模块；AI 代码扫描产出标 `code-derived`，意图层必须经用户确认后落盘 | `recall init` 只建 Git 管道，文档内容从哪来此前无流程；一次性全量扫描在存量项目不可行，未经确认的 AI 推断意图会污染真源 | [VER-20260816-003](logic_version/records/logic_version-20260816-003-semantic-link.md) | 用户确认 | references/project-onboarding.md + SKILL.md 接入章节 | valid | 2026-09-04 | self |
 | RULE-017 | key | 会话默认延续：新会话或上下文压缩后以现行 logic 文档与活跃议案为准继续（新会话视作新人接手，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度；模糊点先按现行逻辑分析并给出建议再咨询（SKILL 原则 5/11） | 协作协议此前只活在对话历史，每次压缩后用户被迫重讲元规则，正是 Recall 要消灭的 rescan | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | SKILL.md 核心原则 11 | valid | 2026-08-16 | self |
-| RULE-018 | key | 一二级拆分法：根 logic_readme 是**宪法**（全局规则、功能意图层、范围登记表即领域目录），每个任务必读；`logic_domains/领域名/logic_readme.md` + `logic_change.md` 是**部门法**（范围登记表 `doc_policy: paired` 登记，`owned_paths` 声明职权，承载该职权的规则行、代码地图行与测试行），只在任务触及职权时读取，入口 `recall route 路径或关键词`；**无论项目大小至少一个领域**；大部门制：法条少时一域多职，领域 readme 越过 250 行目标即拆小部门（宪法 150/250、领域 250/400、账本 150/300，Density advisory）；根 logic_change 只放修宪议案 + 全项目活跃议案索引（公报：一行一条、`proposal_path` 指向领域账本），领域 logic_change 一事一议、同域同账本、同一 CHG 正文只在一处；领域议案 `affected_scopes` 必含自身且不含 `.`（触宪即修宪案，正文回根账本）；RULE/INT 编号空间全项目唯一；未登记的 logic_readme/logic_change 仍是平行真源；logic_version 全项目唯一；根规章优先于领域 | 单文件根文档在消费项目达 1060/6543 行、超出上下文窗口 20 倍，而此前子文档可选、无 change 配对、从未被任何项目使用；宪法必读保住全局约束与用户意图，部门法按需导入把每任务固定读取从整份根文档降到宪法 + 命中领域；未经登记的拆分会重演平行真源失败模式，无检查的子文档会成为膨胀区与撞号区 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md)；[VER-20260903-004](logic_version/records/logic_version-20260903-004-two-level-docs.md) | 用户确认 2026-09-03（宪法/部门法比喻，"无论大小项目都用一二级拆分法"） | scripts/recall_common.py `registered_domains`/`change_ledgers` + scripts/route_docs.py + scripts/recall_audit/integrity.py 领域与公报核查 + archive.py 密度分档 + tests/test_audit_logic_map.py、tests/test_recall_cli.py、tests/test_validate.py、tests/test_recall_common.py；本仓库自身：MOD-GIT-PIPELINE、MOD-TOOLCHAIN | valid | 2026-09-04 | self |
+| RULE-018 | key | 一二级拆分法：根 logic_readme 是**宪法**（全局规则、功能意图层、范围登记表即领域目录），每个任务必读；`logic_domains/领域名/logic_readme.md` + `logic_change.md` 是**部门法**（范围登记表 `doc_policy: paired` 登记，`owned_paths` 声明职权，承载该职权的规则行、代码地图行与测试行），只在任务触及职权时读取，入口 `recall route 路径、关键词或 INT-ID`（按路径职权、领域文本或宪法意图行的锚点/关联规则路由，并展示命中的用户意图及其来源）；**无论项目大小至少一个领域**；大部门制：法条少时一域多职，领域 readme 越过 250 行目标即拆小部门（宪法 150/250、领域 250/400、账本 150/300，Density advisory）；根 logic_change 只放修宪议案 + 全项目活跃议案索引（公报：一行一条、`proposal_path` 指向领域账本），领域 logic_change 一事一议、同域同账本、同一 CHG 正文只在一处；领域议案 `affected_scopes` 必含自身且不含 `.`（触宪即修宪案，正文回根账本）；RULE/INT 编号空间全项目唯一；未登记的 logic_readme/logic_change 仍是平行真源；logic_version 全项目唯一；根规章优先于领域 | 单文件根文档在消费项目达 1060/6543 行、超出上下文窗口 20 倍，而此前子文档可选、无 change 配对、从未被任何项目使用；宪法必读保住全局约束与用户意图，部门法按需导入把每任务固定读取从整份根文档降到宪法 + 命中领域；未经登记的拆分会重演平行真源失败模式，无检查的子文档会成为膨胀区与撞号区 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md)；[VER-20260903-004](logic_version/records/logic_version-20260903-004-two-level-docs.md) | 用户确认 2026-09-03（宪法/部门法比喻，"无论大小项目都用一二级拆分法"） | scripts/recall_common.py `registered_domains`/`change_ledgers` + scripts/route_docs.py + scripts/recall_audit/integrity.py 领域与公报核查 + archive.py 密度分档 + tests/test_audit_logic_map.py、tests/test_recall_cli.py、tests/test_validate.py、tests/test_recall_common.py；本仓库自身：MOD-GIT-PIPELINE、MOD-TOOLCHAIN | valid | 2026-09-04 | self |
 | RULE-019 | key | 文档引用纪律：规范的语义正文只存在于 logic_readme（宪法或所属领域）的规则行；SKILL、模板、生命周期文档、CLAUDE/AGENTS 入口等其他位置只保留"见 RULE-XXX"式指针与纯操作步骤；审计对账"git 跟踪的顶层 Markdown 入口 ⊆ owned_paths ∪ unmapped_paths"，未登记条目使静态门失败 | 同一语义散布多处（曾达 5 处）每次更新需 N 连改、漏一处即漂移；改名换姓的制度副本（README 重述通道、SUMMARY 总结）平行真源检测抓不到，只能靠登记对账机器可见 | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md) | 用户确认 | scripts/audit_logic_map.py 根目录覆盖对账 + tests/test_audit_logic_map.py | valid | 2026-09-04 | self |
 | RULE-020 | key | 收尾归零：任务完成态 = 交付物就位 + 本次新建的非交付物（探针脚本、临时测试、草稿、调试输出）已删除或经用户同意保留 + 最终汇报列出处置清单；`medium`/`high` 通道必建 `logic_version/working/` 下以 version_slug 命名目录内的 `logic_temp.md`（位置由审计器校验），在其"工作区产物台账"登记 path / artifact_kind / disposition / reason / cleaned_at，台账清零（无未执行的 delete、无 pending）方可关闭 CHG 并删除 working 目录；`simple` 通道不建文件，只在最终汇报列清单；`recall status` 把未跟踪文件单列为待处置候选，`recall validate` 对未被 .gitignore 覆盖的未跟踪文件非阻断告警；**任何工具都不自动删除文件**，处置由代理逐项执行并对用户可见 | AI 解题产生的临时文件在任务"完成"后无人负责；RULE-011 默认排除未跟踪文件保住了远端却让本地垃圾隐形累积；只有把收尾写进"完成"的定义才能覆盖不建 CHG 的 simple 通道 | [VER-20260903-001](logic_version/records/logic_version-20260903-001-cleanup-ledger.md) | 用户确认 2026-09-03（A/B 二选一选 B） | references/logic-temp-template.md 台账表 + scripts/recall_common.py `classify_porcelain` + scripts/validate.py `report_untracked_leftovers` + tests/test_recall_cli.py + tests/test_validate.py；**已被 git add 的垃圾无自动检测**，只能靠台账或汇报清单 | valid | 2026-09-03 | self |
 | RULE-022 | key | 按需披露：SKILL.md 首屏只保留路由问题、三通道、默认读取顺序、核心原则、调用模式/命令与"按需读取"表，其余细节（文档模型、Git 同步、治理模式、项目接入、代理入口、领域模板）只在 references/ 保留一份并由表指向；审计器按层分包在 `scripts/recall_audit/`（只许向下依赖，`audit_logic_map.py` 只做入口，新写函数不超过 150 行，结构见 MOD-TOOLCHAIN 代码地图）；Density 段对越过目标值的文档给出 advisory 提示 | SKILL 每次触发约 6300 token、其中近半是代理极少当场需要的目录模型与 Git 细节；审计器单文件 6764 行、最大函数 650 行，是修改成本最高且最易再出 RULE-009 式静默漂移的地方；行数目标此前只写在文档里、无机器信号 | [VER-20260903-002](logic_version/records/logic_version-20260903-002-structure-context-cost.md)；[VER-20260903-003](logic_version/records/logic_version-20260903-003-structural-closure.md) | 用户确认 2026-09-03 | SKILL.md + references/document-model.md、references/git-sync.md + scripts/recall_audit/ + tests/test_audit_logic_map.py | valid | 2026-09-04 | self |
@@ -109,25 +109,25 @@
 
 ## 功能意图与用户流程
 
-用户视角层，与代码地图（系统视角）互补；只在宪法维护（RULE-014）。新增或调整用户可见功能前先对照本节做融入分析。
+用户视角层：**用户的表述就是宪法的来源**。每条意图标 `来源`（`user:日期` 原话登记 / `user-confirmed:日期` AI 起草经用户确认 / `code-derived`、`inferred` 待确认），未经用户确认的意图不得驱动实施；只在宪法维护（RULE-014）。用户提出新目标或约束时先对照本节：已有则复用，没有则先立修宪案登记，再做领域工作。
 
 ### 功能意图登记
 
-| intent_id | 功能入口 | intent（服务的用户目标） | 流程位置 | 关联规则 | 代码锚点 | last_verified |
-|---|---|---|---|---|---|---|
-| INT-20260816-001 | logic_readme 功能意图与用户流程层 | AI 从文档恢复功能级产品逻辑与用户流程，无需重扫代码库 | FLOW-002#1 | RULE-014 | logic_readme.md | 2026-08-16 |
-| INT-20260816-002 | recall init | 一条命令完成 Git + Recall 接入，无需手动配置 | FLOW-001#1 | RULE-010 | scripts/init_recall.py | 2026-08-16 |
-| INT-20260816-003 | 文档阅读（SKILL/宪法/根账本 → 命中领域） | AI 在修改前恢复设计上下文，不从代码反推意图；宪法必读，领域按需，SKILL 细节按需读 references | FLOW-002#1 | RULE-001..004, RULE-018, RULE-022 | SKILL.md; references/document-model.md | 2026-09-04 |
-| INT-20260816-004 | recall new | 修改前留下"为什么改"的决策记录骨架 | FLOW-002#3 | RULE-003, RULE-012 | scripts/create_ver.py | 2026-08-16 |
-| INT-20260816-005 | recall sync | 一条命令保存并同步全部进度，无需手写 Git 序列 | FLOW-001#3, FLOW-002#5 | RULE-011, RULE-013 | scripts/git_sync.py | 2026-08-16 |
-| INT-20260816-006 | recall status / recall list | 快速了解系统当前状态（领域数、各账本议案、未提交/未推送）与最近决策 | FLOW-003#1 | RULE-010, RULE-012, RULE-018, RULE-021 | scripts/recall.py; scripts/recall_common.py; scripts/link_ver_git.py | 2026-09-04 |
-| INT-20260816-007 | recall query file/commit/intent | 双向追溯：从代码定位"为什么改"，从功能意图定位"要改哪里" | FLOW-003#2 | RULE-013, RULE-014 | scripts/link_ver_git.py | 2026-08-16 |
-| INT-20260816-008 | recall validate / audit | 确认宪法、领域文档、记录与 Git 状态一致；审计门按治理模式分档 | FLOW-003#3 | RULE-009, RULE-015, RULE-018, RULE-023 | scripts/validate.py; scripts/recall_audit/integrity.py | 2026-09-04 |
-| INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | RULE-021 | scripts/detect_conflicts.py | 2026-09-03 |
-| INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建宪法骨架 + 至少一个领域，按触发时机逐模块补全 | FLOW-005#2 | RULE-016, RULE-018 | references/project-onboarding.md | 2026-09-04 |
-| INT-20260816-011 | 一二级拆分（宪法 + 部门法，RULE-018） | 大小项目统一两级：改哪个领域读哪份部门法，宪法保证全局约束；领域过大拆小部门 | FLOW-005#4 | RULE-018 | references/logic-domain-template.md; scripts/recall_audit/integrity.py | 2026-09-04 |
-| INT-20260903-001 | 收尾归零（logic_temp 工作区产物台账 + status/validate 残留提示） | 任务结束时工作区只剩交付物，AI 不遗留探针脚本、临时测试与草稿 | FLOW-002#6 | RULE-020 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | 2026-09-03 |
-| INT-20260903-002 | recall route | 按目标路径/关键词得到本次应读的文档清单与上下文成本，只导入命中的领域 | FLOW-002#1 | RULE-018 | scripts/route_docs.py | 2026-09-04 |
+| intent_id | 功能入口 | intent（服务的用户目标） | 流程位置 | 关联规则 | 代码锚点 | 来源 | last_verified |
+|---|---|---|---|---|---|---|---|
+| INT-20260816-001 | logic_readme 功能意图与用户流程层 | AI 从文档恢复功能级产品逻辑与用户流程，无需重扫代码库 | FLOW-002#1 | RULE-014 | logic_readme.md | user-confirmed:2026-08-16 | 2026-08-16 |
+| INT-20260816-002 | recall init | 一条命令完成 Git + Recall 接入，无需手动配置 | FLOW-001#1 | RULE-010 | scripts/init_recall.py | user-confirmed:2026-08-16 | 2026-08-16 |
+| INT-20260816-003 | 文档阅读（SKILL/宪法/根账本 → 命中领域） | AI 在修改前恢复设计上下文，不从代码反推意图；宪法必读，领域按需，SKILL 细节按需读 references | FLOW-002#1 | RULE-001..004, RULE-018, RULE-022 | SKILL.md; references/document-model.md | user-confirmed:2026-08-16 | 2026-09-04 |
+| INT-20260816-004 | recall new | 修改前留下"为什么改"的决策记录骨架 | FLOW-002#3 | RULE-003, RULE-012 | scripts/create_ver.py | user-confirmed:2026-08-16 | 2026-08-16 |
+| INT-20260816-005 | recall sync | 一条命令保存并同步全部进度，无需手写 Git 序列 | FLOW-001#3, FLOW-002#5 | RULE-011, RULE-013 | scripts/git_sync.py | user-confirmed:2026-08-16 | 2026-08-16 |
+| INT-20260816-006 | recall status / recall list | 快速了解系统当前状态（领域数、各账本议案、未提交/未推送）与最近决策 | FLOW-003#1 | RULE-010, RULE-012, RULE-018, RULE-021 | scripts/recall.py; scripts/recall_common.py; scripts/link_ver_git.py | user-confirmed:2026-08-16 | 2026-09-04 |
+| INT-20260816-007 | recall query file/commit/intent | 双向追溯：从代码定位"为什么改"，从功能意图定位"要改哪里" | FLOW-003#2 | RULE-013, RULE-014 | scripts/link_ver_git.py | user-confirmed:2026-08-16 | 2026-08-16 |
+| INT-20260816-008 | recall validate / audit | 确认宪法、领域文档、记录与 Git 状态一致；审计门按治理模式分档 | FLOW-003#3 | RULE-009, RULE-015, RULE-018, RULE-023 | scripts/validate.py; scripts/recall_audit/integrity.py | user-confirmed:2026-08-16 | 2026-09-04 |
+| INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | RULE-021 | scripts/detect_conflicts.py | user-confirmed:2026-08-16 | 2026-09-03 |
+| INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建宪法骨架 + 至少一个领域，按触发时机逐模块补全 | FLOW-005#2 | RULE-016, RULE-018 | references/project-onboarding.md | user-confirmed:2026-08-16 | 2026-09-04 |
+| INT-20260816-011 | 一二级拆分（宪法 + 部门法，RULE-018） | 大小项目统一两级：改哪个领域读哪份部门法，宪法保证全局约束；领域过大拆小部门 | FLOW-005#4 | RULE-018 | references/logic-domain-template.md; scripts/recall_audit/integrity.py | user:2026-09-03 | 2026-09-04 |
+| INT-20260903-001 | 收尾归零（logic_temp 工作区产物台账 + status/validate 残留提示） | 任务结束时工作区只剩交付物，AI 不遗留探针脚本、临时测试与草稿 | FLOW-002#6 | RULE-020 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | user:2026-09-03 | 2026-09-03 |
+| INT-20260903-002 | recall route | 按目标路径/关键词得到本次应读的文档清单与上下文成本，只导入命中的领域 | FLOW-002#1 | RULE-018 | scripts/route_docs.py | user:2026-09-03 | 2026-09-04 |
 
 编号 `INT-YYYYMMDD-NNN` 与 CHG/VER 的 `intent_traceability` 链共用；"代码锚点"列支撑 `recall query intent`，validate 检查锚点存在性。
 
@@ -189,8 +189,7 @@
 
 ## 兼容与迁移制度
 
-- 对象与策略：文档模型（单文件 + 可选子文档 → 宪法 + 部门法）为 replace，无并行版本；存量项目迁移 = 新建领域目录、登记 paired 行、搬迁规则行（步骤见 references/project-onboarding.md）；工具对旧式 readme-only 子文档与无领域项目继续接受，只给 advisory 提示
-- 回滚能力：Git 版本控制
+- 对象与策略：文档模型（单文件 + 可选子文档 → 宪法 + 部门法）为 replace，无并行版本；存量项目迁移 = 新建领域目录、登记 paired 行、搬迁规则行、意图表补 `来源` 列（步骤见 references/project-onboarding.md）；工具对旧式 readme-only 子文档、无领域项目与缺来源列继续接受，只给 advisory 提示；回滚能力：Git 版本控制
 
 ## 测试与验证
 
@@ -203,6 +202,8 @@
 | integration | INV-003 VER-* 不可变 | `git log --follow -- logic_version/records/` | 已发布 VER-* 只有创建与占位符回填提交 | Git log |
 
 ## 有效决策索引
+
+完整索引见 [logic_version/index.md](logic_version/index.md)。
 
 | version_id | 决策摘要 | 关联规则 | 记录 |
 |---|---|---|---|
@@ -222,8 +223,7 @@
 | VER-20260903-002 | 结构性与上下文成本优化：CLI 胶水故障修复与子进程冒烟、recall_common 公共基础设施、未推送提交提示、SKILL 按需披露、审计器分层包、Density 目标提示 | RULE-010, RULE-021, RULE-022 | [记录](logic_version/records/logic_version-20260903-002-structure-context-cost.md) |
 | VER-20260903-003 | 结构性收口：Git 调用与 porcelain 解析单源 + 测试级静态门、审计器大函数按检查拆分、CHG 字段按治理模式分档、审计 `--json` UTF-8、根文档压缩 | RULE-008, RULE-021..023 | [记录](logic_version/records/logic_version-20260903-003-structural-closure.md) |
 | VER-20260903-004 | 一二级拆分法：宪法（根）+ 部门法（logic_domains 领域 readme/change 成对）、根账本公报、`recall route` 按需导入、密度分档；本仓库拆为 2 个领域 | RULE-015, RULE-018, RULE-021 | [记录](logic_version/records/logic_version-20260903-004-two-level-docs.md) |
-
-完整索引见 [logic_version/index.md](logic_version/index.md)。
+| VER-20260904-001 | 一法多议案：跨账本目标规则冲突与旧议案基线失效检查（不分档）、意图层来源列（用户表述即宪法）、按意图路由、conflicts 新节 | RULE-014, RULE-015, RULE-018, RULE-023 | [记录](logic_version/records/logic_version-20260904-001-intent-provenance-conflicts.md) |
 
 ## 活跃议案入口
 
@@ -234,6 +234,7 @@
 
 - 仅支持个人或小团队使用（low-concurrency）；不提供实际权限控制（依赖 Git）；归档需人工判断——`recall new` 只生成骨架，"为什么"必须手写
 - 宪法的行数由规则行与意图层决定：规则行是刚性的、一行一条；本文档越过 150 行目标（Density advisory）时先把领域相关规则迁入部门法，再压缩 FLOW/UXI；禁止未登记的第二现行文档（INV-001/002）
+- 一法多议案的机器检测依赖 `authority_surfaces` 写明目标 RULE；未写的议案只在拟议制度提到规则时得到提示，基线失效只比对 `last_reviewed` 与议案日期、不比对规则正文
 - 两级模型对存量项目是强制目标而非即时门禁：无领域的项目只收到 `constitution-without-domains` 提示、静态门不失败；是否让"无领域"与硬上限越线进门属待立案议题
 - 工具链侧限制（validate CHG-ID 正则、VER 模板假错误、`recall route` 子串匹配、审计器超限函数）见 MOD-TOOLCHAIN"当前限制"
 

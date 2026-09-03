@@ -37,7 +37,7 @@ INV-001/INV-002 与核心原则 3；合法做法见下"领域划分与拆分"—
    - "哪些操作习惯绝对不能破坏？"（→ UXI，可为空）
 5. **不变量与当前限制**：只写用户明确说出的约束，宁缺毋滥
 
-产出以用户确认为生效条件：骨架落盘前把 INT/FLOW 初稿念给用户听，确认后写入。落盘后跑
+产出以用户确认为生效条件：骨架落盘前把 INT/FLOW 初稿念给用户听，确认后写入。每条 INT 的 `来源` 列如实标注：用户原话转写填 `user:日期`，AI 起草经确认填 `user-confirmed:日期`，尚未确认的填 `inferred` 或 `code-derived`（validate 告警，直到用户确认）。用户的表述就是宪法的来源；此后用户每次提出新目标或约束，先对照意图层，没有就先立修宪案登记再做领域工作。落盘后跑
 `recall validate` 与 `python scripts/audit_logic_map.py . --current-state`，Density 段不应再出现
 `constitution-without-domains`。
 

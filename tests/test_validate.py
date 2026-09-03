@@ -248,6 +248,127 @@ class DomainLedgerTests(unittest.TestCase):
         )
 
 
+def intent_layer_readme(*, source_header: str | None, source_value: str = "") -> str:
+    """带功能意图登记表的最小 readme；``source_header`` 为 None 时不含「来源」列。"""
+    has_source = source_header is not None
+    header = (
+        "| intent_id | 功能入口 | intent | 流程位置 | 关联规则 | 代码锚点 |"
+        + (f" {source_header} |" if has_source else "")
+        + " last_verified |"
+    )
+    separator = "|---" * (8 if has_source else 7) + "|"
+    row = (
+        "| INT-20260816-001 | demo 命令 | 示例用户目标 | FLOW-001#1 | RULE-001 | src/app.py |"
+        + (f" {source_value} |" if has_source else "")
+        + " 2026-08-16 |"
+    )
+    return (
+        "# test\n\n## 功能意图与用户流程\n\n### 功能意图登记\n\n"
+        f"{header}\n{separator}\n{row}\n\n"
+        "### 用户流程\n\n- FLOW-001 示例：1. 运行 demo → INT-20260816-001\n"
+    )
+
+
+class IntentSourceColumnTests(unittest.TestCase):
+    """RULE-014/016：意图登记表的「来源」列——区分用户表述与 AI 推断。"""
+
+    def _check(self, content: str):
+        result = VALIDATE.ValidationResult()
+        VALIDATE.check_intent_layer(content, {"RULE-001"}, result)
+        return result
+
+    @staticmethod
+    def _source_notices(result) -> list:
+        # check_intent_layer 末尾总会加一条“校验完成”的 info，只取来源列相关的提示
+        return [msg for msg in result.info if "来源" in msg]
+
+    def test_missing_source_column_is_info_only(self) -> None:
+        result = self._check(intent_layer_readme(source_header=None))
+        notices = self._source_notices(result)
+        self.assertEqual(len(notices), 1, result.info)
+        self.assertIn("缺少「来源」列", notices[0])
+        self.assertIn("logic_readme.md", notices[0])
+        self.assertEqual(result.warnings, [])
+        self.assertEqual(result.errors, [])
+
+    def test_missing_source_column_uses_doc_label(self) -> None:
+        result = VALIDATE.ValidationResult()
+        VALIDATE.check_intent_layer(
+            intent_layer_readme(source_header=None),
+            {"RULE-001"},
+            result,
+            doc_label="src/logic_readme.md",
+        )
+        self.assertTrue(
+            [
+                msg
+                for msg in result.info
+                if "src/logic_readme.md:" in msg and "缺少「来源」列" in msg
+            ],
+            result.info,
+        )
+
+    def test_unconfirmed_sources_warn(self) -> None:
+        for value in ("", "inferred", "code-derived", "Inferred", "code-derived:2026-09-04"):
+            with self.subTest(source=value):
+                result = self._check(intent_layer_readme(source_header="来源", source_value=value))
+                self.assertEqual(len(result.warnings), 1, result.warnings)
+                self.assertIn("INT-20260816-001", result.warnings[0])
+                self.assertIn("尚未经用户确认", result.warnings[0])
+                self.assertEqual(self._source_notices(result), [])
+                self.assertEqual(result.errors, [])
+        empty = self._check(intent_layer_readme(source_header="来源", source_value=""))
+        self.assertIn("「空」", empty.warnings[0])
+
+    def test_user_sources_are_silent(self) -> None:
+        for value in ("user:2026-09-04", "user-confirmed:2026-09-04", "User-Confirmed:2026-09-04"):
+            with self.subTest(source=value):
+                result = self._check(intent_layer_readme(source_header="来源", source_value=value))
+                self.assertEqual(result.warnings, [])
+                self.assertEqual(self._source_notices(result), [])
+                self.assertEqual(result.errors, [])
+
+    def test_unrecognized_source_format_warns(self) -> None:
+        for value in ("用户口述", "user", "user:昨天", "confirmed:2026-09-04"):
+            with self.subTest(source=value):
+                result = self._check(intent_layer_readme(source_header="来源", source_value=value))
+                self.assertEqual(len(result.warnings), 1, result.warnings)
+                self.assertIn("格式无法识别", result.warnings[0])
+                self.assertIn(value, result.warnings[0])
+
+    def test_source_header_is_matched_by_prefix_before_last_verified(self) -> None:
+        """表头「来源（user/inferred）」这类带说明的写法也算来源列。"""
+        result = self._check(
+            intent_layer_readme(source_header="来源（user/inferred）", source_value="inferred")
+        )
+        self.assertEqual(self._source_notices(result), [])
+        self.assertEqual(len(result.warnings), 1, result.warnings)
+        self.assertIn("尚未经用户确认", result.warnings[0])
+
+    def test_source_column_does_not_break_anchor_check(self) -> None:
+        """来源列插在代码锚点之后、last_verified 之前，锚点列位置不变。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            result = VALIDATE.ValidationResult()
+            VALIDATE.check_intent_layer(
+                intent_layer_readme(source_header="来源", source_value="user:2026-09-04"),
+                {"RULE-001"},
+                result,
+                root,
+            )
+            self.assertTrue(any("src/app.py" in msg and "不存在" in msg for msg in result.warnings), result.warnings)
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("pass\n", encoding="utf-8")
+            ok = VALIDATE.ValidationResult()
+            VALIDATE.check_intent_layer(
+                intent_layer_readme(source_header="来源", source_value="user:2026-09-04"),
+                {"RULE-001"},
+                ok,
+                root,
+            )
+        self.assertEqual(ok.warnings, [])
+
+
 class DocDriftTests(unittest.TestCase):
     def test_non_git_directory_is_silent(self) -> None:
         result = VALIDATE.ValidationResult()

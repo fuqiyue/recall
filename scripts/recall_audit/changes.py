@@ -140,19 +140,17 @@ def review_freshness_issues(
     return issues
 
 
-def change_coordination_issues(
-    blocks: dict[str, str], *, ledger_mode: str = ""
-) -> list[str]:
-    """Validate declared relationships between active CHGs in one root ledger.
+_WAITING_STATUSES = {"awaiting-decision", "blocked"}
+_IMPLEMENTATION_STATUSES = {"implementing", "verifying", "promoting"}
 
-    This intentionally validates only declared coordination.  It cannot prove
-    that two code paths really are independent, so a missing declaration still
-    requires human/code-semantic review.
 
-    ``ledger_mode`` 是账本的 ``governance_mode``（RULE-023）：personal 块缺少
-    collaborative/compliance 层字段时不报缺失，写了的字段照常校验。
+def _coordination_entries(
+    blocks: dict[str, str], ledger_mode: str, issues: list[str]
+) -> dict[str, dict[str, object]]:
+    """逐块解析协调字段（authority_surfaces/depends_on/conflicts_with…）。
+
+    块自身的字段问题追加到 ``issues``；返回的 entries 供跨块关系检查使用。
     """
-    issues: list[str] = []
     entries: dict[str, dict[str, object]] = {}
     required_fields = (
         "authority_surfaces",
@@ -165,8 +163,8 @@ def change_coordination_issues(
         "runtime_environments",
         "feature_flag",
     )
-    waiting_statuses = {"awaiting-decision", "blocked"}
-    implementation_statuses = {"implementing", "verifying", "promoting"}
+    waiting_statuses = _WAITING_STATUSES
+    implementation_statuses = _IMPLEMENTATION_STATUSES
 
     for change_id, block in blocks.items():
         raw_values = control_values_raw(block)
@@ -356,15 +354,54 @@ def change_coordination_issues(
             ).strip(),
         }
 
-    dependency_graph: dict[str, set[str]] = {change_id: set() for change_id in entries}
+    return entries
+
+
+def change_coordination_issues(
+    blocks: dict[str, str],
+    *,
+    ledger_mode: str = "",
+    other_ledgers: dict[str, dict[str, str]] | None = None,
+) -> list[str]:
+    """Validate declared relationships between the active CHGs of one ledger.
+
+    This intentionally validates only declared coordination.  It cannot prove
+    that two code paths really are independent, so a missing declaration still
+    requires human/code-semantic review.
+
+    ``ledger_mode`` 是账本的 ``governance_mode``（RULE-023）：personal 块缺少
+    collaborative/compliance 层字段时不报缺失，写了的字段照常校验。
+
+    ``other_ledgers`` 是同一项目其余账本（根 + 各领域）的 CHG 块（RULE-018）：
+    ``depends_on`` / ``conflicts_with`` / ``blocked_by`` 的目标可以落在别的账本，
+    根议案与领域议案互写 ``conflicts_with`` 正是一法多议案的规定解法，不得被账本
+    边界打成 ``conflict-target-not-active``。其他账本块自身的字段问题由它们各自的
+    调用报告，这里只借用其关系字段；同账本影响面重叠仍只在本账本内比对
+    （跨账本重叠由 :func:`cross_ledger_rule_conflicts` 报告）。
+    """
+    issues: list[str] = []
+    waiting_statuses = _WAITING_STATUSES
+    implementation_statuses = _IMPLEMENTATION_STATUSES
+    entries = _coordination_entries(blocks, ledger_mode, issues)
+    all_entries: dict[str, dict[str, object]] = dict(entries)
+    for other_blocks in (other_ledgers or {}).values():
+        if other_blocks is blocks:
+            continue
+        for other_id, other_entry in _coordination_entries(other_blocks, "", []).items():
+            all_entries.setdefault(other_id, other_entry)
+
+    dependency_graph: dict[str, set[str]] = {change_id: set() for change_id in all_entries}
+    for change_id, entry in all_entries.items():
+        for target, _revision in entry["dependencies"]:  # type: ignore[index]
+            if target in all_entries:
+                dependency_graph[change_id].add(target)
     for change_id, entry in entries.items():
         status = str(entry["status"])
         for target, revision in entry["dependencies"]:  # type: ignore[index]
-            target_entry = entries.get(target)
+            target_entry = all_entries.get(target)
             if target_entry is None:
                 issues.append(f"{change_id}:dependency-target-not-active:{target}")
                 continue
-            dependency_graph[change_id].add(target)
             target_revision = str(target_entry["proposal_revision"])
             if target_revision != revision and status not in waiting_statuses:
                 issues.append(
@@ -408,12 +445,14 @@ def change_coordination_issues(
     for change_id in sorted(dependency_graph):
         visit(change_id)
     for cycle in sorted(cycles):
-        issues.append("dependency-cycle:" + ",".join(cycle))
+        # 跨账本环只由持有最小 CHG-ID 的账本报告一次
+        if cycle[0] in entries:
+            issues.append("dependency-cycle:" + ",".join(cycle))
 
     checked_conflict_pairs: set[tuple[str, str]] = set()
     for change_id, entry in entries.items():
         for target in sorted(entry["conflict_ids"]):  # type: ignore[index]
-            target_entry = entries.get(target)
+            target_entry = all_entries.get(target)
             if target_entry is None:
                 issues.append(f"{change_id}:conflict-target-not-active:{target}")
                 continue
@@ -470,7 +509,7 @@ def change_coordination_issues(
             continue
         for item in entry["blocked_by"]:  # type: ignore[index]
             target = normalize_change_id(item.split("@", 1)[0])
-            if target and target not in entries:
+            if target and target not in all_entries:
                 issues.append(f"{change_id}:blocked-by-target-not-active:{target}")
 
     return sorted(set(issues))
@@ -811,4 +850,90 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
         if extra:
             issues.append("index-ids-without-body:" + ",".join(extra))
 
+    return sorted(set(issues))
+
+
+# ---------------------------------------------------------------------------
+# RULE-018/023：一法多议案——跨账本目标规则冲突与旧议案基线失效（VER-20260904-001）
+# ---------------------------------------------------------------------------
+
+_RULE_TOKEN_RE = re.compile(r"\bRULE-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
+_PROPOSED_SECTION_RE = re.compile(r"^###\s+拟议制度\s*$(.*?)(?=^###\s|\Z)", re.MULTILINE | re.DOTALL)
+
+
+def _block_rule_targets(raw_values: dict[str, list[str]]) -> set[str]:
+    """CHG 明确声明要改的规则：只认 authority_surfaces 里的 RULE-ID（方案 A，避免顺带引用误报）。"""
+    targets: set[str] = set()
+    for item in relationship_items(raw_values, "authority_surfaces"):
+        for match in _RULE_TOKEN_RE.findall(item):
+            targets.add(match.upper())
+    return targets
+
+
+def _block_date(values: dict[str, list[str]]) -> str:
+    """议案立案/最近变动日期：取 created 与 last_status_change 中较晚且合法的一个。"""
+    dates = [
+        value
+        for key in ("created", "last_status_change")
+        for value in values.get(key, [])
+        if is_iso_date(value)
+    ]
+    return max(dates) if dates else ""
+
+
+def cross_ledger_rule_conflicts(
+    blocks_by_ledger: dict[str, dict[str, str]], rule_dates: dict[str, str]
+) -> list[str]:
+    """一法多议案：跨全部账本比对目标规则，并检查旧议案的基线是否已被新法推翻。
+
+    - ``shared-rule-target-needs-explicit-conflict``：两个活跃 CHG（不同账本）的
+      authority_surfaces 指向同一 RULE 却未互写 conflicts_with。同账本重叠由
+      ``change_coordination_issues`` 的 unmarked-authority-surface-overlap 报告。
+    - ``rule-changed-after-proposal``：目标规则的 last_reviewed 晚于 CHG 的
+      created/last_status_change——规则在议案之后被改过，须重核 based_on
+      （references/change-lifecycle.md 第 3 步），否则旧议案会带着失效基线生效。
+    - ``mentions-rule-without-authority-surfaces``：拟议制度提到 RULE 却没有声明
+      authority_surfaces，冲突检测对它不可见。
+    不按治理模式分档：personal 只需多写一行 ``authority_surfaces: RULE-xxx``。
+    """
+    issues: list[str] = []
+    entries: list[tuple[str, str, set[str], set[str], str]] = []
+    for ledger, blocks in blocks_by_ledger.items():
+        for change_id, block in blocks.items():
+            values = control_values(block)
+            raw_values = control_values_raw(block)
+            targets = _block_rule_targets(raw_values)
+            conflict_ids = {
+                normalize_change_id(item)
+                for item in relationship_items(raw_values, "conflicts_with")
+                if normalize_change_id(item)
+            }
+            if not targets:
+                proposed = _PROPOSED_SECTION_RE.search(block)
+                mentioned = sorted(
+                    {match.upper() for match in _RULE_TOKEN_RE.findall(proposed.group(1))}
+                ) if proposed else []
+                if mentioned:
+                    issues.append(
+                        f"{change_id}:mentions-rule-without-authority-surfaces:" + ",".join(mentioned)
+                    )
+            change_date = _block_date(values)
+            if change_date:
+                for rule_id in sorted(targets):
+                    rule_date = rule_dates.get(rule_id, "")
+                    if is_iso_date(rule_date) and rule_date > change_date:
+                        issues.append(
+                            f"{change_id}:rule-changed-after-proposal:{rule_id}:{rule_date}>{change_date}"
+                        )
+            entries.append((ledger, change_id, targets, conflict_ids, change_date))
+
+    for index, (ledger_a, id_a, targets_a, conflicts_a, _) in enumerate(entries):
+        for ledger_b, id_b, targets_b, conflicts_b, _ in entries[index + 1:]:
+            if ledger_a == ledger_b:
+                continue
+            shared = sorted(targets_a & targets_b)
+            if shared and (id_b not in conflicts_a or id_a not in conflicts_b):
+                issues.append(
+                    f"{id_a}:shared-rule-target-needs-explicit-conflict:{id_b}:" + ",".join(shared)
+                )
     return sorted(set(issues))

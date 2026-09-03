@@ -66,7 +66,7 @@
 
 普通追踪至少保留索引，以及正文中的 `status`、`effective`、`topic_id`、`proposal_revision`、决策门槛/状态、`owner`、`changed_by`、`scope`、`affected_scopes`、`intent_source_refs`、`intent_digest`、`intent_status`、`authority_surfaces`、`based_on`、依赖/冲突、运行暴露、历史保留级别、当前证据、拟议规则、验证/验收、回滚和开放问题；`medium`/`high` 条目另须保留 `raw_request`、`decomposition`、`fit_analysis`。下面的完整字段与矩阵只在用户明确要求正式审查或表单合规时全部填写。
 
-`governance_mode: personal` 的最小块（RULE-023，目标 15-40 行）：元数据只需 `status`、`effective: false`、`proposal_revision`、`recall_route`、`owner`、`changed_by`、`scope`，实施前补 `decision_confirmed_by` + `decision_confirmed_at`（`high` 建议再写 `decision_ref`）；正文保留目标、理由与当前证据、影响范围、`medium`/`high` 三字段、方案与决策、回滚、晋升目标。其余字段写了就会被审计器按完整规则校验（缺则不查、写则照查），见 references/field-vocabulary.md。
+`governance_mode: personal` 的最小块（RULE-023，目标 15-40 行）：元数据只需 `status`、`effective: false`、`proposal_revision`、`recall_route`、`owner`、`changed_by`、`scope`，实施前补 `decision_confirmed_by` + `decision_confirmed_at`（`high` 建议再写 `decision_ref`）；正文保留目标、理由与当前证据、影响范围、`medium`/`high` 三字段、方案与决策、回滚、晋升目标。**要修改现有规则的议案必须写 `authority_surfaces: RULE-xxx`**：这是一法多议案检测的唯一依据——同一规则被多个活跃议案指向须互写 `conflicts_with` 并给出 `conflict_resolution`（后案 `supersede` 前案、或 `sequence-and-revalidate` 排序），规则在议案之后被修订（`last_reviewed` 更晚）时审计与 `recall conflicts` 提示重核 `based_on`。其余字段写了就会被审计器按完整规则校验（缺则不查、写则照查），见 references/field-vocabulary.md。
 
 普通修复准备引入 adapter、全局 feature flag、dual-read/dual-write、平行真源或新抽象时，不需要补齐整份正式表单，但必须设为 `decision_gate: required`，并记录真实消费者/旧状态证据、最小修复不足的原因、唯一权威源、复杂度增量、负责人、可验证移除触发器和最晚复查日期。缺少这些信息时保持候选，不直接实现临时结构。
 

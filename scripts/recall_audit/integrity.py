@@ -49,6 +49,7 @@ from .textutil import (
 )
 from .changes import (
     change_field_tier,
+    cross_ledger_rule_conflicts,
     change_coordination_issues,
     change_heading_ids,
     change_index_ids,
@@ -1046,6 +1047,9 @@ class _CurrentStateContext:
     index_rows: list[dict[str, str]] = field(default_factory=list)
     gazette_rows: list[dict[str, str]] = field(default_factory=list)
     domain_change_ids: dict[str, str] = field(default_factory=dict)
+    ledger_blocks: dict[str, dict[str, str]] = field(default_factory=dict)
+    ledger_modes: dict[str, str] = field(default_factory=dict)
+    rule_dates: dict[str, str] = field(default_factory=dict)
     body_ids: set[str] = field(default_factory=set)
     topic_members: dict[str, set[str]] = field(default_factory=dict)
     topics_by_change: dict[str, set[str]] = field(default_factory=dict)
@@ -1131,6 +1135,8 @@ def _check_current_policy_table(ctx: _CurrentStateContext) -> None:
             ctx.document_issues.append(
                 f"logic_readme:current-policy-row-{index}-last-reviewed-must-be-date"
             )
+        elif rule_id:
+            ctx.rule_dates[rule_id.upper()] = last_reviewed
 
 
 def _check_code_map_table(ctx: _CurrentStateContext) -> None:
@@ -1774,7 +1780,10 @@ def _check_block_index_row(
 def _check_change_blocks(ctx: _CurrentStateContext) -> None:
     """逐个议案块核查责任字段、主题、范围、关联模块与索引行。"""
     ledger_mode = (control_values(ctx.change_text).get("governance_mode") or [""])[0]
-    for change_id, block in change_blocks(ctx.change_text).items():
+    root_blocks = change_blocks(ctx.change_text)
+    ctx.ledger_blocks["logic_change.md"] = root_blocks
+    ctx.ledger_modes["logic_change.md"] = ledger_mode
+    for change_id, block in root_blocks.items():
         values = control_values(block)
         raw_values = control_values_raw(block)
         tier = change_field_tier(values, ledger_mode)
@@ -1849,8 +1858,11 @@ def _check_domain_readme(ctx: _CurrentStateContext, scope: str) -> None:
             ctx.document_issues.append(
                 f"{label}:current-policy-row-{index}-key-needs-immutable-decision-link"
             )
-        if not is_iso_date(row.get("last_reviewed", "").strip()):
+        last_reviewed = row.get("last_reviewed", "").strip()
+        if not is_iso_date(last_reviewed):
             ctx.document_issues.append(f"{label}:current-policy-row-{index}-last-reviewed-must-be-date")
+        elif rule_id:
+            ctx.rule_dates[rule_id.upper()] = last_reviewed
     for index, row in enumerate(markdown_table_rows(text, "代码地图"), start=1):
         for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
             value = row.get(column, "").strip()
@@ -1905,9 +1917,6 @@ def _check_domain_block(
         gazette_status = gazette[0].get("status", "").strip().casefold()
         if gazette_status != (values.get("status") or [""])[0]:
             ctx.proposal_issues.append(f"{change_id}:root-index-status-mismatch:{gazette_status or 'empty'}")
-    ctx.proposal_issues.extend(
-        change_coordination_issues({change_id: block}, ledger_mode=ledger_mode)
-    )
 
 
 def _check_domain_change(ctx: _CurrentStateContext, scope: str) -> None:
@@ -1944,8 +1953,12 @@ def _check_domain_change(ctx: _CurrentStateContext, scope: str) -> None:
             f"{label}:active_changes-count-mismatch:{declared or 'missing'}!={expected}"
         )
     local_rows = markdown_table_rows(text, "活跃议案索引")
-    for change_id, block in change_blocks(text).items():
+    blocks = change_blocks(text)
+    ctx.ledger_blocks[f"{scope}/logic_change.md"] = blocks
+    ctx.ledger_modes[f"{scope}/logic_change.md"] = ledger_mode
+    for change_id, block in blocks.items():
         _check_domain_block(ctx, scope, change_id, block, local_rows, ledger_mode)
+    # 协调检查（依赖/冲突/影响面重叠）在所有账本收集完后统一执行：_check_ledger_coordination
 
 
 def _check_gazette_rows(ctx: _CurrentStateContext) -> None:
@@ -1959,6 +1972,22 @@ def _check_gazette_rows(ctx: _CurrentStateContext) -> None:
             ctx.proposal_issues.append(f"{change_id}:root-index-target-body-not-found:{target}")
 
 
+def _check_ledger_coordination(ctx: _CurrentStateContext) -> None:
+    """协调检查（依赖/冲突/影响面重叠）以整本账本为单位，并能看见其余账本的活跃 CHG。
+
+    RULE-023：账本的 governance_mode 决定块的字段档位。RULE-018：根议案与领域议案
+    互写 conflicts_with / depends_on 是一法多议案的规定解法，目标解析必须跨账本，
+    否则规定解法本身会被打成 conflict-target-not-active，门永远过不去。
+    """
+    for label, blocks in ctx.ledger_blocks.items():
+        others = {key: value for key, value in ctx.ledger_blocks.items() if key != label}
+        ctx.proposal_issues.extend(
+            change_coordination_issues(
+                blocks, ledger_mode=ctx.ledger_modes.get(label, ""), other_ledgers=others
+            )
+        )
+
+
 def _check_domain_documents(ctx: _CurrentStateContext, audits: list[ModuleAudit]) -> None:
     """RULE-018：逐个已登记领域核查 readme 表格、账本与公报一致性，并并入模块语义问题。"""
     domain_scopes = {scope for _, scope in _registered_domain_rows(ctx)}
@@ -1968,6 +1997,8 @@ def _check_domain_documents(ctx: _CurrentStateContext, audits: list[ModuleAudit]
         if (ctx.root / scope / "logic_change.md").is_file():
             _check_domain_change(ctx, scope)
     _check_gazette_rows(ctx)
+    # 一法多议案：跨账本目标规则冲突 + 旧议案基线失效（VER-20260904-001）
+    ctx.proposal_issues.extend(cross_ledger_rule_conflicts(ctx.ledger_blocks, ctx.rule_dates))
     for audit in audits:
         if audit.path not in domain_scopes:
             continue
@@ -2025,12 +2056,7 @@ def audit_current_state_integrity(
     _check_change_blocks(ctx)
     _check_topic_memberships(ctx)
     _check_domain_documents(ctx, audits)
-
-    # RULE-023：账本的 governance_mode 决定 CHG 块的字段档位
-    ledger_mode = (control_values(change_text).get("governance_mode") or [""])[0]
-    ctx.proposal_issues.extend(
-        change_coordination_issues(change_blocks(change_text), ledger_mode=ledger_mode)
-    )
+    _check_ledger_coordination(ctx)
 
     return ctx.result()
 

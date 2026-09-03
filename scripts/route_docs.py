@@ -12,6 +12,7 @@
 from __future__ import annotations
 
 import json
+import re
 import sys
 from fnmatch import fnmatchcase
 from pathlib import Path
@@ -73,9 +74,73 @@ def _looks_like_path(root: Path, target: str) -> bool:
     return "/" in target or "\\" in target or (root / target).exists()
 
 
-def match_domains(root: Path, targets: List[str]) -> Dict[str, List[str]]:
-    """返回 {scope_path: [命中理由...]}，只含命中的领域。"""
+_INT_ID_RE = re.compile(r"^INT-\d{8}-\d{3}$", re.IGNORECASE)
+_RULE_TOKEN_RE = re.compile(r"\bRULE-[A-Z0-9][A-Z0-9-]*\b", re.IGNORECASE)
+
+
+def constitution_intents(root: Path) -> List[Dict[str, str]]:
+    """宪法功能意图登记表：用户表述层。列：intent_id | 功能入口 | intent | 流程位置 | 关联规则 | 代码锚点 | [来源] | last_verified。"""
+    readme = root / "logic_readme.md"
+    if not readme.exists():
+        return []
+    intents: List[Dict[str, str]] = []
+    source_col = None
+    for line in readme.read_text(encoding="utf-8", errors="replace").splitlines():
+        stripped = line.strip()
+        if stripped.startswith("| intent_id"):
+            headers = [c.strip() for c in stripped.strip("|").split("|")]
+            source_col = next((i for i, h in enumerate(headers) if h.startswith("来源")), None)
+            continue
+        if not stripped.startswith("| INT-"):
+            continue
+        cells = [c.strip() for c in stripped.strip("|").split("|")]
+        if len(cells) < 6:
+            continue
+        intents.append({
+            "intent_id": cells[0].upper(),
+            "entry": cells[1],
+            "intent": cells[2],
+            "rules": [r.upper() for r in _RULE_TOKEN_RE.findall(cells[4])],
+            "anchors": [a.strip().strip("`") for a in re.split(r"[;，,]", cells[5]) if a.strip() and a.strip().lower() != "none"],
+            "source": cells[source_col] if source_col is not None and len(cells) > source_col else "",
+        })
+    return intents
+
+
+def match_intents(root: Path, targets: List[str]) -> List[Dict[str, str]]:
+    """目标是 INT-ID，或关键词出现在意图行的功能入口/用户目标里 → 命中该用户意图。"""
+    matched: List[Dict[str, str]] = []
+    for intent in constitution_intents(root):
+        for target in targets:
+            if _INT_ID_RE.match(target) and target.upper() == intent["intent_id"]:
+                matched.append(intent)
+                break
+            if not _looks_like_path(root, target) and not _INT_ID_RE.match(target):
+                needle = target.casefold()
+                if needle in intent["entry"].casefold() or needle in intent["intent"].casefold():
+                    matched.append(intent)
+                    break
+    return matched
+
+
+def _domain_rule_ids(domain: LogicDomain) -> set:
+    if not domain.readme.exists():
+        return set()
+    return {
+        line.strip().strip("|").split("|")[0].strip().upper()
+        for line in domain.readme.read_text(encoding="utf-8", errors="replace").splitlines()
+        if line.strip().startswith("| RULE-")
+    }
+
+
+def match_domains(root: Path, targets: List[str], intents: Optional[List[Dict[str, str]]] = None) -> Dict[str, List[str]]:
+    """返回 {scope_path: [命中理由...]}，只含命中的领域。
+
+    三条路径：目标路径落在职权 owned_paths；关键词出现在领域文档；
+    命中的宪法意图行（用户表述）的代码锚点或关联规则属于该领域。
+    """
     hits: Dict[str, List[str]] = {}
+    intents = intents or []
     for domain in registered_domains(root):
         reasons: List[str] = []
         owned = domain.owned_paths()
@@ -84,8 +149,19 @@ def match_domains(root: Path, targets: List[str]) -> Dict[str, List[str]]:
                 matched = [item for item in owned if _path_matches(target, item)]
                 if matched:
                     reasons.append(f"路径 {target} 属于职权 {', '.join(matched)}")
-            elif _keyword_matches(target, domain):
+            elif not _INT_ID_RE.match(target) and _keyword_matches(target, domain):
                 reasons.append(f"关键词 '{target}' 出现在该领域文档")
+        domain_rules = _domain_rule_ids(domain) if intents else set()
+        for intent in intents:
+            anchor_hits = [a for a in intent["anchors"] if any(_path_matches(a, item) for item in owned)]
+            rule_hits = [r for r in intent["rules"] if r in domain_rules]
+            if anchor_hits or rule_hits:
+                parts = []
+                if anchor_hits:
+                    parts.append(f"锚点 {', '.join(anchor_hits)}")
+                if rule_hits:
+                    parts.append(f"规则 {', '.join(rule_hits)}")
+                reasons.append(f"用户意图 {intent['intent_id']}（{intent['intent'][:30]}）的{'与'.join(parts)}属于本领域")
         if reasons:
             hits[domain.scope_path] = reasons
     return hits
@@ -109,7 +185,8 @@ def _gazette_hits(root: Path, scopes: List[str]) -> List[str]:
 
 def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
     domains = registered_domains(root)
-    hits = match_domains(root, targets) if targets else {}
+    intents = match_intents(root, targets) if targets else []
+    hits = match_domains(root, targets, intents) if targets else {}
     reading: List[Dict[str, object]] = []
 
     def add(path: Path, role: str, reason: str) -> None:
@@ -142,6 +219,9 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
         "targets": targets,
         "reading_order": reading,
         "matched_domains": sorted(hits),
+        "matched_intents": [
+            {k: v for k, v in intent.items()} for intent in intents
+        ],
         "in_flight_changes": _gazette_hits(root, sorted(hits)),
         "domains": all_domains,
         "total_lines": total_lines,
@@ -158,6 +238,12 @@ def _print_plan(plan: Dict[str, object]) -> None:
         print(f"{index}. {item['path']}  [{item['role']}]  {item['lines']} 行 ≈ {item['tokens']} token{flag}")
         print(f"   理由：{item['reason']}")
     print(f"\n合计约 {plan['total_lines']} 行 ≈ {plan['total_tokens_estimate']} token")
+    if plan["matched_intents"]:
+        print("\n🎯 命中的用户意图（宪法意图层——以用户表述为准）：")
+        for intent in plan["matched_intents"]:
+            source = intent.get("source") or "未标来源"
+            flag = "" if source.lower().startswith("user") else "  ⚠️ 非用户确认来源，实施前先确认"
+            print(f"   • {intent['intent_id']} {intent['entry']}：{intent['intent']}  [来源 {source}]{flag}")
     if plan["in_flight_changes"]:
         print("\n🔄 命中领域有在办议案：")
         for line in plan["in_flight_changes"]:

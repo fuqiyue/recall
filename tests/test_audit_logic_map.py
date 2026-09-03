@@ -615,6 +615,100 @@ def domain_change(*, affected_scopes: str = "src") -> str:
     )
 
 
+
+def domain_gazette_row(change_id: str, *, status: str = "draft") -> str:
+    """根公报中指向 src 领域账本另一条 CHG 的行。"""
+    return (
+        f"| {change_id} | {status} | src | self | domain test | none | "
+        f"[{change_id}](src/logic_change.md#{change_id.casefold()}) | 2026-07-22 |"
+    )
+
+
+def append_domain_change(
+    document: str,
+    *,
+    change_id: str,
+    status: str = "draft",
+    authority_surfaces: str = "RULE-APP-OUTPUT",
+    conflicts_with: str = "none",
+    conflict_resolution: str = "none",
+) -> str:
+    """向 src 领域账本追加第二条合法 CHG 正文（含本地索引行与 active_changes 计数）。"""
+    source = change_document(
+        full=False,
+        status=status,
+        authority_surfaces=authority_surfaces,
+        conflicts_with=conflicts_with,
+        conflict_resolution=conflict_resolution,
+    )
+    source_anchor = '<a id="chg-20260722-001"></a>'
+    block = source[source.index(source_anchor) :]
+    block = block.replace("CHG-20260722-001", change_id).replace(
+        "chg-20260722-001", change_id.casefold()
+    )
+    block = block.replace(
+        "- related_modules: [MOD-APP](logic_readme.md#scope-mod-app)",
+        "- related_modules: MOD-APP",
+    ).replace(
+        "policy: logic_readme.md#rule-output",
+        "policy: src/logic_readme.md#rule-app-output",
+    )
+    active_count = len(AUDIT.change_blocks(document))
+    document = document.replace(
+        f"- active_changes: {active_count}",
+        f"- active_changes: {active_count + 1}",
+        1,
+    )
+    index_row = (
+        f"| {change_id} | {status} | src | self | domain test | none | "
+        f"[{change_id}](logic_change.md#{change_id.casefold()}) | 2026-07-22 |"
+    )
+    domain_anchor = f'<a id="{DOMAIN_CHANGE_ID.casefold()}"></a>'
+    assert document.count("\n\n" + domain_anchor) == 1
+    document = document.replace(
+        "\n\n" + domain_anchor,
+        "\n" + index_row + "\n\n" + domain_anchor,
+        1,
+    )
+    return document + "\n" + block
+
+
+def rule_change_block(
+    change_id: str,
+    *,
+    authority_surfaces: str | None = "RULE-OUTPUT",
+    conflicts_with: str = "none",
+    created: str = "2026-07-22",
+    last_status_change: str = "2026-07-22",
+    proposed_policy: str = "Keep the output contract.",
+) -> str:
+    """手写的最小 CHG 块：供 cross_ledger_rule_conflicts 直接单测。"""
+    authority_line = (
+        f"- authority_surfaces: {authority_surfaces}\n"
+        if authority_surfaces is not None
+        else ""
+    )
+    return f"""## {change_id}: Test proposal
+
+### 元数据
+
+- status: draft
+- effective: false
+- created: {created}
+- last_status_change: {last_status_change}
+{authority_line}- conflicts_with: {conflicts_with}
+- conflict_resolution: none
+
+### 拟议制度
+
+{proposed_policy}
+
+### 兼容、迁移与回滚
+
+Rollback the code change.
+"""
+
+
 class RootOnlyAuditTests(unittest.TestCase):
     def write_project(
         self,
@@ -1288,6 +1382,157 @@ class RootOnlyAuditTests(unittest.TestCase):
             ),
             report["density"]["issues"],
         )
+
+    # ------------------------------------------------------------------
+    # 一法多议案（VER-20260904-001）：跨账本目标规则冲突、旧议案基线失效、
+    # 领域账本整本协调检查
+    # ------------------------------------------------------------------
+
+    def _retarget_root_change(self, root: Path, rule_id: str) -> None:
+        """让根 CHG 的 authority_surfaces/based_on 指向指定规则。"""
+        change_path = root / "logic_change.md"
+        text = change_path.read_text(encoding="utf-8")
+        self.assertIn("- authority_surfaces: RULE-OUTPUT", text)
+        text = text.replace(
+            "- authority_surfaces: RULE-OUTPUT", f"- authority_surfaces: {rule_id}"
+        ).replace("surfaces: RULE-OUTPUT", f"surfaces: {rule_id}")
+        change_path.write_text(text, encoding="utf-8")
+
+    def test_cross_ledger_shared_rule_target_requires_explicit_conflict(self) -> None:
+        """根 CHG 与领域 CHG 同指 RULE-APP-OUTPUT 却未互写 conflicts_with → 现状门失败。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            self._retarget_root_change(root, "RULE-APP-OUTPUT")
+            report = self.collect(root)
+
+        issues = report["current_integrity"]["proposal_issues"]
+        self.assertEqual(
+            issues,
+            [
+                "CHG-20260722-001:shared-rule-target-needs-explicit-conflict:"
+                f"{DOMAIN_CHANGE_ID}:RULE-APP-OUTPUT"
+            ],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_cross_ledger_reciprocal_conflict_passes_gate(self) -> None:
+        """互写 conflicts_with + 同一 conflict_resolution + 单向 depends_on 后，门应当通过。
+
+        这是一法多议案的规定解法（RULE-023）：根议案与领域议案的目标可以跨账本
+        解析，不得被账本边界打成 conflict-target-not-active / dependency-target-not-active。
+        """
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            self._retarget_root_change(root, "RULE-APP-OUTPUT")
+            root_change = root / "logic_change.md"
+            text = root_change.read_text(encoding="utf-8")
+            text = text.replace(
+                "- conflicts_with: none", f"- conflicts_with: {DOMAIN_CHANGE_ID}"
+            ).replace(
+                "- conflict_resolution: none",
+                "- conflict_resolution: sequence-and-revalidate",
+            )
+            root_change.write_text(text, encoding="utf-8")
+            domain_change_path = root / "src" / "logic_change.md"
+            text = domain_change_path.read_text(encoding="utf-8")
+            text = text.replace(
+                "- conflicts_with: none", "- conflicts_with: CHG-20260722-001"
+            ).replace(
+                "- conflict_resolution: none",
+                "- conflict_resolution: sequence-and-revalidate",
+            ).replace(
+                "- depends_on: none",
+                "- depends_on: CHG-20260722-001@revision-1\n"
+                "- unblock_condition: CHG-20260722-001 closes, then re-verify the output contract",
+            )
+            # 依赖活跃议案的一方须处于 verifying + unblock_condition（联合验收等待），
+            # 否则审计按规则报 active-dependency-needs-block-or-redecision
+            text = text.replace("implementing", "verifying")
+            domain_change_path.write_text(text, encoding="utf-8")
+            text = root_change.read_text(encoding="utf-8")
+            root_change.write_text(
+                text.replace(f"| {DOMAIN_CHANGE_ID} | implementing |", f"| {DOMAIN_CHANGE_ID} | verifying |"),
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        issues = report["current_integrity"]["proposal_issues"]
+        self.assertEqual(issues, [])
+        self.assertTrue(report["static_gate"]["passed"], report["static_gate"])
+
+    def test_rule_reviewed_after_proposal_is_reported_through_gate(self) -> None:
+        """规则 last_reviewed（2026-07-22）晚于 CHG created/last_status_change（2026-07-01）。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            change_path = root / "logic_change.md"
+            text = change_path.read_text(encoding="utf-8")
+            text = text.replace("- created: 2026-07-22", "- created: 2026-07-01").replace(
+                "- last_status_change: 2026-07-22", "- last_status_change: 2026-07-01"
+            )
+            change_path.write_text(text, encoding="utf-8")
+            report = self.collect(root)
+
+        self.assertEqual(
+            report["current_integrity"]["proposal_issues"],
+            ["CHG-20260722-001:rule-changed-after-proposal:RULE-OUTPUT:2026-07-22>2026-07-01"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_domain_rule_reviewed_after_domain_proposal_is_reported(self) -> None:
+        """领域 readme 当前制度行的 last_reviewed 也进入规则日期表。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            domain_change_path = root / "src" / "logic_change.md"
+            text = domain_change_path.read_text(encoding="utf-8")
+            text = text.replace("- created: 2026-07-22", "- created: 2026-07-01").replace(
+                "- last_status_change: 2026-07-22", "- last_status_change: 2026-07-10"
+            )
+            domain_change_path.write_text(text, encoding="utf-8")
+            report = self.collect(root)
+
+        self.assertIn(
+            f"{DOMAIN_CHANGE_ID}:rule-changed-after-proposal:RULE-APP-OUTPUT:2026-07-22>2026-07-10",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_same_domain_ledger_overlap_is_checked_as_whole_ledger(self) -> None:
+        """同一领域账本内两条 CHG 共享 authority_surfaces → unmarked-authority-surface-overlap。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            domain_change_path = root / "src" / "logic_change.md"
+            domain_change_path.write_text(
+                append_domain_change(
+                    domain_change_path.read_text(encoding="utf-8"),
+                    change_id="CHG-20260722-003",
+                    authority_surfaces="RULE-APP-OUTPUT",
+                ),
+                encoding="utf-8",
+            )
+            root_change = root / "logic_change.md"
+            text = root_change.read_text(encoding="utf-8")
+            self.assertIn(DOMAIN_GAZETTE_ROW, text)
+            text = text.replace(
+                DOMAIN_GAZETTE_ROW,
+                DOMAIN_GAZETTE_ROW + "\n" + domain_gazette_row("CHG-20260722-003"),
+                1,
+            )
+            root_change.write_text(text, encoding="utf-8")
+            report = self.collect(root)
+
+        self.assertEqual(
+            report["current_integrity"]["proposal_issues"],
+            [
+                f"{DOMAIN_CHANGE_ID}:unmarked-authority-surface-overlap:"
+                "CHG-20260722-003:rule-app-output"
+            ],
+        )
+        self.assertTrue(self.fails(report))
 
     def test_agent_private_current_document_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2604,6 +2849,301 @@ class GovernanceTierTests(unittest.TestCase):
         )
         self.assertIn("CHG-20260903-001:conflicts-need-resolution", coordination)
         self.assertIn("CHG-20260903-001:invalid-runtime-state:bogus", coordination)
+
+
+def coordination_block(
+    change_id: str,
+    *,
+    status: str = "awaiting-decision",
+    conflicts_with: str = "none",
+    conflict_resolution: str = "none",
+    depends_on: str = "none",
+) -> str:
+    """最小协调块（personal 档）：供 change_coordination_issues 跨账本目标解析单测。"""
+    return f"""## {change_id}: Coordination probe
+
+### 元数据
+
+- status: {status}
+- effective: false
+- proposal_revision: 1
+- authority_surfaces: RULE-OUTPUT
+- depends_on: {depends_on}
+- conflicts_with: {conflicts_with}
+- conflict_resolution: {conflict_resolution}
+
+### 拟议制度
+
+Keep the output contract.
+"""
+
+
+class CrossLedgerCoordinationTests(unittest.TestCase):
+    """RULE-018/023：depends_on / conflicts_with / blocked_by 的目标可落在其他账本。"""
+
+    ROOT_ID = "CHG-20260901-001"
+    DOMAIN_ID = "CHG-20260901-002"
+
+    def _ledgers(self, *, domain_conflicts: str, domain_resolution: str = "supersede"):
+        root_blocks = {
+            self.ROOT_ID: coordination_block(
+                self.ROOT_ID, conflicts_with=self.DOMAIN_ID, conflict_resolution="supersede"
+            )
+        }
+        domain_blocks = {
+            self.DOMAIN_ID: coordination_block(
+                self.DOMAIN_ID,
+                conflicts_with=domain_conflicts,
+                conflict_resolution=domain_resolution,
+            )
+        }
+        return root_blocks, domain_blocks
+
+    def test_reciprocal_conflict_resolves_across_ledgers(self) -> None:
+        root_blocks, domain_blocks = self._ledgers(domain_conflicts=self.ROOT_ID)
+        for own, other in ((root_blocks, domain_blocks), (domain_blocks, root_blocks)):
+            self.assertEqual(
+                AUDIT.change_coordination_issues(
+                    own, ledger_mode="personal", other_ledgers={"other": other}
+                ),
+                [],
+            )
+
+    def test_without_other_ledgers_target_is_still_not_active(self) -> None:
+        """未提供其他账本时保持旧语义：目标不在本账本即报 not-active。"""
+        root_blocks, _ = self._ledgers(domain_conflicts=self.ROOT_ID)
+        self.assertEqual(
+            AUDIT.change_coordination_issues(root_blocks, ledger_mode="personal"),
+            [f"{self.ROOT_ID}:conflict-target-not-active:{self.DOMAIN_ID}"],
+        )
+
+    def test_one_way_conflict_across_ledgers_is_not_reciprocal(self) -> None:
+        root_blocks, domain_blocks = self._ledgers(
+            domain_conflicts="none", domain_resolution="none"
+        )
+        self.assertEqual(
+            AUDIT.change_coordination_issues(
+                root_blocks, ledger_mode="personal", other_ledgers={"src": domain_blocks}
+            ),
+            [f"{self.ROOT_ID}:conflict-not-reciprocal:{self.DOMAIN_ID}"],
+        )
+
+    def test_dependency_target_in_other_ledger_is_active(self) -> None:
+        root_blocks = {
+            self.ROOT_ID: coordination_block(self.ROOT_ID, status="draft")
+        }
+        domain_blocks = {
+            self.DOMAIN_ID: coordination_block(
+                self.DOMAIN_ID, status="draft", depends_on=f"{self.ROOT_ID}@revision-1"
+            )
+        }
+        self.assertEqual(
+            AUDIT.change_coordination_issues(
+                domain_blocks, ledger_mode="personal", other_ledgers={"root": root_blocks}
+            ),
+            [],
+        )
+        self.assertEqual(
+            AUDIT.change_coordination_issues(domain_blocks, ledger_mode="personal"),
+            [f"{self.DOMAIN_ID}:dependency-target-not-active:{self.ROOT_ID}"],
+        )
+
+    def test_cross_ledger_dependency_cycle_reported_once(self) -> None:
+        root_blocks = {
+            self.ROOT_ID: coordination_block(
+                self.ROOT_ID, status="draft", depends_on=f"{self.DOMAIN_ID}@revision-1"
+            )
+        }
+        domain_blocks = {
+            self.DOMAIN_ID: coordination_block(
+                self.DOMAIN_ID, status="draft", depends_on=f"{self.ROOT_ID}@revision-1"
+            )
+        }
+        cycle = f"dependency-cycle:{self.ROOT_ID},{self.DOMAIN_ID}"
+        self.assertIn(
+            cycle,
+            AUDIT.change_coordination_issues(
+                root_blocks, ledger_mode="personal", other_ledgers={"src": domain_blocks}
+            ),
+        )
+        self.assertNotIn(
+            cycle,
+            AUDIT.change_coordination_issues(
+                domain_blocks, ledger_mode="personal", other_ledgers={"root": root_blocks}
+            ),
+        )
+
+
+class CrossLedgerRuleConflictTests(unittest.TestCase):
+    """一法多议案（VER-20260904-001）：cross_ledger_rule_conflicts 直接单测。"""
+
+    ROOT = "logic_change.md"
+    DOMAIN = "src/logic_change.md"
+
+    def test_shared_target_across_ledgers_without_reciprocal_conflict(self) -> None:
+        issues = AUDIT.cross_ledger_rule_conflicts(
+            {
+                self.ROOT: {"CHG-20260901-001": rule_change_block("CHG-20260901-001")},
+                self.DOMAIN: {"CHG-20260901-002": rule_change_block("CHG-20260901-002")},
+            },
+            {},
+        )
+        self.assertEqual(
+            issues,
+            [
+                "CHG-20260901-001:shared-rule-target-needs-explicit-conflict:"
+                "CHG-20260901-002:RULE-OUTPUT"
+            ],
+        )
+
+    def test_one_way_conflict_declaration_is_still_reported(self) -> None:
+        issues = AUDIT.cross_ledger_rule_conflicts(
+            {
+                self.ROOT: {
+                    "CHG-20260901-001": rule_change_block(
+                        "CHG-20260901-001", conflicts_with="CHG-20260901-002"
+                    )
+                },
+                self.DOMAIN: {"CHG-20260901-002": rule_change_block("CHG-20260901-002")},
+            },
+            {},
+        )
+        self.assertEqual(len(issues), 1, issues)
+        self.assertIn("shared-rule-target-needs-explicit-conflict", issues[0])
+
+    def test_reciprocal_conflict_declaration_clears_shared_target(self) -> None:
+        issues = AUDIT.cross_ledger_rule_conflicts(
+            {
+                self.ROOT: {
+                    "CHG-20260901-001": rule_change_block(
+                        "CHG-20260901-001", conflicts_with="CHG-20260901-002"
+                    )
+                },
+                self.DOMAIN: {
+                    "CHG-20260901-002": rule_change_block(
+                        "CHG-20260901-002", conflicts_with="`CHG-20260901-001`"
+                    )
+                },
+            },
+            {},
+        )
+        self.assertEqual(issues, [])
+
+    def test_same_ledger_overlap_is_left_to_coordination_check(self) -> None:
+        """同账本重叠由 change_coordination_issues 报 unmarked-authority-surface-overlap。"""
+        blocks = {
+            "CHG-20260901-001": rule_change_block("CHG-20260901-001"),
+            "CHG-20260901-002": rule_change_block("CHG-20260901-002"),
+        }
+        self.assertEqual(AUDIT.cross_ledger_rule_conflicts({self.ROOT: blocks}, {}), [])
+        self.assertIn(
+            "CHG-20260901-001:unmarked-authority-surface-overlap:CHG-20260901-002:rule-output",
+            AUDIT.change_coordination_issues(blocks, ledger_mode="personal"),
+        )
+
+    def test_multiple_shared_targets_are_listed_sorted_and_uppercased(self) -> None:
+        issues = AUDIT.cross_ledger_rule_conflicts(
+            {
+                self.ROOT: {
+                    "CHG-20260901-001": rule_change_block(
+                        "CHG-20260901-001", authority_surfaces="rule-output; RULE-INPUT"
+                    )
+                },
+                self.DOMAIN: {
+                    "CHG-20260901-002": rule_change_block(
+                        "CHG-20260901-002",
+                        authority_surfaces="RULE-INPUT, RULE-OUTPUT, RULE-OTHER",
+                    )
+                },
+            },
+            {},
+        )
+        self.assertEqual(
+            issues,
+            [
+                "CHG-20260901-001:shared-rule-target-needs-explicit-conflict:"
+                "CHG-20260901-002:RULE-INPUT,RULE-OUTPUT"
+            ],
+        )
+
+    def test_rule_changed_after_proposal_uses_latest_change_date(self) -> None:
+        block = rule_change_block(
+            "CHG-20260901-001", created="2026-07-01", last_status_change="2026-07-10"
+        )
+        stale = AUDIT.cross_ledger_rule_conflicts(
+            {self.ROOT: {"CHG-20260901-001": block}}, {"RULE-OUTPUT": "2026-08-01"}
+        )
+        self.assertEqual(
+            stale,
+            ["CHG-20260901-001:rule-changed-after-proposal:RULE-OUTPUT:2026-08-01>2026-07-10"],
+        )
+        same_day = AUDIT.cross_ledger_rule_conflicts(
+            {self.ROOT: {"CHG-20260901-001": block}}, {"RULE-OUTPUT": "2026-07-10"}
+        )
+        self.assertEqual(same_day, [])
+        older = AUDIT.cross_ledger_rule_conflicts(
+            {self.ROOT: {"CHG-20260901-001": block}}, {"RULE-OUTPUT": "2026-06-30"}
+        )
+        self.assertEqual(older, [])
+
+    def test_rule_date_check_ignores_unrelated_rules_and_undated_blocks(self) -> None:
+        undated = rule_change_block(
+            "CHG-20260901-001", created="event-driven", last_status_change="none"
+        )
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts(
+                {self.ROOT: {"CHG-20260901-001": undated}}, {"RULE-OUTPUT": "2026-08-01"}
+            ),
+            [],
+        )
+        dated = rule_change_block("CHG-20260901-001", created="2026-07-01")
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts(
+                {self.ROOT: {"CHG-20260901-001": dated}},
+                {"RULE-INPUT": "2026-08-01", "RULE-OUTPUT": "not-a-date"},
+            ),
+            [],
+        )
+
+    def test_mentioning_rule_without_authority_surfaces_is_reported(self) -> None:
+        block = rule_change_block(
+            "CHG-20260901-001",
+            authority_surfaces="none",
+            proposed_policy="Tighten rule-output and RULE-INPUT; RULE-OUTPUT again.",
+        )
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts({self.ROOT: {"CHG-20260901-001": block}}, {}),
+            ["CHG-20260901-001:mentions-rule-without-authority-surfaces:RULE-INPUT,RULE-OUTPUT"],
+        )
+        missing_field = rule_change_block(
+            "CHG-20260901-001",
+            authority_surfaces=None,
+            proposed_policy="Rewrite RULE-OUTPUT.",
+        )
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts({self.ROOT: {"CHG-20260901-001": missing_field}}, {}),
+            ["CHG-20260901-001:mentions-rule-without-authority-surfaces:RULE-OUTPUT"],
+        )
+
+    def test_declared_authority_surfaces_suppress_mention_issue(self) -> None:
+        block = rule_change_block(
+            "CHG-20260901-001",
+            authority_surfaces="RULE-OUTPUT",
+            proposed_policy="Also touches RULE-INPUT in passing.",
+        )
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts({self.ROOT: {"CHG-20260901-001": block}}, {}),
+            [],
+        )
+
+    def test_mentions_outside_proposed_policy_section_are_ignored(self) -> None:
+        block = rule_change_block(
+            "CHG-20260901-001", authority_surfaces="none", proposed_policy="No rule ids here."
+        ) + "\n### 开放问题与用户澄清\n\n- questions_for_user: does RULE-OUTPUT apply?\n"
+        self.assertEqual(
+            AUDIT.cross_ledger_rule_conflicts({self.ROOT: {"CHG-20260901-001": block}}, {}),
+            [],
+        )
 
 
 if __name__ == "__main__":

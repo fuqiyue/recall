@@ -186,14 +186,44 @@ def check_intent_layer(
     if not section.strip():
         return
 
-    # 解析 INT 登记表
+    # 解析 INT 登记表（含表头：定位可选的"来源"列）
     int_rows = []
+    source_col = None
     for line in section.splitlines():
-        if not line.strip().startswith('| INT-'):
+        stripped = line.strip()
+        if stripped.startswith('| intent_id'):
+            headers = [cell.strip() for cell in stripped.strip('|').split('|')]
+            for idx, header in enumerate(headers):
+                if header.startswith('来源'):
+                    source_col = idx
             continue
-        cells = [cell.strip() for cell in line.strip().strip('|').split('|')]
+        if not stripped.startswith('| INT-'):
+            continue
+        cells = [cell.strip() for cell in stripped.strip('|').split('|')]
         if len(cells) >= 5:
             int_rows.append(cells)
+
+    # RULE-014/016：用户表述即宪法——每条意图须标来源；AI 推断不得冒充用户确认
+    if int_rows and source_col is None:
+        result.add_info(
+            f"{doc_label}: 功能意图登记表缺少「来源」列（RULE-014：建议补 "
+            "user:YYYY-MM-DD / user-confirmed:YYYY-MM-DD / code-derived / inferred，"
+            "区分用户表述与 AI 推断）"
+        )
+    elif source_col is not None:
+        for cells in int_rows:
+            source = cells[source_col] if len(cells) > source_col else ''
+            lowered = source.lower()
+            if not source or lowered in ('inferred', 'code-derived') or lowered.startswith(('inferred', 'code-derived')):
+                result.add_warning(
+                    f"{cells[0]}: 意图来源为「{source or '空'}」，尚未经用户确认"
+                    "（RULE-016：意图层必须经用户确认后落盘；确认后改为 user-confirmed:日期）"
+                )
+            elif not re.match(r'^user(?:-confirmed)?:\d{4}-\d{2}-\d{2}', lowered):
+                result.add_warning(
+                    f"{cells[0]}: 意图来源「{source}」格式无法识别"
+                    "（应为 user:日期 / user-confirmed:日期 / code-derived / inferred）"
+                )
 
     int_ids = set()
     for cells in int_rows:
