@@ -48,6 +48,7 @@ recall help          # 完整帮助
 ## 兼容性
 
 - Windows / Linux / macOS，Python 3.11+，仅依赖标准库
+- `scripts/` 须整目录部署（`audit_logic_map.py` 是 `recall_audit/` 分层包的入口，`recall_common.py` 为各脚本共用）
 - 与 Claude Code（CLAUDE.md）和 Codex（AGENTS.md）代理入口兼容
 
 ## 许可

@@ -30,8 +30,11 @@ jobs:
     - name: 运行逻辑地图测试
       run: python tests/test_audit_logic_map.py
 
-    - name: 运行 Git 自动同步测试
-      run: python -m unittest tests.test_git_sync
+    - name: 运行 CLI / 校验 / 公共模块 / Git 自动同步测试
+      run: python -m unittest tests.test_git_sync tests.test_recall_cli tests.test_validate tests.test_recall_common
+
+    - name: 审计静态门（current-state）
+      run: python scripts/audit_logic_map.py . --current-state
 
     - name: 检查文档一致性
       run: |
@@ -40,7 +43,7 @@ jobs:
         test -f logic_change.md || (echo "❌ logic_change.md 缺失" && exit 1)
         test -d logic_version || (echo "❌ logic_version/ 目录缺失" && exit 1)
 
-        # 验证 Code Map 标记存在
-        grep -q "Code Map" logic_readme.md || (echo "⚠️ 警告: logic_readme.md 缺少 Code Map" && exit 0)
+        # 验证代码地图章节存在（表头曾叫 Code Map，2026-08 起为"代码地图"）
+        grep -q "## 代码地图" logic_readme.md || (echo "❌ logic_readme.md 缺少「代码地图」章节" && exit 1)
 
         echo "✅ 文档结构完整"

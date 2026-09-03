@@ -69,7 +69,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 超过硬上限时按顺序处理：压缩失效细节 → 把已结束内容归档到 `logic_version/` → 降低字段层级。不要靠新建文件解决长度问题。
 
-`python scripts/audit_logic_map.py <project-root> --current-state` 会对超限文件报告 `density` 告警。
+`python scripts/audit_logic_map.py <project-root> --current-state` 的 Density 段会报告越过硬上限的文件（`exceeds-hard-limit`）与越过目标值的文件（`over-target`）；两者都是 advisory，不影响静态门。
 
 ## 反模式
 

@@ -19,7 +19,7 @@ where python3 >nul 2>&1
 if not errorlevel 1 goto :use_python3
 
 echo [ERROR] Python not found on PATH. 1>&2
-echo         Install Python 3.8+: https://www.python.org/downloads/ 1>&2
+echo         Install Python 3.11+: https://www.python.org/downloads/ 1>&2
 exit /b 127
 
 :use_python

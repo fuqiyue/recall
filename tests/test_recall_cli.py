@@ -278,5 +278,68 @@ class StatusLeftoverTests(unittest.TestCase):
         self.assertEqual(recall.classify_porcelain(None), ([], []))
 
 
+class UnpushedHintTests(unittest.TestCase):
+    """RULE-010：status 把本地领先上游的提交数变成一行提示；无上游时沉默。"""
+
+    def test_describe_unpushed(self):
+        self.assertIsNone(recall.describe_unpushed(None))
+        self.assertIsNone(recall.describe_unpushed(0))
+        line = recall.describe_unpushed(3)
+        self.assertIn("3", line)
+        self.assertIn("RULE-010", line)
+
+
+class CliGlueSmokeTests(unittest.TestCase):
+    """RULE-021：每条子命令以子进程方式真跑一遍，只断言退出码与关键输出。
+
+    2026-09-03 两处故障（status 的 GBK 解码、conflicts 把子命令名当项目根）
+    都发生在 recall.py 与子模块的装配层，纯函数测试全绿却上不了线。
+    """
+
+    RECALL = ROOT / "scripts" / "recall.py"
+
+    def _run(self, *args, cwd=ROOT):
+        import subprocess
+
+        env = dict(os.environ)
+        env.pop("PYTHONIOENCODING", None)
+        completed = subprocess.run(
+            [sys.executable, str(self.RECALL), *args],
+            cwd=str(cwd),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=60,
+            env=env,
+        )
+        return completed.returncode, completed.stdout + completed.stderr
+
+    def test_help_exits_zero(self):
+        code, out = self._run("help")
+        self.assertEqual(code, 0)
+        self.assertIn("conflicts", out)
+
+    def test_status_exits_zero_in_this_repo(self):
+        code, out = self._run("status")
+        self.assertEqual(code, 0, out)
+        self.assertIn("Recall 系统状态", out)
+        self.assertNotIn("错误", out)
+        self.assertNotIn("Traceback", out)
+
+    def test_conflicts_resolves_project_root_from_subdirectory(self):
+        # 0 = 无冲突，2 = 检出潜在冲突；1 才是胶水层失败（找不到 logic_readme.md）
+        code, out = self._run("conflicts", cwd=ROOT / "scripts")
+        self.assertIn(code, (0, 2), out)
+        self.assertIn("读取到", out)
+        self.assertNotIn("未找到 logic_readme.md", out)
+
+    def test_validate_runs_end_to_end(self):
+        code, out = self._run("validate")
+        self.assertIn(code, (0, 1), out)
+        self.assertIn("验证报告", out)
+        self.assertNotIn("Traceback", out)
+
+
 if __name__ == "__main__":
     unittest.main()

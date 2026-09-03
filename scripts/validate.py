@@ -11,6 +11,13 @@ import sys
 from pathlib import Path
 from typing import List, Dict, Tuple
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from recall_common import (  # noqa: E402  RULE-021
+    find_project_root,
+    force_utf8_output,
+    unpushed_commit_count,
+)
+
 # 决策记录文件名：logic_version-YYYYMMDD-NNN-<scope>.md
 RECORD_NAME_RE = re.compile(
     r'^logic_version-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE
@@ -53,21 +60,6 @@ COMMIT_PATTERNS = (
 )
 
 
-def _force_utf8_when_redirected() -> None:
-    """重定向到文件/管道时把输出流切成 UTF-8。
-
-    Windows 上重定向后的 stdout 用 ANSI 代码页（如 cp936），
-    报告里的 emoji 会触发 UnicodeEncodeError。本脚本既可被
-    recall.py 以子进程调用，也可被用户直接运行，所以必须自带这个修复。
-    """
-    for stream in (sys.stdout, sys.stderr):
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            if not stream.isatty():
-                stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
 
 
 class ValidationResult:
@@ -117,15 +109,6 @@ class ValidationResult:
             print("✅ 没有错误，但有一些警告需要注意。\n")
         else:
             print("❌ 验证失败，请修复上述错误。\n")
-
-def find_project_root() -> Path:
-    """查找项目根目录（包含 logic_readme.md）"""
-    current = Path.cwd()
-    while current != current.parent:
-        if (current / "logic_readme.md").exists():
-            return current
-        current = current.parent
-    return Path.cwd()
 
 def extract_rule_definitions(readme_path: Path) -> List[Tuple[str, int]]:
     """提取规则**定义行**（当前制度表格里以 RULE-ID 开头的行）。
@@ -557,6 +540,22 @@ def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
 LEFTOVER_LIST_LIMIT = 10
 
 
+def report_unpushed_commits(count, result: 'ValidationResult') -> None:
+    """本地领先上游的提交数 → 非阻断告警（RULE-010 推送责任核对）。
+
+    自动同步只是默认值不是保证：未跑过 ``recall init`` 的半接入项目会静默
+    退化成"只提交不推送"，2026-09-02 消费项目因此出现远端停在中间提交、
+    CI 18 项失败。此前 status/validate 都只报脏工作区、不报未推送。
+    ``count`` 为 None（无上游/非仓库）时不告警：是否配置远端是用户的事。
+    """
+    if count is None or count <= 0:
+        return
+    result.add_warning(
+        f"本地领先上游 {count} 个未推送提交"
+        "（RULE-010：请 recall sync 或 git push；一批提交只推前几个会让远端停在中间提交上）"
+    )
+
+
 def report_untracked_leftovers(paths: List[str], result: 'ValidationResult') -> None:
     """未跟踪且未被 .gitignore 覆盖的文件 → 非阻断告警（RULE-020 收尾归零）。
 
@@ -703,6 +702,9 @@ def validate_recall() -> ValidationResult:
     # 3c. 漂移度量（RULE-015）：文档是代码理解的缓存，量化缓存的"新鲜度"
     check_doc_drift(root, result)
 
+    # 3d. 推送责任核对（RULE-010）：本地不得长期领先远端
+    report_unpushed_commits(unpushed_commit_count(root), result)
+
     # 4. 检查 Git 仓库状态
     try:
         git_status = subprocess.run(
@@ -748,7 +750,7 @@ def validate_recall() -> ValidationResult:
 
 def main() -> int:
     """主入口。返回退出码，供 recall.py 直接使用。"""
-    _force_utf8_when_redirected()
+    force_utf8_output()
     print("\n🔍 开始验证 Recall 系统一致性...\n")
 
     result = validate_recall()

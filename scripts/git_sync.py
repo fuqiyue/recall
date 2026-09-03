@@ -63,47 +63,14 @@ REF_LINE_RE = re.compile(r"Ref:\s*(logic_version/records/\S+?\.md)", re.IGNORECA
 INTERNAL_COMMIT_ENV = "RECALL_INTERNAL_COMMIT"
 
 
-def _force_utf8_when_redirected() -> None:
-    """Keep reports usable when stdout/stderr are redirected on Windows."""
-    for stream in (sys.stdout, sys.stderr):
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            if not stream.isatty():
-                stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-
-def run_git(args: Iterable[str], cwd: Optional[Path] = None, timeout: int = 60) -> Tuple[bool, str, str]:
-    """Run Git without a shell and return ``(ok, stdout, stderr)``."""
-    try:
-        result = subprocess.run(
-            ["git", *list(args)],
-            cwd=str(cwd) if cwd else None,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=timeout,
-        )
-    except (OSError, ValueError, subprocess.SubprocessError) as exc:
-        return False, "", str(exc)
-    return (
-        result.returncode == 0,
-        (result.stdout or "").strip(),
-        (result.stderr or "").strip(),
-    )
-
-
-def find_project_root(start: Optional[Path] = None) -> Path:
-    """Find the Recall project root from ``start`` or the current directory."""
-    current = (start or Path.cwd()).resolve()
-    while current != current.parent:
-        if (current / "logic_readme.md").exists():
-            return current
-        current = current.parent
-    return (start or Path.cwd()).resolve()
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# RULE-021：根查找 / Git 调用 / 编码防护共用 recall_common；名字保留在本模块
+# 命名空间内，tests/test_git_sync.py 以 patch.object(git_sync, "run_git") 打桩。
+from recall_common import (  # noqa: E402
+    find_project_root,
+    force_utf8_output as _force_utf8_when_redirected,
+    run_git,
+)
 
 
 def _git_root(project_root: Path) -> Optional[Path]:

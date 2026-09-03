@@ -13,21 +13,8 @@ import re
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
-
-def _force_utf8_output():
-    """强制 stdout/stderr 使用 UTF-8 编码（Windows 兼容）。
-
-    与其他脚本一致地做防护：流可能被替换成没有 reconfigure 的对象
-    （测试、包装器），失败时保持原编码而不是崩溃。
-    """
-    for stream in (sys.stdout, sys.stderr):
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            if (stream.encoding or "").lower() != "utf-8":
-                stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from recall_common import find_project_root, force_utf8_output  # noqa: E402
 
 
 def extract_rules(content: str) -> List[Dict[str, str]]:
@@ -194,14 +181,20 @@ def format_conflict_report(
     return '\n'.join(report)
 
 
-def main():
-    """主函数"""
-    _force_utf8_output()
+def main(argv=None):
+    """主函数。``argv`` 为可选的项目根参数列表；不给时按 cwd 向上查找。
 
-    if len(sys.argv) > 1:
-        project_root = Path(sys.argv[1])
+    旧实现直接读 ``sys.argv[1]``：经 ``recall conflicts`` 调用时 argv[1]
+    是子命令名 ``conflicts``，于是把它当目录、永远报找不到
+    logic_readme.md（VER-20260903-002）。
+    """
+    force_utf8_output()
+
+    args = list(sys.argv[1:] if argv is None else argv)
+    if args:
+        project_root = find_project_root(Path(args[0]))
     else:
-        project_root = Path.cwd()
+        project_root = find_project_root()
 
     readme_path = project_root / 'logic_readme.md'
     change_path = project_root / 'logic_change.md'

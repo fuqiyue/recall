@@ -14,6 +14,13 @@ from pathlib import Path
 SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
+from recall_common import (  # noqa: E402  RULE-021：根查找/Git 调用/编码防护只此一份
+    find_project_root,
+    force_utf8_output,
+    run_git,
+    unpushed_commit_count,
+)
+
 # 决策记录文件名，与 validate.py / link_ver_git.py / create_ver.py 一致（RULE-009）
 RECORD_NAME_RE = re.compile(r'^logic_version-\d{8}-\d{3}-.+\.md$', re.IGNORECASE)
 
@@ -25,22 +32,6 @@ def find_version_records(records_dir):
     return sorted(
         path for path in records_dir.glob("*.md") if RECORD_NAME_RE.match(path.name)
     )
-
-def _force_utf8_when_redirected():
-    """重定向到文件/管道时把输出流切成 UTF-8。
-
-    Windows 上重定向后的 stdout 用 ANSI 代码页（如 cp936），
-    帮助信息里的 emoji 会触发 UnicodeEncodeError。
-    """
-    for stream in (sys.stdout, sys.stderr):
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            if not stream.isatty():
-                stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
 
 def print_help():
     """显示帮助信息"""
@@ -95,7 +86,7 @@ def print_help():
 
   status
     显示当前 Recall 系统状态
-    包括规则数量、活跃变更、最近决策等
+    包括规则数量、活跃变更、最近决策、未提交/未跟踪/未推送提示
     示例: recall status
 
   conflicts
@@ -267,21 +258,23 @@ def classify_porcelain(porcelain_output):
     return tracked, untracked
 
 
+def describe_unpushed(count):
+    """把 ``unpushed_commit_count`` 的结果变成一行提示；None 表示不提示。
+
+    RULE-010：自动同步只是默认值不是保证，半接入项目会静默退化成"只提交
+    不推送"。这里只报数字，不推送、不改仓库状态。
+    """
+    if count is None or count <= 0:
+        return None
+    return (
+        f"⬆️  未推送提交: 本地领先上游 {count} 个"
+        "（RULE-010：请 recall sync 或 git push，勿让本地长期领先远端）"
+    )
+
+
 def cmd_status():
     """显示系统状态"""
     try:
-        import re
-        from pathlib import Path
-
-        # 查找项目根目录
-        def find_project_root():
-            current = Path.cwd()
-            while current != current.parent:
-                if (current / "logic_readme.md").exists():
-                    return current
-                current = current.parent
-            return Path.cwd()
-
         root = find_project_root()
 
         print("\n" + "=" * 60)
@@ -324,31 +317,22 @@ def cmd_status():
         else:
             print("📚 决策记录: ⚠️  logic_version/records/ 不存在")
 
-        # 检查 Git 状态
-        import subprocess
-        try:
-            result = subprocess.run(
-                ['git', 'log', '-1', '--format=%h %s'],
-                capture_output=True,
-                text=True,
-                cwd=root,
-                timeout=5
-            )
-            if result.returncode == 0:
-                last_commit = result.stdout.strip()
+        # 检查 Git 状态（run_git 固定 utf-8：中文提交信息在 GBK 下曾让本命令崩溃）
+        ok_log, last_commit, log_err = run_git(['log', '-1', '--format=%h %s'], cwd=root, timeout=5)
+        git_missing = not ok_log and any(
+            marker in log_err for marker in ('not recognized', 'No such file', 'WinError 2', 'Errno 2')
+        )
+        if git_missing:
+            print(f"\n🔖 Git: ⚠️  未安装或不可用")
+        else:
+            if ok_log:
                 print(f"\n🔖 最近提交: {last_commit}")
             else:
                 print(f"\n🔖 最近提交: ⚠️  无法读取")
 
-            status_result = subprocess.run(
-                ['git', 'status', '--porcelain'],
-                capture_output=True,
-                text=True,
-                cwd=root,
-                timeout=5
-            )
-            if status_result.returncode == 0:
-                tracked, untracked = classify_porcelain(status_result.stdout)
+            ok_status, porcelain, _ = run_git(['status', '--porcelain'], cwd=root, timeout=5)
+            if ok_status:
+                tracked, untracked = classify_porcelain(porcelain)
                 if tracked:
                     print(f"⚠️  未提交变更: {len(tracked)} 个已跟踪文件")
                 if untracked:
@@ -362,8 +346,9 @@ def cmd_status():
                     print("   交付物请 git add；非交付物请删除或加入 .gitignore")
                 if not tracked and not untracked:
                     print(f"✅ 工作区状态: 干净")
-        except (OSError, subprocess.SubprocessError):
-            print(f"\n🔖 Git: ⚠️  未安装或不可用")
+            unpushed_line = describe_unpushed(unpushed_commit_count(root))
+            if unpushed_line:
+                print(unpushed_line)
 
         print("\n" + "=" * 60)
         print("💡 提示: 运行 'recall validate' 检查系统一致性")
@@ -379,7 +364,8 @@ def cmd_conflicts():
     """检测规则冲突"""
     try:
         import detect_conflicts
-        return detect_conflicts.main()
+        # 显式传空 argv：否则子模块会把 sys.argv[1]（子命令名）当项目根
+        return detect_conflicts.main([])
     except ImportError:
         print("❌ 错误: 找不到 detect_conflicts.py")
         return 1
@@ -389,7 +375,7 @@ def cmd_conflicts():
 
 def main():
     """主入口"""
-    _force_utf8_when_redirected()
+    force_utf8_output()
 
     if len(sys.argv) < 2:
         print_help()

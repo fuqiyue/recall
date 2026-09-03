@@ -11,64 +11,31 @@ recall status 都按这个名字发现记录，任何一方改名都会让记录
 """
 
 import re
-import subprocess
 import sys
 from datetime import date
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from recall_common import SELF_ROOT, force_utf8_output, git_output  # noqa: E402
+from recall_common import find_project_root as _find_root  # noqa: E402
 
 # 规范记录名；旧命名 ver-YYYYMMDD-NNN-*.md 只用于提取已占用的序号
 RECORD_NAME_RE = re.compile(r'^logic_version-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE)
 LEGACY_NAME_RE = re.compile(r'^ver-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE)
 
 
-def _force_utf8_output():
-    """强制 stdout/stderr 使用 UTF-8 编码（Windows 兼容）。
-
-    与 detect_conflicts.py 等兄弟脚本一致：只看 isatty 会漏掉交互式
-    GBK 控制台（cp936 下 emoji 直接崩，违反 RULE-008 非交互/重定向可用
-    的精神）；流可能被替换成没有 reconfigure 的对象（测试、包装器），
-    失败时保持原编码而不是崩溃。
-    """
-    for stream in (sys.stdout, sys.stderr):
-        if stream is None or not hasattr(stream, "reconfigure"):
-            continue
-        try:
-            if (stream.encoding or "").lower() != "utf-8":
-                stream.reconfigure(encoding="utf-8", errors="replace")
-        except (OSError, ValueError):
-            pass
-
-
 def find_project_root(start=None):
-    """向上查找包含 logic_readme.md 的目录。
+    """向上查找 logic_readme.md；找不到时退回 Recall 自身（RULE-021 公共实现）。
 
-    找不到时退回脚本所在项目根：skill 被集中安装、而用户在无
-    logic_readme.md 的目录运行时，记录应落回 Recall 自身而不是 cwd。
+    skill 被集中安装、而用户在无 logic_readme.md 的目录运行时，记录应
+    落回 Recall 自身而不是 cwd。
     """
-    current = (start or Path.cwd()).resolve()
-    while current != current.parent:
-        if (current / "logic_readme.md").exists():
-            return current
-        current = current.parent
-    return Path(__file__).resolve().parent.parent
+    return _find_root(start, fallback=SELF_ROOT)
 
 
 def head_short_hash(cwd):
-    """返回当前 HEAD 短哈希；无 Git/无提交时返回 None（argv 列表，RULE-006）。"""
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=str(cwd),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=5,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    value = (result.stdout or "").strip()
-    return value if result.returncode == 0 and value else None
+    """返回当前 HEAD 短哈希；无 Git/无提交时返回 None。"""
+    return git_output(["rev-parse", "--short", "HEAD"], cwd=cwd, timeout=5) or None
 
 
 def get_next_ver_number(records_dir, today_str):
@@ -117,7 +84,7 @@ def extract_quick_template(template_text):
 def create_ver_record(title, scope, template_path=None, output_dir=None):
     """创建版本决策记录。返回退出码：0 成功，1 失败。"""
     # recall.py cmd_new 直接调用本函数、绕过 main()，防护必须在这里
-    _force_utf8_output()
+    force_utf8_output()
     root = find_project_root()
     if template_path is None:
         template_path = root / "references" / "logic-version-template.md"

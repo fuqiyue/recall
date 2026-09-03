@@ -4,10 +4,12 @@
 用于追溯某个文件或提交的完整上下文
 """
 
-import subprocess
 import sys
 from pathlib import Path
 import re
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from recall_common import find_project_root, force_utf8_output, git_output  # noqa: E402
 
 
 # 决策记录文件名：logic_version-YYYYMMDD-NNN-<scope>.md
@@ -27,20 +29,6 @@ COMMIT_PATTERNS = (
 INT_ID_RE = re.compile(r'^INT-\d{8}-\d{3}$', re.IGNORECASE)
 RULE_ID_RE = re.compile(r'\bRULE-\d{3}\b')
 VER_ID_RE = re.compile(r'\bVER-\d{8}-\d{3}\b')
-
-def find_project_root(start=None):
-    """向上查找包含 logic_readme.md 的目录，找不到时退回当前目录。
-
-    旧代码用相对 cwd 的常量路径，在子目录中运行 query/list 会
-    静默找不到任何记录，与 CLI 帮助承诺的"子目录可执行"不符。
-    """
-    current = (start or Path.cwd()).resolve()
-    while current != current.parent:
-        if (current / "logic_readme.md").exists():
-            return current
-        current = current.parent
-    return (start or Path.cwd()).resolve()
-
 
 def _records_dir():
     return find_project_root() / "logic_version" / "records"

@@ -11,7 +11,7 @@ elif command -v python >/dev/null 2>&1; then
     RECALL_PY=python
 else
     echo "[ERROR] Python not found on PATH." >&2
-    echo "        Install Python 3.8+: https://www.python.org/downloads/" >&2
+    echo "        Install Python 3.11+: https://www.python.org/downloads/" >&2
     exit 127
 fi
 

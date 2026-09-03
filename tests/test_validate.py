@@ -185,5 +185,24 @@ class UntrackedLeftoverTests(unittest.TestCase):
         self.assertNotIn(paths[-1], message)
 
 
+class UnpushedCommitTests(unittest.TestCase):
+    """RULE-010：本地领先上游的提交数 → 非阻断告警；无上游/非仓库沉默。"""
+
+    def test_none_and_zero_are_silent(self) -> None:
+        result = VALIDATE.ValidationResult()
+        VALIDATE.report_unpushed_commits(None, result)
+        VALIDATE.report_unpushed_commits(0, result)
+        self.assertFalse(result.warnings)
+        self.assertFalse(result.errors)
+
+    def test_positive_count_is_warning_not_error(self) -> None:
+        result = VALIDATE.ValidationResult()
+        VALIDATE.report_unpushed_commits(4, result)
+        self.assertFalse(result.errors)
+        self.assertEqual(len(result.warnings), 1)
+        self.assertIn("4", result.warnings[0])
+        self.assertIn("RULE-010", result.warnings[0])
+
+
 if __name__ == "__main__":
     unittest.main()
