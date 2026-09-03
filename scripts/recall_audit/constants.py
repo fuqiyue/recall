@@ -238,6 +238,40 @@ REQUIRED_CHANGE_FIELDS_V2 = REQUIRED_CHANGE_FIELDS | {
 
 REQUIRED_CHANGE_FIELDS_V2_ROOT: set[str] = set()
 
+# RULE-023：CHG 块字段要求按治理模式分档（references/field-vocabulary.md 的
+# collaborative / compliance 层）。personal 模式下这些字段"缺则不查、写则照查"；
+# status / effective / proposal_revision / recall_route / changed_by 与实施前的
+# decision_confirmed_by + decision_confirmed_at 在所有模式都必填。
+PERSONAL_OPTIONAL_CHANGE_FIELDS = {
+    # collaborative 层
+    "topic_id",
+    "authority_surfaces",
+    "based_on",
+    "depends_on",
+    "conflicts_with",
+    "conflict_resolution",
+    "semantic_review_state",
+    "semantic_reviewed_by",
+    "semantic_review_ref",
+    "semantic_reviewed_at",
+    # compliance 层
+    "decision_gate",
+    "decision_state",
+    "decision_record",
+    "decision_ref",
+    "confirmed_proposal_revision",
+    "reserved_version_id",
+    "version_slug",
+    "runtime_state",
+    "runtime_environments",
+    "feature_flag",
+    "history_retention",
+    "intent_source_refs",
+    "intent_traceability",
+    "docs_impact",
+    "governance_execution_ref",
+}
+
 CURRENT_README_SECTIONS = {
     "文档控制",
     "范围登记与归属",

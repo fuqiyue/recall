@@ -17,6 +17,7 @@ from .constants import (
     GOVERNANCE_VERIFICATION_STATES,
     HISTORY_RETENTION_POLICIES,
     INTENT_ID_RE,
+    PERSONAL_OPTIONAL_CHANGE_FIELDS,
     POSITIVE_INTEGER_RE,
     RECALL_ROUTES,
     REVIEW_DUE_RE,
@@ -38,6 +39,18 @@ from .textutil import (
     normalize_topic_id,
     relationship_items,
 )
+
+def change_field_tier(values: dict[str, list[str]], ledger_mode: str = "") -> str:
+    """RULE-023：决定 CHG 块的字段要求档位。
+
+    块自身的 ``governance_mode`` 优先，其次是账本（logic_change 文档控制）的模式；
+    两者都缺时按 ``full`` 处理——保守地保持拆档前的完整字段要求，而不是替
+    未声明模式的项目降低门槛。返回 ``"personal"`` 或 ``"full"``。
+    """
+    block_mode = (values.get("governance_mode") or [""])[0]
+    mode = (block_mode or ledger_mode or "").strip().casefold()
+    return "personal" if mode == "personal" else "full"
+
 
 def governance_evidence_issues(
     values: dict[str, list[str]], *, label: str, collaborative_required: bool = False
@@ -127,12 +140,17 @@ def review_freshness_issues(
     return issues
 
 
-def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
+def change_coordination_issues(
+    blocks: dict[str, str], *, ledger_mode: str = ""
+) -> list[str]:
     """Validate declared relationships between active CHGs in one root ledger.
 
     This intentionally validates only declared coordination.  It cannot prove
     that two code paths really are independent, so a missing declaration still
     requires human/code-semantic review.
+
+    ``ledger_mode`` 是账本的 ``governance_mode``（RULE-023）：personal 块缺少
+    collaborative/compliance 层字段时不报缺失，写了的字段照常校验。
     """
     issues: list[str] = []
     entries: dict[str, dict[str, object]] = {}
@@ -153,9 +171,16 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
     for change_id, block in blocks.items():
         raw_values = control_values_raw(block)
         values = control_values(block)
+        strict = change_field_tier(values, ledger_mode) != "personal"
+
+        def present(key: str) -> bool:
+            # RULE-023：personal 层对可选字段"缺则不查、写则照查"
+            return strict or key in raw_values
 
         def one_value(key: str) -> str:
             field_values = raw_values.get(key, [])
+            if not field_values and not present(key) and key in PERSONAL_OPTIONAL_CHANGE_FIELDS:
+                return ""
             if len(field_values) != 1:
                 issues.append(
                     f"{change_id}:{key}-must-appear-once:{len(field_values)}"
@@ -172,7 +197,7 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
         authority_non_none = [
             item for item in authority_items if not is_none_like(item)
         ]
-        if not authority_non_none:
+        if present("authority_surfaces") and not authority_non_none:
             issues.append(f"{change_id}:missing-authority-surfaces")
         if any(is_none_like(item) for item in authority_items) and authority_non_none:
             issues.append(f"{change_id}:authority-surfaces-cannot-mix-none")
@@ -188,7 +213,8 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
         based_on = field_values["based_on"]
         based_on_folded = based_on.casefold()
         if not has_meaningful_value(values, "based_on"):
-            issues.append(f"{change_id}:missing-based-on")
+            if present("based_on"):
+                issues.append(f"{change_id}:missing-based-on")
         else:
             if "policy:" not in based_on_folded:
                 issues.append(f"{change_id}:based-on-needs-policy-reference")
@@ -207,11 +233,16 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
                     )
 
         history_retention = field_values["history_retention"].casefold()
-        if history_retention not in HISTORY_RETENTION_POLICIES:
+        check_history = present("history_retention")
+        if check_history and history_retention not in HISTORY_RETENTION_POLICIES:
             issues.append(
                 f"{change_id}:invalid-history-retention:{history_retention}"
             )
-        if (values.get("recall_route") or [""])[0] == "high" and history_retention != "full":
+        if (
+            check_history
+            and (values.get("recall_route") or [""])[0] == "high"
+            and history_retention != "full"
+        ):
             issues.append(f"{change_id}:high-route-needs-full-history-retention")
         if history_retention == "full" and decision_record != "required":
             issues.append(f"{change_id}:full-history-needs-required-decision-record")
@@ -227,7 +258,7 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
         runtime_items = relationship_items(raw_values, "runtime_environments")
         runtime_non_none = [item for item in runtime_items if not is_none_like(item)]
         feature_flag = field_values["feature_flag"]
-        if runtime_state not in RUNTIME_STATES:
+        if present("runtime_state") and runtime_state not in RUNTIME_STATES:
             issues.append(f"{change_id}:invalid-runtime-state:{runtime_state}")
         if any(is_none_like(item) for item in runtime_items) and runtime_non_none:
             issues.append(f"{change_id}:runtime-environments-cannot-mix-none")
@@ -299,13 +330,14 @@ def change_coordination_issues(blocks: dict[str, str]) -> list[str]:
 
         conflict_resolution = field_values["conflict_resolution"].casefold()
         has_conflict = bool(conflict_ids or conflict_surfaces)
-        if conflict_resolution not in CONFLICT_RESOLUTIONS:
+        if present("conflict_resolution") and conflict_resolution not in CONFLICT_RESOLUTIONS:
             issues.append(
                 f"{change_id}:invalid-conflict-resolution:{conflict_resolution}"
             )
-        elif has_conflict and conflict_resolution == "none":
+        elif has_conflict and conflict_resolution in {"none", ""}:
+            # personal 块可以不写 conflict_resolution，但一旦声明了冲突就必须给出裁定
             issues.append(f"{change_id}:conflicts-need-resolution")
-        elif not has_conflict and conflict_resolution != "none":
+        elif not has_conflict and conflict_resolution not in {"none", ""}:
             issues.append(f"{change_id}:conflict-resolution-without-conflict")
         if conflict_resolution == "unresolved" and status not in waiting_statuses:
             issues.append(f"{change_id}:unresolved-conflict-needs-block-or-redecision")
@@ -448,12 +480,22 @@ def change_lifecycle_issues(
     change_id: str,
     values: dict[str, list[str]],
     raw_values: dict[str, list[str]],
+    *,
+    tier: str = "full",
 ) -> list[str]:
-    """Validate version-bound decision confirmation and semantic review metadata."""
+    """Validate version-bound decision confirmation and semantic review metadata.
+
+    ``tier`` 来自 :func:`change_field_tier`（RULE-023）。personal 档不要求
+    ``decision_gate`` 状态机与语义审查字段，但进入实施状态前仍必须有
+    ``decision_confirmed_by`` + ``decision_confirmed_at``：用户确认是核心原则 1/5，
+    不随治理模式降级。
+    """
     issues: list[str] = []
 
     def one_value(key: str) -> str:
         entries = raw_values.get(key, [])
+        if not entries and tier == "personal" and key in PERSONAL_OPTIONAL_CHANGE_FIELDS:
+            return ""
         if len(entries) != 1:
             issues.append(f"{change_id}:{key}-must-appear-once:{len(entries)}")
             return ""
@@ -516,7 +558,8 @@ def change_lifecycle_issues(
             issues.append(f"{change_id}:decision_confirmed_at-must-be-date")
 
     status = (values.get("status") or [""])[0]
-    if recall_route == "high" and decision_gate != "required":
+    personal_without_gate = tier == "personal" and not decision_gate
+    if recall_route == "high" and decision_gate != "required" and not personal_without_gate:
         issues.append(f"{change_id}:high-route-needs-required-decision")
     if decision_gate == "required" and recall_route != "high":
         issues.append(f"{change_id}:required-decision-needs-high-route")
@@ -551,6 +594,13 @@ def change_lifecycle_issues(
         confirmation_must_be_empty()
         if status == "awaiting-decision":
             issues.append(f"{change_id}:awaiting-decision-needs-required-gate")
+    elif not decision_gate and tier == "personal":
+        # RULE-023：personal 档没有 decision_gate 状态机，但实施必须有确认来源
+        if status in {"implementing", "verifying", "promoting"}:
+            if is_none_like(confirmed_by):
+                issues.append(f"{change_id}:implementation-needs-decision-confirmation")
+            if not is_iso_date(confirmed_at):
+                issues.append(f"{change_id}:decision_confirmed_at-must-be-date")
 
     if review_state in {"passed", "failed"}:
         for key, value in (
@@ -624,6 +674,7 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
         index for index, line in enumerate(lines) if CHANGE_HEADING_RE.match(line)
     ]
     proposal_index_rows = markdown_table_rows(text, "活跃议案索引")
+    ledger_mode = (control_values(text).get("governance_mode") or [""])[0]
     heading_ids: list[str] = []
     issues: list[str] = []
     for position, start in enumerate(starts):
@@ -634,6 +685,7 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
         block = chr(10).join(lines[start:end])
         values = control_values(block)
         raw_values = control_values_raw(block)
+        tier = change_field_tier(values, ledger_mode)
         statuses = values.get("status", [])
         if not statuses:
             issues.append(f"{change_id}:missing-status")
@@ -646,7 +698,9 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
         if not effective or any(value != "false" for value in effective):
             issues.append(f"{change_id}:effective-must-be-false")
         topic_values = raw_values.get("topic_id", [])
-        if len(topic_values) != 1:
+        if not topic_values and tier == "personal":
+            pass  # RULE-023：personal 档 topic_id 可省
+        elif len(topic_values) != 1:
             issues.append(
                 f"{change_id}:topic-id-must-appear-once:{len(topic_values)}"
             )
@@ -675,7 +729,7 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
                 for prefix in ("pr:", "ci:", "approval:")
             ):
                 issues.append(f"{change_id}:governance-execution-ref-needs-pr-ci-or-approval")
-        issues.extend(change_lifecycle_issues(change_id, values, raw_values))
+        issues.extend(change_lifecycle_issues(change_id, values, raw_values, tier=tier))
         if "blocked" in statuses:
             if "开放问题" not in block:
                 issues.append(f"{change_id}:blocked-needs-open-question")

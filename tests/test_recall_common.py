@@ -69,6 +69,29 @@ class RunGitTests(unittest.TestCase):
             self.assertTrue(ok)
             self.assertEqual(out.splitlines()[0], " M .marker")
 
+    def test_parse_porcelain_handles_rename_quotes_and_short_lines(self):
+        entries = recall_common.parse_porcelain(
+            ' M scripts/recall.py\n'
+            'R  old_name.md -> new_name.md\n'
+            '?? "有 空格/文件.md"\n'
+            '\n'
+            'A  logic_version/records/new.md\n'
+        )
+        self.assertEqual(
+            entries,
+            [
+                (" M", "scripts/recall.py"),
+                ("R ", "new_name.md"),
+                ("??", "有 空格/文件.md"),
+                ("A ", "logic_version/records/new.md"),
+            ],
+        )
+        tracked, untracked = recall_common.classify_porcelain(
+            ' M a.py\n?? b.py\nR  c.md -> d.md\n'
+        )
+        self.assertEqual((tracked, untracked), (["a.py", "d.md"], ["b.py"]))
+        self.assertEqual(recall_common.classify_porcelain(None), ([], []))
+
     def test_run_git_decodes_non_ascii_as_utf8(self):
         """中文提交信息在 GBK 默认编码下曾让 status 崩溃；这里直接在本仓库读一次。"""
         ok, out, _ = recall_common.run_git(["log", "-1", "--format=%s"], cwd=ROOT, timeout=10)
@@ -76,6 +99,32 @@ class RunGitTests(unittest.TestCase):
             self.skipTest("not a git checkout")
         self.assertIsInstance(out, str)
         self.assertNotIn("�" * 3, out)  # 不应整段变成替换字符
+
+
+class SingleGitInfrastructureGateTests(unittest.TestCase):
+    """RULE-021 的机器门：scripts/ 下只有 recall_common 可以直接用 subprocess 调 git。
+
+    今天 run_git 的 strip 差异证明两套 Git 调用一定会漂移；文字规则拦不住新
+    脚本再抄一份，所以用静态扫描把"只此一份"变成测试失败。
+    """
+
+    def test_no_direct_subprocess_git_outside_recall_common(self):
+        offenders = []
+        for path in sorted((ROOT / "scripts").rglob("*.py")):
+            if path.name == "recall_common.py" or "__pycache__" in path.parts:
+                continue
+            text = path.read_text(encoding="utf-8")
+            for lineno, line in enumerate(text.splitlines(), 1):
+                stripped = line.strip()
+                if stripped.startswith("#"):
+                    continue
+                if "subprocess." in stripped and "recall_common" not in stripped:
+                    offenders.append(f"{path.relative_to(ROOT)}:{lineno}: {stripped}")
+        self.assertEqual(
+            offenders,
+            [],
+            "scripts/ 下禁止绕过 recall_common.run_git 直接调 subprocess（RULE-021）",
+        )
 
 
 if __name__ == "__main__":

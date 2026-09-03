@@ -6,15 +6,17 @@ Recall 一致性验证工具
 """
 
 import re
-import subprocess
 import sys
 from pathlib import Path
 from typing import List, Dict, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (  # noqa: E402  RULE-021
+    classify_porcelain,
     find_project_root,
     force_utf8_output,
+    git_output,
+    run_git,
     unpushed_commit_count,
 )
 
@@ -485,19 +487,9 @@ def is_valid_git_commit(commit_hash: str) -> bool:
     if not commit_hash:
         return False
 
-    try:
-        result = subprocess.run(
-            ['git', 'cat-file', '-t', commit_hash],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            timeout=5
-        )
-    except (OSError, subprocess.SubprocessError):
-        # git 未安装、不在 PATH，或超时
-        return False
-    return result.returncode == 0 and 'commit' in (result.stdout or '')
+    # git 未安装、不在 PATH 或超时时 run_git 返回 ok=False，不抛异常（RULE-021）
+    ok, out, _ = run_git(['cat-file', '-t', commit_hash], timeout=5)
+    return ok and 'commit' in out
 
 def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
     """漂移度量（RULE-015）：统计自上次触及 logic 文档以来累积的提交数。
@@ -510,15 +502,7 @@ def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
     ]
 
     def _git(args: List[str]) -> str:
-        try:
-            proc = subprocess.run(
-                ['git'] + args,
-                capture_output=True, text=True, encoding='utf-8',
-                errors='replace', cwd=root, timeout=10,
-            )
-        except (OSError, subprocess.SubprocessError):
-            return ''
-        return (proc.stdout or '').strip() if proc.returncode == 0 else ''
+        return (git_output(args, cwd=root, timeout=10) or '').strip()
 
     last_logic = _git(['rev-list', '-1', 'HEAD', '--'] + logic_pathspecs)
     if not last_logic:
@@ -705,46 +689,22 @@ def validate_recall() -> ValidationResult:
     # 3d. 推送责任核对（RULE-010）：本地不得长期领先远端
     report_unpushed_commits(unpushed_commit_count(root), result)
 
-    # 4. 检查 Git 仓库状态
-    try:
-        git_status = subprocess.run(
-            ['git', 'status', '--porcelain'],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
-            cwd=root,
-            timeout=5
+    # 4. 检查 Git 仓库状态（RULE-021：经 recall_common.run_git，失败不抛异常）
+    ok_status, porcelain, status_err = run_git(['status', '--porcelain'], cwd=root, timeout=5)
+    if ok_status:
+        tracked_dirty, _ = classify_porcelain(porcelain)
+        if tracked_dirty:
+            result.add_warning(f"有 {len(tracked_dirty)} 个已跟踪文件的未提交变更")
+        # 4b. 收尾归零（RULE-020）：未跟踪且未被忽略的文件单列告警
+        untracked = git_output(
+            ['ls-files', '--others', '--exclude-standard'], cwd=root, timeout=5
         )
-    except (OSError, subprocess.SubprocessError):
-        result.add_warning("Git 不可用或未安装")
+        if untracked is not None:
+            report_untracked_leftovers(untracked.splitlines(), result)
+    elif 'not a git repository' in status_err.lower() or 'git' in status_err.lower():
+        result.add_warning("无法检查 Git 状态（可能未初始化 Git）")
     else:
-        if git_status.returncode == 0:
-            tracked_dirty = [
-                line for line in (git_status.stdout or '').splitlines()
-                if line.strip() and not line.startswith('??')
-            ]
-            if tracked_dirty:
-                result.add_warning(f"有 {len(tracked_dirty)} 个已跟踪文件的未提交变更")
-            # 4b. 收尾归零（RULE-020）：未跟踪且未被忽略的文件单列告警
-            try:
-                untracked = subprocess.run(
-                    ['git', 'ls-files', '--others', '--exclude-standard'],
-                    capture_output=True,
-                    text=True,
-                    encoding='utf-8',
-                    errors='replace',
-                    cwd=root,
-                    timeout=5
-                )
-            except (OSError, subprocess.SubprocessError):
-                untracked = None
-            if untracked is not None and untracked.returncode == 0:
-                report_untracked_leftovers(
-                    (untracked.stdout or '').splitlines(), result
-                )
-        else:
-            result.add_warning("无法检查 Git 状态（可能未初始化 Git）")
+        result.add_warning("Git 不可用或未安装")
 
     return result
 

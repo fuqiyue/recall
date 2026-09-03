@@ -31,6 +31,8 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 **personal 模式不维护** `semantic_review_*`、`governance_verification`、`governance_verified_at` 这些独立记录。实施者与审查者是同一人时，分离的字段不增加控制力，只增加行数。需要记下自审结论时写一行自述即可。
 
+**审计器口径（RULE-023）**：`audit --current-state` 对 personal 模式的 CHG 块只强制 `status`、`effective: false`、`proposal_revision`、`recall_route`、`changed_by`，以及进入 `implementing`/`verifying`/`promoting` 前的 `decision_confirmed_by` + `decision_confirmed_at`（用户确认不随治理模式降级；`changed_by` 按治理模式文档要求诚实记录，故所有层级必填）。collaborative / compliance 层字段"缺则不查、写则照查"——写了就按完整规则校验。块自身 `governance_mode` 优先于账本模式；两者都缺按完整要求处理。`--formal-review` 与 collaborative 模式的要求不变。
+
 ## collaborative 层（+9 个）
 
 | 字段 | 含义 |

@@ -24,7 +24,6 @@ import argparse
 import os
 import re
 import stat
-import subprocess
 import sys
 from pathlib import Path
 from typing import Iterable, Optional, Tuple
@@ -69,6 +68,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (  # noqa: E402
     find_project_root,
     force_utf8_output as _force_utf8_when_redirected,
+    parse_porcelain,
     run_git,
 )
 
@@ -248,12 +248,7 @@ def _list_dirty_files(project_root: Path) -> list:
     ok, output, _ = run_git(["status", "--porcelain"], cwd=project_root)
     if not ok:
         return []
-    entries = []
-    for line in output.splitlines():
-        if len(line) < 4:
-            continue
-        entries.append((line[:2], line[3:].strip().strip('"')))
-    return entries
+    return parse_porcelain(output)
 
 
 def _print_commit_plan(entries: list, excluded: list = None) -> None:

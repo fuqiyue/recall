@@ -18,7 +18,7 @@ from __future__ import annotations
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 # Recall 自身的仓库根（skill 安装目录）；供 create_ver 等在 cwd 链上
 # 找不到 logic_readme.md 时回退。
@@ -113,3 +113,39 @@ def unpushed_commit_count(cwd: Optional[Path] = None) -> Optional[int]:
     if not ok or not out.isdigit():
         return None
     return int(out)
+
+
+def parse_porcelain(porcelain_output: Optional[str]) -> List[Tuple[str, str]]:
+    """把 ``git status --porcelain`` 输出解析为 ``(两位状态码, 路径)`` 列表。
+
+    只此一份（RULE-021）：git_sync 的提交清单与 ``recall status`` 的分类此前各
+    解析一次，重命名与引号处理不一致。规则：状态码是前两列；重命名/复制
+    ``R  old -> new`` 只保留新路径；含空格或非 ASCII 的路径 Git 会加双引号，
+    这里去掉。空行跳过；不足三列的异常行按整行为路径、状态码为空处理。
+    """
+    entries: List[Tuple[str, str]] = []
+    for raw_line in (porcelain_output or "").splitlines():
+        if not raw_line.strip():
+            continue
+        if len(raw_line) > 3:
+            code, path = raw_line[:2], raw_line[3:].strip()
+        else:
+            code, path = "", raw_line.strip()
+        if " -> " in path:
+            path = path.split(" -> ", 1)[1]
+        entries.append((code, path.strip().strip('"')))
+    return entries
+
+
+def classify_porcelain(porcelain_output: Optional[str]) -> Tuple[List[str], List[str]]:
+    """把 porcelain 输出分成 ``(已跟踪变更路径, 未跟踪文件路径)`` 两组。
+
+    RULE-020（收尾归零）：未跟踪文件是 AI 解题过程残留的主要形态，而 RULE-011
+    让它们默认不进自动保存提交，因此必须单列提示，不能与已跟踪修改混成一个
+    "未提交变更"计数。只分类、不删除。
+    """
+    tracked: List[str] = []
+    untracked: List[str] = []
+    for code, path in parse_porcelain(porcelain_output):
+        (untracked if code == "??" else tracked).append(path)
+    return tracked, untracked

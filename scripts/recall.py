@@ -15,6 +15,7 @@ SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from recall_common import (  # noqa: E402  RULE-021：根查找/Git 调用/编码防护只此一份
+    classify_porcelain,
     find_project_root,
     force_utf8_output,
     run_git,
@@ -234,28 +235,8 @@ def cmd_validate():
         print(f"❌ 错误: {e}")
         return 1
 
-def classify_porcelain(porcelain_output):
-    """把 ``git status --porcelain`` 输出分成已跟踪变更与未跟踪文件两组路径。
-
-    RULE-020（收尾归零）：未跟踪文件是 AI 解题过程残留（探针脚本、临时
-    测试、草稿）的主要形态，而 RULE-011 让它们默认不进自动保存提交，
-    因此必须单列提示，不能与已跟踪修改混成一个"未提交变更"计数。
-    只分类、不删除。
-    """
-    tracked = []
-    untracked = []
-    for raw_line in (porcelain_output or "").splitlines():
-        if not raw_line.strip():
-            continue
-        code = raw_line[:2]
-        path = raw_line[3:].strip() if len(raw_line) > 3 else raw_line.strip()
-        if " -> " in path:  # 重命名：只关心新路径
-            path = path.split(" -> ", 1)[1]
-        if code == "??":
-            untracked.append(path)
-        else:
-            tracked.append(path)
-    return tracked, untracked
+# classify_porcelain 的实现在 recall_common（RULE-021：porcelain 解析只此一份，
+# git_sync 的提交清单与这里的 status 分类共用）；名字保留在本模块供测试访问。
 
 
 def describe_unpushed(count):

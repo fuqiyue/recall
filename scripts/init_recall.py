@@ -13,37 +13,16 @@ Recall 初始化脚本
 
 import argparse
 import os
-import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# RULE-021：Git 调用只此一份（argv 列表、不经 shell、固定 utf-8），不得自行实现
+from recall_common import run_git  # noqa: E402
 
 
 class Aborted(Exception):
     """用户中断，或非交互模式下缺少必要输入。"""
-
-
-def run_git(args, cwd=None):
-    """运行 git 命令，返回 (成功, stdout, stderr)。
-
-    参数以列表传入且不经过 shell：多行 commit message、
-    含空格或引号的用户名都能原样传递，也不会被 shell 解释。
-    """
-    try:
-        result = subprocess.run(
-            ["git"] + list(args),
-            cwd=str(cwd) if cwd else None,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-        )
-    except (OSError, ValueError) as e:
-        return False, "", str(e)
-    return (
-        result.returncode == 0,
-        (result.stdout or "").strip(),
-        (result.stderr or "").strip(),
-    )
 
 
 def check_git_installed():

@@ -6,9 +6,10 @@ from __future__ import annotations
 
 import os
 import re
-import subprocess
+from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
+from recall_common import run_git  # RULE-021：Git 调用只此一份
 from .constants import (
     ADR_NAME_RE,
     AGENT_ENTRY_CONFIG_DIRS,
@@ -64,11 +65,56 @@ from .integrity import (
     active_change_ids,
 )
 
-def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
-    history_root = root / CURRENT_HISTORY_ROOT
-    working_root = history_root / "working"
-    index = history_root / "index.md"
-    active_ids = active_change_ids(root, audits)
+_CURRENT_DOC_NAMES = {"logic_readme.md", "logic_change.md", "logic_temp.md"}
+
+
+# ---------------------------------------------------------------------------
+# logic_version/working 临时工作区（audit_temp_working）
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _TempWorkingContext:
+    """logic_version/working 核查的输入与累积结果。"""
+
+    root: Path
+    history_root: Path
+    working_root: Path
+    active_ids: set[str]
+    active_blocks: dict[str, tuple[Path, str]]
+    completed_version_ids: set[str]
+    indexed_temp_paths: list[tuple[dict[str, str], str | None]]
+    records: list[str] = field(default_factory=list)
+    malformed: list[dict] = field(default_factory=list)
+    missing_temp: list[str] = field(default_factory=list)
+    orphan_change_ids: list[str] = field(default_factory=list)
+    expired: list[str] = field(default_factory=list)
+    forbidden_files: list[str] = field(default_factory=list)
+    unindexed: list[str] = field(default_factory=list)
+    extra_entries: list[str] = field(default_factory=list)
+    stale_index_entries: list[str] = field(default_factory=list)
+    change_temp_link_issues: list[str] = field(default_factory=list)
+
+    def result(self, exists: bool) -> dict:
+        return {
+            "exists": exists,
+            "records": sorted(self.records),
+            "malformed": self.malformed,
+            "missing_logic_temp": sorted(self.missing_temp),
+            "orphan_change_ids": sorted(set(self.orphan_change_ids)),
+            "expired": sorted(set(self.expired)),
+            "forbidden_files": sorted(set(self.forbidden_files)),
+            "unindexed": sorted(set(self.unindexed)),
+            "extra_entries": sorted(set(self.extra_entries)),
+            "stale_index_entries": sorted(set(self.stale_index_entries)),
+            "change_temp_link_issues": sorted(set(self.change_temp_link_issues)),
+        }
+
+
+def _collect_active_change_blocks(
+    root: Path, audits: list[ModuleAudit]
+) -> dict[str, tuple[Path, str]]:
+    """Collect (logic_change path, block text) for every active change id (casefolded)."""
     active_blocks: dict[str, tuple[Path, str]] = {}
     for audit in audits:
         if not audit.logic_change:
@@ -80,6 +126,11 @@ def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
             continue
         for change_id, block in change_blocks(change_text).items():
             active_blocks[change_id.casefold()] = (change_file, block)
+    return active_blocks
+
+
+def _collect_completed_version_ids(history_root: Path) -> set[str]:
+    """Collect casefolded version_id values of every archived version record."""
     completed_version_ids: set[str] = set()
     records_root = history_root / "records"
     if records_root.is_dir():
@@ -90,49 +141,42 @@ def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
             for version_id in control_values(record_text).get("version_id", []):
                 if VERSION_ID_RE.fullmatch(version_id):
                     completed_version_ids.add(version_id.casefold())
-    index_text = ""
-    if index.is_file():
-        index_text, _ = read_text(index)
-    index_rows = markdown_table_rows(index_text, "活跃临时记录")
+    return completed_version_ids
 
-    def canonical_index_temp_path(row: dict[str, str]) -> str | None:
-        target = cell_link_target(row.get("path", ""))
-        if not target:
-            return None
-        normalized = target.replace("\\", "/").strip()
-        candidate = (
-            root / normalized
-            if normalized.casefold().startswith(f"{CURRENT_HISTORY_ROOT.casefold()}/")
-            else history_root / normalized
-        ).resolve()
-        if not is_within(candidate, history_root):
-            return None
-        return candidate.relative_to(root).as_posix()
 
-    def index_entry_label(row: dict[str, str]) -> str:
-        version_id = row.get("version_id", "").strip("` ") or "unknown-version"
-        change_id = (
-            normalize_change_id(row.get("change_id", ""))
-            or row.get("change_id", "").strip("` ")
-            or "unknown-change"
-        )
-        target = cell_link_target(row.get("path", "")) or "missing-path"
-        return f"{version_id}:{change_id}:{target}"
+def _canonical_index_temp_path(
+    root: Path, history_root: Path, row: dict[str, str]
+) -> str | None:
+    """Resolve an index row's temp `path` link to a root-relative posix path."""
+    target = cell_link_target(row.get("path", ""))
+    if not target:
+        return None
+    normalized = target.replace("\\", "/").strip()
+    candidate = (
+        root / normalized
+        if normalized.casefold().startswith(f"{CURRENT_HISTORY_ROOT.casefold()}/")
+        else history_root / normalized
+    ).resolve()
+    if not is_within(candidate, history_root):
+        return None
+    return candidate.relative_to(root).as_posix()
 
-    indexed_temp_paths = [(row, canonical_index_temp_path(row)) for row in index_rows]
 
-    records: list[str] = []
-    malformed: list[dict] = []
-    missing_temp: list[str] = []
-    orphan_change_ids: list[str] = []
-    expired: list[str] = []
-    forbidden_files: list[str] = []
-    unindexed: list[str] = []
-    extra_entries: list[str] = []
-    stale_index_entries: list[str] = []
-    change_temp_link_issues: list[str] = []
+def _index_entry_label(row: dict[str, str]) -> str:
+    """Render a stable `version:change:path` label for an index row."""
+    version_id = row.get("version_id", "").strip("` ") or "unknown-version"
+    change_id = (
+        normalize_change_id(row.get("change_id", ""))
+        or row.get("change_id", "").strip("` ")
+        or "unknown-change"
+    )
+    target = cell_link_target(row.get("path", "")) or "missing-path"
+    return f"{version_id}:{change_id}:{target}"
 
-    for change_id, (_, change_block) in active_blocks.items():
+
+def _check_declared_temp_paths(ctx: _TempWorkingContext) -> None:
+    """核查每个活跃议案声明的 temp_path 位于 working 下、存在且回指该议案。"""
+    for change_id, (_, change_block) in ctx.active_blocks.items():
         change_raw = control_values_raw(change_block)
         declared_temp = (change_raw.get("temp_path") or [""])[0].strip("<>")
         if declared_temp.casefold() in {
@@ -144,19 +188,19 @@ def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
         }:
             continue
         normalized_temp = normalize_scope_path(declared_temp)
-        temp_candidate = (root / normalized_temp).resolve()
+        temp_candidate = (ctx.root / normalized_temp).resolve()
         expected_prefix = f"{CURRENT_HISTORY_ROOT.casefold()}/working/"
         if (
             not normalized_temp.casefold().startswith(expected_prefix)
-            or not is_within(temp_candidate, working_root)
+            or not is_within(temp_candidate, ctx.working_root)
             or temp_candidate.name.casefold() != "logic_temp.md"
         ):
-            change_temp_link_issues.append(
+            ctx.change_temp_link_issues.append(
                 f"{change_id.upper()}:invalid-declared-temp-path:{declared_temp}"
             )
             continue
         if not temp_candidate.is_file():
-            change_temp_link_issues.append(
+            ctx.change_temp_link_issues.append(
                 f"{change_id.upper()}:declared-temp-not-found:{declared_temp}"
             )
             continue
@@ -167,163 +211,214 @@ def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
             if normalize_change_id(value)
         }
         if temp_error or temp_source_ids != {change_id.upper()}:
-            change_temp_link_issues.append(
+            ctx.change_temp_link_issues.append(
                 f"{change_id.upper()}:declared-temp-source-mismatch:{declared_temp}"
             )
 
+
+def _check_temp_identity(
+    ctx: _TempWorkingContext,
+    entry: Path,
+    relative_temp: str,
+    values: dict[str, list[str]],
+    raw_values: dict[str, list[str]],
+    semantic: list[str],
+) -> None:
+    """核查 logic_temp 的 version_id 未与已完成版本冲突、slug 与目录名一致、temp_path 自指正确。"""
+    version_id = (values.get("version_id") or [""])[0]
+    if version_id.casefold() in ctx.completed_version_ids:
+        semantic.append(f"working-temp-conflicts-completed-version:{version_id}")
+
+    version_slug = (raw_values.get("version_slug") or [""])[0]
+    if version_slug and version_slug != entry.name:
+        semantic.append(f"version-slug-folder-mismatch:{version_slug}!={entry.name}")
+    temp_path = (raw_values.get("temp_path") or [""])[0].strip("<>")
+    if temp_path and normalize_scope_path(temp_path) != relative_temp:
+        semantic.append(f"temp-path-mismatch:{temp_path}!={relative_temp}")
+
+
+def _check_temp_sources(
+    ctx: _TempWorkingContext,
+    relative_temp: str,
+    values: dict[str, list[str]],
+    raw_values: dict[str, list[str]],
+    semantic: list[str],
+) -> None:
+    """核查 source_change_id 均为活跃议案且回指本 temp，source_of_truth 指向含正文的 logic_change。"""
+    source_ids = values.get("source_change_id", [])
+    for source_id in source_ids:
+        if source_id not in {item.lower() for item in ctx.active_ids}:
+            ctx.orphan_change_ids.append(f"{relative_temp}:{source_id}")
+            continue
+        change_file, change_block = ctx.active_blocks[source_id.casefold()]
+        change_raw = control_values_raw(change_block)
+        registered_temp = (change_raw.get("temp_path") or [""])[0].strip("<>")
+        if normalize_scope_path(registered_temp) != relative_temp:
+            semantic.append(
+                f"source-change-temp-path-mismatch:{registered_temp or 'missing'}!={relative_temp}"
+            )
+
+    truth_ref = (raw_values.get("source_of_truth") or [""])[0].strip("<>")
+    if truth_ref and truth_ref.lower() not in {"none", "unknown"}:
+        truth_path = (ctx.root / truth_ref).resolve()
+        if (
+            not is_within(truth_path, ctx.root)
+            or not truth_path.is_file()
+            or truth_path.name.lower() != "logic_change.md"
+        ):
+            semantic.append(f"invalid-source-of-truth:{truth_ref}")
+        else:
+            truth_text, truth_error = read_text(truth_path)
+            truth_ids = {item.casefold() for item in change_heading_ids(truth_text)}
+            if truth_error or not all(
+                source_id.casefold() in truth_ids for source_id in source_ids
+            ):
+                semantic.append(f"source-of-truth-missing-change-body:{truth_ref}")
+
+
+def _check_temp_expiry(
+    ctx: _TempWorkingContext,
+    relative_temp: str,
+    values: dict[str, list[str]],
+    semantic: list[str],
+) -> str:
+    """核查 expires 为合法日期并登记已过期记录；返回原始 expires 值。"""
+    expires_value = (values.get("expires") or [""])[0]
+    if expires_value:
+        try:
+            if date.fromisoformat(expires_value) < date.today():
+                ctx.expired.append(relative_temp)
+        except ValueError:
+            semantic.append(f"invalid-expires:{expires_value}")
+    return expires_value
+
+
+def _check_temp_index_rows(
+    ctx: _TempWorkingContext,
+    relative_temp: str,
+    values: dict[str, list[str]],
+    expires_value: str,
+    semantic: list[str],
+) -> None:
+    """核查 logic_version/index.md 活跃临时记录表恰有一行且身份/状态/到期与 temp 一致。"""
+    matching_index_rows = [
+        row
+        for row, indexed_path in ctx.indexed_temp_paths
+        if indexed_path == relative_temp
+    ]
+    if not matching_index_rows:
+        ctx.unindexed.append(relative_temp)
+        return
+    version_id = (values.get("version_id") or [""])[0]
+    source_id = (values.get("source_change_id") or [""])[0]
+    state = (values.get("state") or [""])[0]
+    if len(matching_index_rows) != 1:
+        semantic.append("logic-version-index-temp-duplicate-entry")
+    for row in matching_index_rows:
+        if row.get("version_id", "").strip(
+            "` "
+        ).casefold() != version_id.casefold() or normalize_change_id(
+            row.get("change_id", "")
+        ) != normalize_change_id(source_id):
+            semantic.append("logic-version-index-temp-identity-mismatch")
+        if row.get("state", "").strip("` ").casefold() != state.casefold():
+            semantic.append("logic-version-index-temp-state-mismatch")
+        if row.get("expires", "").strip("` ") != expires_value:
+            semantic.append("logic-version-index-temp-expires-mismatch")
+
+
+def _collect_forbidden_files(ctx: _TempWorkingContext, entry: Path, temp: Path) -> None:
+    """登记工作目录内除 logic_temp 外的现行文档、归档记录、源码与运行数据文件。"""
+    for nested in entry.rglob("*"):
+        if not nested.is_file() or nested == temp:
+            continue
+        name = nested.name.lower()
+        if (
+            name in _CURRENT_DOC_NAMES
+            or HISTORY_NAME_RE.match(nested.name)
+            or ADR_NAME_RE.match(nested.name)
+            or is_source_file(nested)
+            or is_runtime_data_file(nested)
+        ):
+            ctx.forbidden_files.append(nested.relative_to(ctx.root).as_posix())
+
+
+def _check_working_entry(ctx: _TempWorkingContext, entry: Path) -> None:
+    """核查 working 下一个条目：目录命名、logic_temp 结构与语义、索引对账与禁入文件。"""
+    if not entry.is_dir():
+        ctx.extra_entries.append(entry.relative_to(ctx.root).as_posix())
+        return
+    if not VERSION_SLUG_RE.fullmatch(entry.name):
+        ctx.extra_entries.append(entry.relative_to(ctx.root).as_posix())
+    temp = entry / "logic_temp.md"
+    if not temp.is_file():
+        ctx.missing_temp.append(entry.relative_to(ctx.root).as_posix())
+        return
+    relative_temp = temp.relative_to(ctx.root).as_posix()
+    ctx.records.append(relative_temp)
+    sections, fields, links = inspect_markdown(
+        temp, ctx.root, REQUIRED_TEMP_SECTIONS, REQUIRED_TEMP_FIELDS
+    )
+    semantic = semantic_issues(temp, "temp")
+    semantic.extend(placeholder_issues(temp))
+    semantic.extend(f"broken-link:{link}" for link in links)
+    text_value, error = read_text(temp)
+    values = control_values(text_value) if not error else {}
+    raw_values = control_values_raw(text_value) if not error else {}
+    _check_temp_identity(ctx, entry, relative_temp, values, raw_values, semantic)
+    _check_temp_sources(ctx, relative_temp, values, raw_values, semantic)
+    expires_value = _check_temp_expiry(ctx, relative_temp, values, semantic)
+    _check_temp_index_rows(ctx, relative_temp, values, expires_value, semantic)
+
+    if sections or fields or semantic:
+        ctx.malformed.append(
+            {
+                "path": relative_temp,
+                "missing_sections": sections,
+                "missing_fields": fields,
+                "semantic_issues": sorted(set(semantic)),
+            }
+        )
+
+    _collect_forbidden_files(ctx, entry, temp)
+
+
+def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
+    history_root = root / CURRENT_HISTORY_ROOT
+    working_root = history_root / "working"
+    index = history_root / "index.md"
+    index_text = ""
+    if index.is_file():
+        index_text, _ = read_text(index)
+    index_rows = markdown_table_rows(index_text, "活跃临时记录")
+    ctx = _TempWorkingContext(
+        root=root,
+        history_root=history_root,
+        working_root=working_root,
+        active_ids=active_change_ids(root, audits),
+        active_blocks=_collect_active_change_blocks(root, audits),
+        completed_version_ids=_collect_completed_version_ids(history_root),
+        indexed_temp_paths=[
+            (row, _canonical_index_temp_path(root, history_root, row))
+            for row in index_rows
+        ],
+    )
+
+    _check_declared_temp_paths(ctx)
+
     if not working_root.is_dir():
-        stale_index_entries.extend(index_entry_label(row) for row in index_rows)
-        return {
-            "exists": False,
-            "records": records,
-            "malformed": malformed,
-            "missing_logic_temp": missing_temp,
-            "orphan_change_ids": orphan_change_ids,
-            "expired": expired,
-            "forbidden_files": forbidden_files,
-            "unindexed": unindexed,
-            "extra_entries": extra_entries,
-            "stale_index_entries": sorted(set(stale_index_entries)),
-            "change_temp_link_issues": sorted(set(change_temp_link_issues)),
-        }
+        ctx.stale_index_entries.extend(_index_entry_label(row) for row in index_rows)
+        return ctx.result(exists=False)
 
     for entry in sorted(working_root.iterdir()):
-        if not entry.is_dir():
-            extra_entries.append(entry.relative_to(root).as_posix())
-            continue
-        if not VERSION_SLUG_RE.fullmatch(entry.name):
-            extra_entries.append(entry.relative_to(root).as_posix())
-        temp = entry / "logic_temp.md"
-        if not temp.is_file():
-            missing_temp.append(entry.relative_to(root).as_posix())
-            continue
-        relative_temp = temp.relative_to(root).as_posix()
-        records.append(relative_temp)
-        sections, fields, links = inspect_markdown(
-            temp, root, REQUIRED_TEMP_SECTIONS, REQUIRED_TEMP_FIELDS
-        )
-        semantic = semantic_issues(temp, "temp")
-        semantic.extend(placeholder_issues(temp))
-        semantic.extend(f"broken-link:{link}" for link in links)
-        text_value, error = read_text(temp)
-        values = control_values(text_value) if not error else {}
-        raw_values = control_values_raw(text_value) if not error else {}
-        version_id = (values.get("version_id") or [""])[0]
-        if version_id.casefold() in completed_version_ids:
-            semantic.append(f"working-temp-conflicts-completed-version:{version_id}")
+        _check_working_entry(ctx, entry)
 
-        version_slug = (raw_values.get("version_slug") or [""])[0]
-        if version_slug and version_slug != entry.name:
-            semantic.append(
-                f"version-slug-folder-mismatch:{version_slug}!={entry.name}"
-            )
-        temp_path = (raw_values.get("temp_path") or [""])[0].strip("<>")
-        if temp_path and normalize_scope_path(temp_path) != relative_temp:
-            semantic.append(f"temp-path-mismatch:{temp_path}!={relative_temp}")
-
-        source_ids = values.get("source_change_id", [])
-        for source_id in source_ids:
-            if source_id not in {item.lower() for item in active_ids}:
-                orphan_change_ids.append(f"{relative_temp}:{source_id}")
-                continue
-            change_file, change_block = active_blocks[source_id.casefold()]
-            change_raw = control_values_raw(change_block)
-            registered_temp = (change_raw.get("temp_path") or [""])[0].strip("<>")
-            if normalize_scope_path(registered_temp) != relative_temp:
-                semantic.append(
-                    f"source-change-temp-path-mismatch:{registered_temp or 'missing'}!={relative_temp}"
-                )
-
-        truth_ref = (raw_values.get("source_of_truth") or [""])[0].strip("<>")
-        if truth_ref and truth_ref.lower() not in {"none", "unknown"}:
-            truth_path = (root / truth_ref).resolve()
-            if (
-                not is_within(truth_path, root)
-                or not truth_path.is_file()
-                or truth_path.name.lower() != "logic_change.md"
-            ):
-                semantic.append(f"invalid-source-of-truth:{truth_ref}")
-            else:
-                truth_text, truth_error = read_text(truth_path)
-                truth_ids = {item.casefold() for item in change_heading_ids(truth_text)}
-                if truth_error or not all(
-                    source_id.casefold() in truth_ids for source_id in source_ids
-                ):
-                    semantic.append(f"source-of-truth-missing-change-body:{truth_ref}")
-
-        expires_value = (values.get("expires") or [""])[0]
-        if expires_value:
-            try:
-                if date.fromisoformat(expires_value) < date.today():
-                    expired.append(relative_temp)
-            except ValueError:
-                semantic.append(f"invalid-expires:{expires_value}")
-
-        matching_index_rows = [
-            row
-            for row, indexed_path in indexed_temp_paths
-            if indexed_path == relative_temp
-        ]
-        if not matching_index_rows:
-            unindexed.append(relative_temp)
-        else:
-            source_id = (values.get("source_change_id") or [""])[0]
-            state = (values.get("state") or [""])[0]
-            if len(matching_index_rows) != 1:
-                semantic.append("logic-version-index-temp-duplicate-entry")
-            for row in matching_index_rows:
-                if row.get("version_id", "").strip(
-                    "` "
-                ).casefold() != version_id.casefold() or normalize_change_id(
-                    row.get("change_id", "")
-                ) != normalize_change_id(source_id):
-                    semantic.append("logic-version-index-temp-identity-mismatch")
-                if row.get("state", "").strip("` ").casefold() != state.casefold():
-                    semantic.append("logic-version-index-temp-state-mismatch")
-                if row.get("expires", "").strip("` ") != expires_value:
-                    semantic.append("logic-version-index-temp-expires-mismatch")
-
-        if sections or fields or semantic:
-            malformed.append(
-                {
-                    "path": relative_temp,
-                    "missing_sections": sections,
-                    "missing_fields": fields,
-                    "semantic_issues": sorted(set(semantic)),
-                }
-            )
-
-        for nested in entry.rglob("*"):
-            if not nested.is_file() or nested == temp:
-                continue
-            name = nested.name.lower()
-            if (
-                name in {"logic_readme.md", "logic_change.md", "logic_temp.md"}
-                or HISTORY_NAME_RE.match(nested.name)
-                or ADR_NAME_RE.match(nested.name)
-                or is_source_file(nested)
-                or is_runtime_data_file(nested)
-            ):
-                forbidden_files.append(nested.relative_to(root).as_posix())
-
-    record_set = set(records)
-    for row, indexed_path in indexed_temp_paths:
+    record_set = set(ctx.records)
+    for row, indexed_path in ctx.indexed_temp_paths:
         if indexed_path is None or indexed_path not in record_set:
-            stale_index_entries.append(index_entry_label(row))
+            ctx.stale_index_entries.append(_index_entry_label(row))
 
-    return {
-        "exists": True,
-        "records": sorted(records),
-        "malformed": malformed,
-        "missing_logic_temp": sorted(missing_temp),
-        "orphan_change_ids": sorted(set(orphan_change_ids)),
-        "expired": sorted(set(expired)),
-        "forbidden_files": sorted(set(forbidden_files)),
-        "unindexed": sorted(set(unindexed)),
-        "extra_entries": sorted(set(extra_entries)),
-        "stale_index_entries": sorted(set(stale_index_entries)),
-        "change_temp_link_issues": sorted(set(change_temp_link_issues)),
-    }
+    return ctx.result(exists=True)
 
 
 def archive_record_identity(path: Path, kind: str) -> tuple[str | None, str | None]:
@@ -338,23 +433,14 @@ def archive_record_identity(path: Path, kind: str) -> tuple[str | None, str | No
     return path.stem, None
 
 
-def audit_index_consistency(
+
+def _collect_expected_index_entries(
     index: Path,
-    root: Path,
     version_records: list[Path],
     decision_records: list[Path],
     backup_sets: list[Path],
-) -> dict:
-    index_text, error = read_text(index)
-    if error:
-        return {
-            "unindexed_records": [],
-            "duplicate_ids": [],
-            "row_mismatches": [],
-            "unknown_record_links": [],
-            "error": f"unreadable:{error}",
-        }
-
+) -> list[tuple[str, str | None, str, str | None]]:
+    """Collect (kind, identity, index-relative path, status) for every archived record."""
     expected: list[tuple[str, str | None, str, str | None]] = []
     for path in version_records:
         identity, _ = archive_record_identity(path, "version")
@@ -382,7 +468,102 @@ def audit_index_consistency(
                     None,
                 )
             )
+    return expected
 
+
+def _canonical_table_target(root: Path, index: Path, cell: str) -> str | None:
+    """Resolve an index table link cell to an index-relative posix path (None if invalid)."""
+    target = cell_link_target(cell)
+    if not target:
+        return None
+    normalized = target.replace("\\", "/").strip()
+    candidate = (
+        root / normalized
+        if normalized.casefold().startswith(f"{CURRENT_HISTORY_ROOT.casefold()}/")
+        else index.parent / normalized
+    ).resolve()
+    if not is_within(candidate, index.parent):
+        return None
+    return candidate.relative_to(index.parent.resolve()).as_posix()
+
+
+def _check_index_rows(
+    root: Path,
+    index: Path,
+    expected: list[tuple[str, str | None, str, str | None]],
+    table_specs: dict[str, tuple[list[dict[str, str]], str, str | None, str]],
+) -> tuple[list[str], list[str]]:
+    """核查每条归档记录在索引表中恰有一行且 id/status 一致；返回 (unindexed, row_mismatches)。"""
+    unindexed: list[str] = []
+    row_mismatches: list[str] = []
+    for kind, identity, path, status in expected:
+        rows, id_column, status_column, path_column = table_specs[kind]
+        matching_rows = [
+            row
+            for row in rows
+            if _canonical_table_target(root, index, row.get(path_column, "")) == path
+        ]
+        if not matching_rows:
+            unindexed.append(path)
+            continue
+        if len(matching_rows) != 1:
+            row_mismatches.append(f"{path}:duplicate-row")
+        row = matching_rows[0]
+        indexed_identity = row.get(id_column, "").strip("` ")
+        if identity and indexed_identity.casefold() != identity.casefold():
+            row_mismatches.append(f"{path}:id")
+        if (
+            status_column
+            and status
+            and row.get(status_column, "").strip("` ").casefold() != status.casefold()
+        ):
+            row_mismatches.append(f"{path}:status")
+    return unindexed, row_mismatches
+
+
+def _collect_unknown_index_links(
+    root: Path,
+    index: Path,
+    expected: list[tuple[str, str | None, str, str | None]],
+    table_specs: dict[str, tuple[list[dict[str, str]], str, str | None, str]],
+) -> list[str]:
+    """登记索引表中无法解析或不对应任何归档记录的行链接。"""
+    expected_paths_by_kind: dict[str, set[str]] = {
+        kind: {path for row_kind, _, path, _ in expected if row_kind == kind}
+        for kind in table_specs
+    }
+    unknown_links: list[str] = []
+    for kind, (rows, id_column, _, path_column) in table_specs.items():
+        for row in rows:
+            relative = _canonical_table_target(root, index, row.get(path_column, ""))
+            row_id = row.get(id_column, "").strip("` ") or "unknown"
+            if relative is None:
+                unknown_links.append(f"{kind}:invalid-row:{row_id}")
+            elif relative not in expected_paths_by_kind[kind]:
+                unknown_links.append(relative)
+    return unknown_links
+
+
+def audit_index_consistency(
+    index: Path,
+    root: Path,
+    version_records: list[Path],
+    decision_records: list[Path],
+    backup_sets: list[Path],
+) -> dict:
+    index_text, error = read_text(index)
+    if error:
+        return {
+            "unindexed_records": [],
+            "duplicate_ids": [],
+            "row_mismatches": [],
+            "unknown_record_links": [],
+            "error": f"unreadable:{error}",
+        }
+
+    expected = _collect_expected_index_entries(
+        index, version_records, decision_records, backup_sets
+    )
     table_specs = {
         "version": (
             markdown_table_rows(index_text, "不可变决策记录"),
@@ -404,49 +585,8 @@ def audit_index_consistency(
         ),
     }
 
-    def canonical_table_target(cell: str) -> str | None:
-        target = cell_link_target(cell)
-        if not target:
-            return None
-        normalized = target.replace("\\", "/").strip()
-        candidate = (
-            root / normalized
-            if normalized.casefold().startswith(f"{CURRENT_HISTORY_ROOT.casefold()}/")
-            else index.parent / normalized
-        ).resolve()
-        if not is_within(candidate, index.parent):
-            return None
-        return candidate.relative_to(index.parent.resolve()).as_posix()
-
-    unindexed: list[str] = []
+    unindexed, row_mismatches = _check_index_rows(root, index, expected, table_specs)
     id_paths: dict[str, list[str]] = {}
-    row_mismatches: list[str] = []
-    expected_paths_by_kind: dict[str, set[str]] = {
-        kind: {path for row_kind, _, path, _ in expected if row_kind == kind}
-        for kind in table_specs
-    }
-    for kind, identity, path, status in expected:
-        rows, id_column, status_column, path_column = table_specs[kind]
-        matching_rows = [
-            row
-            for row in rows
-            if canonical_table_target(row.get(path_column, "")) == path
-        ]
-        if not matching_rows:
-            unindexed.append(path)
-            continue
-        if len(matching_rows) != 1:
-            row_mismatches.append(f"{path}:duplicate-row")
-        row = matching_rows[0]
-        indexed_identity = row.get(id_column, "").strip("` ")
-        if identity and indexed_identity.casefold() != identity.casefold():
-            row_mismatches.append(f"{path}:id")
-        if (
-            status_column
-            and status
-            and row.get(status_column, "").strip("` ").casefold() != status.casefold()
-        ):
-            row_mismatches.append(f"{path}:status")
     for _, identity, path, _ in expected:
         if identity:
             id_paths.setdefault(identity.casefold(), []).append(path)
@@ -455,16 +595,7 @@ def audit_index_consistency(
         for identity, paths in id_paths.items()
         if len(paths) > 1
     )
-
-    unknown_links: list[str] = []
-    for kind, (rows, id_column, _, path_column) in table_specs.items():
-        for row in rows:
-            relative = canonical_table_target(row.get(path_column, ""))
-            row_id = row.get(id_column, "").strip("` ") or "unknown"
-            if relative is None:
-                unknown_links.append(f"{kind}:invalid-row:{row_id}")
-            elif relative not in expected_paths_by_kind[kind]:
-                unknown_links.append(relative)
+    unknown_links = _collect_unknown_index_links(root, index, expected, table_specs)
 
     return {
         "unindexed_records": sorted(set(unindexed)),
@@ -475,13 +606,13 @@ def audit_index_consistency(
     }
 
 
-def audit_archive(root: Path) -> dict:
-    archive = root / CURRENT_HISTORY_ROOT
-    versions_root = archive / "records"
-    decisions_root = archive / "decisions"
-    backups_root = archive / "backups"
-    working_root = archive / "working"
-    index = archive / "index.md"
+# ---------------------------------------------------------------------------
+# logic_version 归档整体（audit_archive）
+# ---------------------------------------------------------------------------
+
+
+def _collect_legacy_history(root: Path, archive: Path) -> tuple[list[str], bool, list[str]]:
+    """Collect legacy history roots, whether they coexist with the current one, and their records."""
     legacy_roots = sorted(
         name for name in LEGACY_HISTORY_ROOTS if (root / name).is_dir()
     )
@@ -495,11 +626,16 @@ def audit_archive(root: Path) -> dict:
             and (
                 HISTORY_NAME_RE.match(path.name)
                 or ADR_NAME_RE.match(path.name)
-                or path.name.lower()
-                in {"logic_readme.md", "logic_change.md", "logic_temp.md"}
+                or path.name.lower() in _CURRENT_DOC_NAMES
             )
         )
+    return legacy_roots, duplicate_history_roots, legacy_records
 
+
+def _collect_archive_layout_issues(
+    root: Path, archive: Path, working_root: Path
+) -> tuple[list[str], list[str]]:
+    """登记归档根下不允许的子项、误放的现行文档与 working 外的 logic_temp；返回 (extra_paths, forbidden_current_docs)。"""
     extra_paths: list[str] = []
     forbidden_current_docs: list[str] = []
     if archive.is_dir():
@@ -514,25 +650,38 @@ def audit_archive(root: Path) -> dict:
                 forbidden_current_docs.append(path.relative_to(root).as_posix())
             if lowered == "logic_temp.md" and not is_within(path, working_root):
                 extra_paths.append(path.relative_to(root).as_posix())
+    return extra_paths, forbidden_current_docs
 
-    version_records = (
-        sorted(
-            path
-            for path in versions_root.rglob("*.md")
-            if HISTORY_NAME_RE.match(path.name)
-        )
-        if versions_root.is_dir()
+
+def _collect_archive_records(
+    root: Path,
+    records_root: Path,
+    name_re: re.Pattern[str],
+    canonical_re: re.Pattern[str],
+    extra_paths: list[str],
+) -> list[Path]:
+    """List records under `records_root` matching `name_re`; register non-canonical entries as extra paths."""
+    records = (
+        sorted(path for path in records_root.rglob("*.md") if name_re.match(path.name))
+        if records_root.is_dir()
         else []
     )
-    if versions_root.is_dir():
-        for path in versions_root.rglob("*"):
+    if records_root.is_dir():
+        for path in records_root.rglob("*"):
             if path.is_dir():
                 extra_paths.append(path.relative_to(root).as_posix() + "/")
-            elif not (
-                path.parent == versions_root
-                and CANONICAL_VERSION_RE.fullmatch(path.name)
-            ):
+            elif not (path.parent == records_root and canonical_re.fullmatch(path.name)):
                 extra_paths.append(path.relative_to(root).as_posix())
+    return records
+
+
+def _check_version_records(
+    root: Path,
+    versions_root: Path,
+    version_records: list[Path],
+    archive_broken_links: list[str],
+) -> list[dict]:
+    """核查每份版本记录的结构、语义、文件名/ID/slug 一致与 correction 目标；返回 malformed 列表。"""
     malformed_versions: list[dict] = []
     version_id_values = {
         identity
@@ -540,8 +689,6 @@ def audit_archive(root: Path) -> dict:
         for identity, error in [archive_record_identity(path, "version")]
         if identity and not error
     }
-    archive_broken_links: list[str] = []
-
     for path in version_records:
         sections, fields, links = inspect_markdown(
             path, root, REQUIRED_VERSION_SECTIONS, REQUIRED_VERSION_FIELDS
@@ -579,24 +726,13 @@ def audit_archive(root: Path) -> dict:
         archive_broken_links.extend(
             f"{path.relative_to(root).as_posix()}:{item}" for item in links
         )
+    return malformed_versions
 
-    decision_records = (
-        sorted(
-            path
-            for path in decisions_root.rglob("*.md")
-            if ADR_NAME_RE.match(path.name)
-        )
-        if decisions_root.is_dir()
-        else []
-    )
-    if decisions_root.is_dir():
-        for path in decisions_root.rglob("*"):
-            if path.is_dir():
-                extra_paths.append(path.relative_to(root).as_posix() + "/")
-            elif not (
-                path.parent == decisions_root and ADR_NAME_RE.fullmatch(path.name)
-            ):
-                extra_paths.append(path.relative_to(root).as_posix())
+
+def _check_decision_records(
+    root: Path, decision_records: list[Path], archive_broken_links: list[str]
+) -> list[dict]:
+    """核查每份 ADR 的结构与语义；返回 malformed 列表。"""
     malformed_decisions: list[dict] = []
     for path in decision_records:
         sections, fields, links = inspect_markdown(
@@ -616,17 +752,13 @@ def audit_archive(root: Path) -> dict:
         archive_broken_links.extend(
             f"{path.relative_to(root).as_posix()}:{item}" for item in links
         )
+    return malformed_decisions
 
-    backup_sets = (
-        sorted(path for path in backups_root.iterdir() if path.is_dir())
-        if backups_root.is_dir()
-        else []
-    )
-    backups_missing_manifest = [
-        path.relative_to(root).as_posix()
-        for path in backup_sets
-        if not (path / "manifest.md").is_file()
-    ]
+
+def _check_backup_manifests(
+    root: Path, backup_sets: list[Path], archive_broken_links: list[str]
+) -> list[dict]:
+    """核查每个备份集 manifest.md 的结构与语义；返回 malformed 列表。"""
     malformed_backups: list[dict] = []
     for path in backup_sets:
         manifest = path / "manifest.md"
@@ -649,13 +781,90 @@ def audit_archive(root: Path) -> dict:
         archive_broken_links.extend(
             f"{manifest.relative_to(root).as_posix()}:{item}" for item in links
         )
+    return malformed_backups
 
-    has_records = bool(
-        version_records
-        or decision_records
-        or backup_sets
-        or (working_root.is_dir() and any(working_root.iterdir()))
+
+def _check_index_control(
+    root: Path, index: Path, text: str, archive_broken_links: list[str]
+) -> str | None:
+    """核查 index.md 的必备章节/字段与控制值（history_root/format/root_only/allowed_children）；返回问题摘要。"""
+    sections, fields, links = inspect_markdown(
+        index,
+        root,
+        REQUIRED_ARCHIVE_INDEX_SECTIONS,
+        REQUIRED_ARCHIVE_INDEX_FIELDS,
     )
+    index_values = control_values(text)
+    history_roots = index_values.get("history_root", [])
+    if (
+        len(history_roots) != 1
+        or normalize_scope_path(history_roots[0] if history_roots else "")
+        != CURRENT_HISTORY_ROOT
+    ):
+        fields.append("history_root-must-be-logic_version")
+    if index_values.get("history_format", []) != ["2"]:
+        fields.append("history_format-must-be-2")
+    if index_values.get("root_only", []) != ["true"]:
+        fields.append("root_only-must-be-true")
+    allowed_values = index_values.get("allowed_children", [])
+    allowed_children = {
+        item.strip()
+        for value in allowed_values
+        for item in re.split(r"[,;，；]", value)
+        if item.strip()
+    }
+    if len(allowed_values) != 1 or allowed_children != {
+        item.casefold() for item in HISTORY_ALLOWED_CHILDREN
+    }:
+        fields.append("allowed_children-mismatch")
+    index_issue: str | None = None
+    if sections or fields:
+        details = []
+        if sections:
+            details.append("missing-sections=" + ",".join(sections))
+        if fields:
+            details.append("missing-fields=" + ",".join(fields))
+        index_issue = ";".join(details)
+    archive_broken_links.extend(
+        f"{CURRENT_HISTORY_ROOT}/index.md:{item}" for item in links
+    )
+    return index_issue
+
+
+def _summarize_index_consistency(index_consistency: dict) -> list[str]:
+    """Render the non-empty index-consistency findings as `key=...` detail strings."""
+    consistency_details = []
+    if index_consistency["unindexed_records"]:
+        consistency_details.append(
+            "unindexed=" + ",".join(index_consistency["unindexed_records"])
+        )
+    if index_consistency["duplicate_ids"]:
+        consistency_details.append(
+            "duplicate-ids=" + ",".join(index_consistency["duplicate_ids"])
+        )
+    if index_consistency["row_mismatches"]:
+        consistency_details.append(
+            "row-mismatches=" + ",".join(index_consistency["row_mismatches"])
+        )
+    if index_consistency["unknown_record_links"]:
+        consistency_details.append(
+            "unknown-links=" + ",".join(index_consistency["unknown_record_links"])
+        )
+    if index_consistency["error"]:
+        consistency_details.append(index_consistency["error"])
+    return consistency_details
+
+
+def _check_archive_index(
+    root: Path,
+    index: Path,
+    has_records: bool,
+    version_records: list[Path],
+    decision_records: list[Path],
+    backup_sets: list[Path],
+    archive_broken_links: list[str],
+) -> tuple[str | None, dict]:
+    """核查 logic_version/index.md 存在性、控制字段与记录对账；返回 (index_issue, index_consistency)。"""
     index_issue: str | None = None
     index_consistency = {
         "unindexed_records": [],
@@ -671,72 +880,73 @@ def audit_archive(root: Path) -> dict:
         if error:
             index_issue = f"unreadable:{error}"
         else:
-            sections, fields, links = inspect_markdown(
-                index,
-                root,
-                REQUIRED_ARCHIVE_INDEX_SECTIONS,
-                REQUIRED_ARCHIVE_INDEX_FIELDS,
-            )
-            index_values = control_values(text)
-            history_roots = index_values.get("history_root", [])
-            if (
-                len(history_roots) != 1
-                or normalize_scope_path(history_roots[0] if history_roots else "")
-                != CURRENT_HISTORY_ROOT
-            ):
-                fields.append("history_root-must-be-logic_version")
-            if index_values.get("history_format", []) != ["2"]:
-                fields.append("history_format-must-be-2")
-            if index_values.get("root_only", []) != ["true"]:
-                fields.append("root_only-must-be-true")
-            allowed_values = index_values.get("allowed_children", [])
-            allowed_children = {
-                item.strip()
-                for value in allowed_values
-                for item in re.split(r"[,;，；]", value)
-                if item.strip()
-            }
-            if len(allowed_values) != 1 or allowed_children != {
-                item.casefold() for item in HISTORY_ALLOWED_CHILDREN
-            }:
-                fields.append("allowed_children-mismatch")
-            if sections or fields:
-                details = []
-                if sections:
-                    details.append("missing-sections=" + ",".join(sections))
-                if fields:
-                    details.append("missing-fields=" + ",".join(fields))
-                index_issue = ";".join(details)
-            archive_broken_links.extend(
-                f"{CURRENT_HISTORY_ROOT}/index.md:{item}" for item in links
-            )
+            index_issue = _check_index_control(root, index, text, archive_broken_links)
             index_consistency = audit_index_consistency(
                 index, root, version_records, decision_records, backup_sets
             )
-            consistency_details = []
-            if index_consistency["unindexed_records"]:
-                consistency_details.append(
-                    "unindexed=" + ",".join(index_consistency["unindexed_records"])
-                )
-            if index_consistency["duplicate_ids"]:
-                consistency_details.append(
-                    "duplicate-ids=" + ",".join(index_consistency["duplicate_ids"])
-                )
-            if index_consistency["row_mismatches"]:
-                consistency_details.append(
-                    "row-mismatches=" + ",".join(index_consistency["row_mismatches"])
-                )
-            if index_consistency["unknown_record_links"]:
-                consistency_details.append(
-                    "unknown-links="
-                    + ",".join(index_consistency["unknown_record_links"])
-                )
-            if index_consistency["error"]:
-                consistency_details.append(index_consistency["error"])
+            consistency_details = _summarize_index_consistency(index_consistency)
             if consistency_details:
                 index_issue = ";".join(
                     [item for item in [index_issue] if item] + consistency_details
                 )
+    return index_issue, index_consistency
+
+
+def audit_archive(root: Path) -> dict:
+    archive = root / CURRENT_HISTORY_ROOT
+    versions_root = archive / "records"
+    decisions_root = archive / "decisions"
+    backups_root = archive / "backups"
+    working_root = archive / "working"
+    index = archive / "index.md"
+    legacy_roots, duplicate_history_roots, legacy_records = _collect_legacy_history(
+        root, archive
+    )
+    extra_paths, forbidden_current_docs = _collect_archive_layout_issues(
+        root, archive, working_root
+    )
+
+    archive_broken_links: list[str] = []
+    version_records = _collect_archive_records(
+        root, versions_root, HISTORY_NAME_RE, CANONICAL_VERSION_RE, extra_paths
+    )
+    malformed_versions = _check_version_records(
+        root, versions_root, version_records, archive_broken_links
+    )
+    decision_records = _collect_archive_records(
+        root, decisions_root, ADR_NAME_RE, ADR_NAME_RE, extra_paths
+    )
+    malformed_decisions = _check_decision_records(
+        root, decision_records, archive_broken_links
+    )
+
+    backup_sets = (
+        sorted(path for path in backups_root.iterdir() if path.is_dir())
+        if backups_root.is_dir()
+        else []
+    )
+    backups_missing_manifest = [
+        path.relative_to(root).as_posix()
+        for path in backup_sets
+        if not (path / "manifest.md").is_file()
+    ]
+    malformed_backups = _check_backup_manifests(root, backup_sets, archive_broken_links)
+
+    has_records = bool(
+        version_records
+        or decision_records
+        or backup_sets
+        or (working_root.is_dir() and any(working_root.iterdir()))
+    )
+    index_issue, index_consistency = _check_archive_index(
+        root,
+        index,
+        has_records,
+        version_records,
+        decision_records,
+        backup_sets,
+        archive_broken_links,
+    )
 
     return {
         "scanned": True,
@@ -923,23 +1133,14 @@ def audit_root_doc_coverage(root: Path) -> dict:
     if unmapped_match:
         registered |= parse_entries(unmapped_match.group(1))
 
-    try:
-        proc = subprocess.run(
-            ["git", "-c", "core.quotepath=false", "ls-files", "--", "*.md"],
-            cwd=root,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            timeout=15,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return skipped
-    if proc.returncode != 0:
+    ok, stdout, _ = run_git(
+        ["-c", "core.quotepath=false", "ls-files", "--", "*.md"], cwd=root, timeout=15
+    )
+    if not ok:
         return skipped
 
     unregistered: set[str] = set()
-    for line in (proc.stdout or "").splitlines():
+    for line in stdout.splitlines():
         rel = line.strip().strip('"')
         if not rel:
             continue
@@ -1217,6 +1418,9 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
                 lines = block.count('\n') + 1
                 if lines > 80:
                     issues.append(f"{change_id}:exceeds-chg-limit:{lines}>80")
+                elif lines > 40:
+                    # RULE-023：单条 CHG 目标 15-40 行（field-vocabulary），越过目标先提示
+                    notices.append(f"{change_id}:over-chg-target:{lines}>40 (hard limit 80)")
 
     # Warn on accumulated blocked CHGs
     blocked_count = 0

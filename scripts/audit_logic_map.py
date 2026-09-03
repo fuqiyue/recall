@@ -63,6 +63,7 @@ from recall_audit.constants import (  # noqa: F401
     MODULE_DOC_POLICIES,
     NONE_LIKE_CONTROL_VALUES,
     PARALLEL_CURRENT_RE,
+    PERSONAL_OPTIONAL_CHANGE_FIELDS,
     POSITIVE_INTEGER_RE,
     README_STATUSES,
     RECALL_ROUTES,
@@ -154,6 +155,7 @@ from recall_audit.fsclassify import (  # noqa: F401
 from recall_audit.changes import (  # noqa: F401
     change_block_semantic_issues,
     change_coordination_issues,
+    change_field_tier,
     change_heading_ids,
     change_index_ids,
     change_lifecycle_issues,

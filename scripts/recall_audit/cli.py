@@ -14,6 +14,11 @@ from .report import (
     strict_failure,
 )
 
+# RULE-008/RULE-021：重定向下 stdout 走 ANSI 代码页，`--json` 里的中文会写成 GBK
+# 或抛 UnicodeEncodeError（2026-09-03 消费项目实测需 PYTHONIOENCODING 才能落盘）。
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from recall_common import force_utf8_output  # noqa: E402
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
@@ -102,6 +107,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    force_utf8_output()
     args = parse_args()
     try:
         report = collect_audit(args)

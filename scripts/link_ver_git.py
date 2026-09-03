@@ -35,23 +35,8 @@ def _records_dir():
 
 
 def run_git(args):
-    """运行 Git 命令并返回 stdout，失败返回 None。
-
-    参数以列表传入且不经过 shell：路径里的空格、引号，以及命令行
-    传入的 commit 值都原样传递，不会被 shell 解释执行。
-    """
-    try:
-        result = subprocess.run(
-            ["git"] + list(args),
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            errors="replace",
-            check=True,
-        )
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return (result.stdout or "").strip()
+    """运行 Git 命令并返回 stdout，失败返回 None（RULE-021：经 recall_common）。"""
+    return git_output(args)
 
 
 def _parse_record(record_file):

@@ -62,7 +62,7 @@ CHG 进入 `promoting` 时建立以下清单：
 - 精确 `authority_surfaces`、`based_on`
 - 依赖/冲突、运行暴露、历史保留级别、`docs_impact`
 
-实质性修改方案、影响面、基线或协调关系时递增版本。
+`governance_mode: personal` 只强制前两项加 `recall_route`/`changed_by`，其余字段缺则不查、写则照查（RULE-023；最小块见 references/logic-change-template.md）。实质性修改方案、影响面、基线或协调关系时递增版本。
 
 ### 2. 获得确认
 

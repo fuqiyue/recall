@@ -2105,5 +2105,122 @@ class ChildReadmeDensityTests(unittest.TestCase):
         )
 
 
+PERSONAL_LEDGER_HEAD = """# Demo Active Changes
+
+## 文档控制
+
+- scope: .
+- scope_path: .
+- module_id: MOD-ROOT
+- current_policy: logic_readme.md
+- owner: self
+- governance_mode: {mode}
+- governance_ref: git:demo-repository
+- governance_evidence: git:demo-repository
+- governance_verification: recorded
+- governance_verified_at: 2026-09-03
+- last_updated: 2026-09-03
+- active_changes: 1
+
+## 议案规则
+
+- All entries are non-effective until promoted.
+
+## 讨论主题索引
+
+| topic_id | 同类议题/共享问题 | coordinator | discussion_refs | related_changes | status |
+|---|---|---|---|---|---|
+
+## 活跃议案索引
+
+| change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
+|---|---|---|---|---|---|---|---|
+| CHG-20260903-001 | {status} | src | self | slim | none | logic_change.md#chg-20260903-001 | 2026-09-03 |
+
+<a id="chg-20260903-001"></a>
+## CHG-20260903-001: Slim personal proposal
+
+### 元数据
+
+- status: {status}
+- effective: false
+- proposal_revision: 1
+- recall_route: medium
+- owner: self
+- changed_by: agent
+- scope: src
+{confirmation}
+### 目标
+
+Keep the output contract.
+"""
+
+
+def personal_ledger(*, mode: str = "personal", status: str = "implementing", confirmed: bool = True) -> str:
+    confirmation = (
+        "- decision_confirmed_by: user\n- decision_confirmed_at: 2026-09-03\n"
+        if confirmed
+        else ""
+    )
+    return PERSONAL_LEDGER_HEAD.format(mode=mode, status=status, confirmation=confirmation)
+
+
+class GovernanceTierTests(unittest.TestCase):
+    """RULE-023：CHG 字段要求按治理模式分档——personal 缺则不查、写则照查。"""
+
+    def test_personal_slim_block_has_no_missing_field_issues(self) -> None:
+        text = personal_ledger()
+        semantic = AUDIT.change_block_semantic_issues(text, root_index=True)
+        coordination = AUDIT.change_coordination_issues(
+            AUDIT.change_blocks(text), ledger_mode="personal"
+        )
+        self.assertEqual(semantic, [])
+        self.assertEqual(coordination, [])
+
+    def test_same_block_under_collaborative_still_requires_full_fields(self) -> None:
+        text = personal_ledger(mode="collaborative")
+        semantic = AUDIT.change_block_semantic_issues(text, root_index=True)
+        coordination = AUDIT.change_coordination_issues(
+            AUDIT.change_blocks(text), ledger_mode="collaborative"
+        )
+        self.assertIn("CHG-20260903-001:topic-id-must-appear-once:0", semantic)
+        self.assertIn("CHG-20260903-001:decision_gate-must-appear-once:0", semantic)
+        self.assertIn("CHG-20260903-001:missing-authority-surfaces", coordination)
+        self.assertIn("CHG-20260903-001:based_on-must-appear-once:0", coordination)
+
+    def test_unknown_mode_keeps_full_requirements(self) -> None:
+        """账本与块都没声明模式时按 full 处理，不替未声明模式的项目降门槛。"""
+        blocks = AUDIT.change_blocks(personal_ledger())
+        self.assertIn(
+            "CHG-20260903-001:missing-authority-surfaces",
+            AUDIT.change_coordination_issues(blocks),
+        )
+
+    def test_personal_implementation_still_needs_confirmation(self) -> None:
+        text = personal_ledger(confirmed=False)
+        issues = AUDIT.change_block_semantic_issues(text, root_index=True)
+        self.assertIn(
+            "CHG-20260903-001:implementation-needs-decision-confirmation", issues
+        )
+        self.assertIn("CHG-20260903-001:decision_confirmed_at-must-be-date", issues)
+        draft = AUDIT.change_block_semantic_issues(
+            personal_ledger(status="draft", confirmed=False), root_index=True
+        )
+        self.assertNotIn(
+            "CHG-20260903-001:implementation-needs-decision-confirmation", draft
+        )
+
+    def test_personal_written_optional_fields_are_still_validated(self) -> None:
+        text = personal_ledger().replace(
+            "- scope: src\n",
+            "- scope: src\n- conflicts_with: CHG-20260903-009\n- runtime_state: bogus\n",
+        )
+        coordination = AUDIT.change_coordination_issues(
+            AUDIT.change_blocks(text), ledger_mode="personal"
+        )
+        self.assertIn("CHG-20260903-001:conflicts-need-resolution", coordination)
+        self.assertIn("CHG-20260903-001:invalid-runtime-state:bogus", coordination)
+
+
 if __name__ == "__main__":
     unittest.main()
