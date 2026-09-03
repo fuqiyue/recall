@@ -128,7 +128,8 @@ recall new "添加暗色模式支持" "add-dark-mode"
 | ## 回滚方式 | 如何撤销 | git revert ... |
 
 非生效状态（rejected/cancelled/rolled-back）的记录登记进 `logic_version/index.md`
-即可，不进 `logic_readme.md` 的有效决策索引（validate 会对反向登记告警）。
+即可，不进 `logic_readme.md` 的有效决策索引（validate 会对反向登记告警）。生效记录
+登记 index.md 后，由相关规则行的"决策记录"列链接；宪法索引只滚动保留最近 3 条（RULE-002）。
 
 ### 可选字段
 

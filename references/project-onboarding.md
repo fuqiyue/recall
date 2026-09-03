@@ -74,7 +74,9 @@ INV-001/INV-002 与核心原则 3；合法做法见下"领域划分与拆分"—
 3. 在根 `logic_change.md` 立修宪案（登记表行属宪法内容），把领域行加入宪法范围登记表：
    `| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | paired | ... | ... | self | active |`
 4. 把该职权范围的规则行、代码地图行、测试行迁入新领域文档（拆分时从原领域迁出并收窄其
-   `owned_paths`）；宪法只保留全局规则、INT 层与该领域的目录行（一句话职责即可）
+   `owned_paths`）；宪法只保留全局规则、INT 层与该领域的目录行（一句话职责即可）。迁入时给
+   代码地图补 `contract_class` 列（`public`/`persisted`/`security`/`internal`）：这是 SKILL
+   "路由一问"的靶子，缺列时每次通道判定都要人工判断"有没有外部调用方"
 5. 引用旧锚点（`#scope-...`）的活跃 CHG 改为引用 `MOD-ID`；原领域账本中只涉及迁出路径的
    CHG 随正文迁到新领域账本，公报行同步改 `proposal_path`
 6. 跑 `recall validate` + `python scripts/audit_logic_map.py . --current-state` 确认编号唯一、

@@ -1139,36 +1139,48 @@ def _check_current_policy_table(ctx: _CurrentStateContext) -> None:
             ctx.rule_dates[rule_id.upper()] = last_reviewed
 
 
+CODE_MAP_REQUIRED_HEADERS = [
+    "路径/稳定锚点",
+    "artifact_class/layer",
+    "职责",
+    "输入",
+    "输出",
+    "权威来源",
+    "可直接编辑",
+    "关联测试",
+]
+# 可选列：SKILL 的"路由一问"靶子（触及 public/persisted/security 即中等以上通道）
+CODE_MAP_OPTIONAL_HEADERS = {"contract_class"}
+CONTRACT_CLASS_VALUES = {"public", "persisted", "security", "internal"}
+
+
+def _code_map_row_issues(row: dict, label: str, index: int) -> list[str]:
+    """单行代码地图检查：关键列非空、contract_class 取值合法（根与领域共用）。"""
+    issues: list[str] = []
+    for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
+        value = row.get(column, "").strip()
+        if not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value:
+            issues.append(f"{label}:code-map-row-{index}-missing-{column}")
+    if "contract_class" in row:
+        contract = row.get("contract_class", "").strip().casefold()
+        if contract not in CONTRACT_CLASS_VALUES:
+            issues.append(
+                f"{label}:code-map-row-{index}-invalid-contract-class:{contract or 'empty'}"
+            )
+    return issues
+
+
 def _check_code_map_table(ctx: _CurrentStateContext) -> None:
-    """核查“代码地图”表的列与每行关键列非空。"""
+    """核查“代码地图”表的列与每行关键列非空；`contract_class` 列可选、取值受限。"""
     code_map_headers = markdown_table_headers(ctx.readme_text, "代码地图")
     code_map_rows = markdown_table_rows(ctx.readme_text, "代码地图")
-    expected_code_map_headers = [
-        "路径/稳定锚点",
-        "artifact_class/layer",
-        "职责",
-        "输入",
-        "输出",
-        "权威来源",
-        "可直接编辑",
-        "关联测试",
-    ]
-    if code_map_headers != expected_code_map_headers:
+    required_only = [h for h in code_map_headers if h not in CODE_MAP_OPTIONAL_HEADERS]
+    if required_only != CODE_MAP_REQUIRED_HEADERS:
         ctx.document_issues.append("logic_readme:code-map-invalid-columns")
     if not code_map_rows:
         ctx.document_issues.append("logic_readme:code-map-needs-at-least-one-row")
     for index, row in enumerate(code_map_rows, start=1):
-        for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
-            value = row.get(column, "").strip()
-            if (
-                not value
-                or value.casefold() in _PLACEHOLDER_VALUES
-                or "<" in value
-                or ">" in value
-            ):
-                ctx.document_issues.append(
-                    f"logic_readme:code-map-row-{index}-missing-{column}"
-                )
+        ctx.document_issues.extend(_code_map_row_issues(row, "logic_readme", index))
 
 
 _FieldLookup = Callable[..., list[str]]
@@ -1864,10 +1876,7 @@ def _check_domain_readme(ctx: _CurrentStateContext, scope: str) -> None:
         elif rule_id:
             ctx.rule_dates[rule_id.upper()] = last_reviewed
     for index, row in enumerate(markdown_table_rows(text, "代码地图"), start=1):
-        for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
-            value = row.get(column, "").strip()
-            if not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value:
-                ctx.document_issues.append(f"{label}:code-map-row-{index}-missing-{column}")
+        ctx.document_issues.extend(_code_map_row_issues(row, label, index))
 
 
 def _check_domain_block(

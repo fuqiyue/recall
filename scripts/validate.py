@@ -8,7 +8,7 @@ Recall 一致性验证工具
 import re
 import sys
 from pathlib import Path
-from typing import List, Dict, Tuple
+from typing import List, Dict, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (
@@ -309,16 +309,33 @@ def check_intent_layer(
         )
 
 
+def rule_linked_versions(*readme_texts: str) -> set:
+    """规则定义行（宪法 + 领域）决策记录列里直接链接的 VER-ID 集合。
+
+    RULE-002：宪法有效决策索引只留指针 + 最近几条，生效 VER 的长期落点是
+    相关规则行的决策记录列；这里收集这些反链供登记对账使用。
+    """
+    linked: set = set()
+    for text in readme_texts:
+        for line in (text or '').splitlines():
+            if RULE_DEF_RE.match(line):
+                linked.update(re.findall(r'\bVER-\d{8}-\d{3}\b', line))
+    return linked
+
+
 def check_ver_registrations(
     version_records: List[Path],
     index_path: Path,
     readme_content: str,
     result: 'ValidationResult',
+    domain_readme_contents: Optional[List[str]] = None,
 ) -> None:
-    """三处登记对账：records/ 文件、logic_version/index.md、logic_readme 有效决策索引。
+    """VER 登记对账：records/ 文件 ↔ logic_version/index.md ↔ 现行文档引用。
 
-    一条记录需要在三处登记（RULE-003）；任何一处缺失都会让追溯链对部分
-    工具静默不可见。同时检测 version_id 撞号（并行会话/分支合并的风险）。
+    每条记录必须登记 index.md；生效记录还必须被现行文档引用——出现在宪法
+    有效决策索引，或被宪法/领域任一规则定义行的决策记录列直接链接（RULE-002：
+    宪法索引只留指针 + 最近几条，全量索引在 index.md）。任何一处缺失都会让
+    追溯链对部分工具静默不可见。同时检测 version_id 撞号。
     """
     file_vers: Dict[str, List[str]] = {}
     for record_path in version_records:
@@ -350,13 +367,17 @@ def check_ver_registrations(
     if index_path.exists():
         index_vers = set(VER_ROW_RE.findall(index_path.read_text(encoding='utf-8')))
     readme_vers = set(VER_ROW_RE.findall(readme_content))
+    linked_vers = rule_linked_versions(readme_content, *(domain_readme_contents or []))
 
     for ver_id in sorted(file_vers):
         if index_path.exists() and ver_id not in index_vers:
             result.add_warning(f"{ver_id} 未登记到 logic_version/index.md")
         inactive = record_status.get(ver_id) in INACTIVE_RECORD_STATUSES
-        if ver_id not in readme_vers and not inactive:
-            result.add_warning(f"{ver_id} 未登记到 logic_readme.md 的有效决策索引")
+        if ver_id not in readme_vers and ver_id not in linked_vers and not inactive:
+            result.add_warning(
+                f"{ver_id} 未被现行文档引用：既不在 logic_readme.md 的有效决策索引，"
+                "也没有任何规则行的决策记录列链接它（RULE-002）"
+            )
         if ver_id in readme_vers and inactive:
             result.add_warning(
                 f"{ver_id} 状态为 {record_status.get(ver_id)}，"
@@ -735,9 +756,13 @@ def validate_recall() -> ValidationResult:
         else:
             result.add_warning(f"{record_path.name} 未关联 Git commit")
 
-    # 3b. 三处登记对账与撞号检测
+    # 3b. VER 登记对账与撞号检测（规则行反链含全部已登记领域文档）
     check_ver_registrations(
-        version_records, version_dir / "index.md", readme_content, result
+        version_records,
+        version_dir / "index.md",
+        readme_content,
+        result,
+        [child.read_text(encoding='utf-8') for child in child_readmes],
     )
 
     # 3c. 漂移度量（RULE-015）：文档是代码理解的缓存，量化缓存的"新鲜度"

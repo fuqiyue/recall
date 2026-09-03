@@ -52,15 +52,15 @@
 | rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
 |---|---|---|---|---|---|---|---|---|---|
 | RULE-010 | key | `recall init` 默认启用仓库级 Git 自动同步并安装受管理的 post-commit hook；**自动同步是默认值而不是保证**——仓库未跑过 `recall init`（无 `recall.autoSync` 配置或受管理 hook 缺失，典型是只接入文档未接管道的半接入项目）时推送责任回落到提交方：每批提交必须在同一轮内推送，本地不得长期领先远端，核对入口是 `git status -sb` 首行的 `ahead` 计数 | 让已提交的 Recall 逻辑和代码及时进入配置的远端，减少本地历史与远端漂移；半接入项目会静默退化成「只提交不推送」，而一批提交里只推前几个会把远端停在测试已进、实现未进的中间提交上（2026-09-02 消费项目实例：7 个提交只推 1 个，CI 18 项失败） | [VER-20260811-001](../../logic_version/records/logic_version-20260811-001-git-auto-sync.md) | 用户要求；推送责任子句为 2026-09-02 用户确认（消费项目事故复盘） | git_sync.py + hook 集成测试；推送责任子句由 `recall status` 的"未推送提交"行与 `recall validate` 的非阻断告警核对（`recall_common.unpushed_commit_count`，无上游分支时不提示；tests/test_recall_cli.py `UnpushedHintTests`、tests/test_validate.py `UnpushedCommitTests`） | valid | 2026-09-03 | self |
-| RULE-011 | key | `recall sync` 默认自动保存：脏工作区的**已跟踪变更**自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；**未跟踪新文件默认排除**，仅 `--include-new` 或用户先 `git add` 时纳入，提交前列出文件清单与被排除清单；post-commit hook 场景绝不自动提交其他脏文件 | 自动化不得上传用户未明确要求的文件：非交互环境下事后警告拦不住已推上远端的私人文件，默认必须是"新文件留在本地" | [VER-20260816-005](../../logic_version/records/logic_version-20260816-005-audit-remediation.md) | 用户确认 | git_sync.py 单元测试（默认排除/`--include-new` 双向用例） | valid | 2026-08-16 | self |
+| RULE-011 | key | `recall sync` 默认自动保存：脏工作区的**已跟踪变更**自动提交后同步（`recall.autoCommit`，`--manual` 切换手动）；**未跟踪新文件默认排除**，仅 `--include-new` 或用户先 `git add` 时纳入，提交前列出文件清单与被排除清单；post-commit hook 场景绝不自动提交其他脏文件 | 自动化不得上传用户未明确要求的文件：非交互环境下事后警告拦不住已推上远端的私人文件，默认必须是"新文件留在本地" | [VER-20260811-003](../../logic_version/records/logic_version-20260811-003-auto-save-sync.md)；[VER-20260816-005](../../logic_version/records/logic_version-20260816-005-audit-remediation.md) | 用户确认 | git_sync.py 单元测试（默认排除/`--include-new` 双向用例） | valid | 2026-08-16 | self |
 | RULE-013 | key | 提交后自动回填决策记录的 after_commit，双通道定位记录：commit message 的 Ref 行 + 本次提交内规范命名的记录文件；识别新旧两种占位符（`- after_commit:`/`- commit:`）且只按整个字段行匹配（叙述文字中引用的占位符不回填）；无法回填时打印警告而非静默跳过；内部提交通过环境变量防止 hook 递归；**占位符必须是模板原文 `- after_commit: _待填写_`**，留空的字段行不被识别（2026-09-03 实例：手工补填） | 只认 Ref 行时自动保存提交（无 Ref）永不触发回填；裸子串替换曾把记录叙述文字里引用的占位符改成哈希，污染不可变记录正文 | [VER-20260816-002](../../logic_version/records/logic_version-20260816-002-traceability-repair.md) | 复现验证 | tests/test_git_sync.py（含端到端与字段行锚定）；`git_sync.AFTER_COMMIT_PLACEHOLDER` | valid | 2026-09-04 | self |
 
 ## 代码地图
 
-| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
-|---|---|---|---|---|---|---|---|
-| scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交、自动同步默认开启（RULE-010） | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
-| scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、自动保存提交（RULE-011）、回填 after_commit（RULE-013）、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
+| 路径/稳定锚点 | artifact_class/layer | contract_class | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|---|
+| scripts/init_recall.py | source/runtime-code | public | 首次初始化：Git 仓库、身份、.gitignore、首次提交、自动同步默认开启（RULE-010） | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
+| scripts/git_sync.py | source/runtime-code | public | 配置 Git 自动同步策略、安装受管理 hook、自动保存提交（RULE-011）、回填 after_commit（RULE-013）、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
 
 ## 安全与运维
 

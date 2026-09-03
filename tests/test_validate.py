@@ -101,6 +101,46 @@ class RejectedRecordRegistrationTests(unittest.TestCase):
             result.warnings,
         )
 
+    def test_rule_row_link_counts_as_registration(self) -> None:
+        """RULE-002：宪法索引只留最近几条，规则行"决策记录"列的链接是长期落点。"""
+        readme = (
+            "## 当前制度\n\n| rule_id | 规则等级 | 规则 | why | 决策记录 |\n|---|---|---|---|---|\n"
+            "| RULE-001 | key | 逻辑回档 | 省 token | "
+            "[VER-20260816-101](logic_version/records/logic_version-20260816-101-win.md) |\n\n"
+            "## 有效决策索引\n\n完整索引见 index.md。\n"
+        )
+        result = self._run(readme)
+        self.assertFalse(
+            [msg for msg in result.warnings if "VER-20260816-101" in msg],
+            result.warnings,
+        )
+
+    def test_rule_row_link_in_domain_readme_counts(self) -> None:
+        result = VALIDATE.ValidationResult()
+        with tempfile.TemporaryDirectory() as temporary:
+            records_dir = Path(temporary)
+            records = [
+                write_record(records_dir, "logic_version-20260816-101-win.md", "effective")
+            ]
+            index_path = records_dir / "index.md"
+            index_path.write_text("| VER-20260816-101 | win |\n", encoding="utf-8")
+            domain_text = (
+                "| RULE-010 | key | 自动同步 | why | "
+                "[VER-20260816-101](../../logic_version/records/logic_version-20260816-101-win.md) |\n"
+            )
+            VALIDATE.check_ver_registrations(
+                records, index_path, "", result, [domain_text]
+            )
+        self.assertFalse(result.warnings, result.warnings)
+
+    def test_mention_outside_rule_row_does_not_count(self) -> None:
+        """正文里顺带提到 VER 不算引用：只有规则定义行的链接才是落点。"""
+        result = self._run("背景：参见 VER-20260816-101 的讨论。\n")
+        self.assertTrue(
+            [msg for msg in result.warnings if "VER-20260816-101" in msg],
+            result.warnings,
+        )
+
 
 class ChildReadmeCoverageTests(unittest.TestCase):
     """RULE-018：已登记子文档纳入编号空间与一致性检查。"""

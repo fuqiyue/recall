@@ -88,6 +88,44 @@ class CreateVerTests(unittest.TestCase):
         self.assertEqual(recall.cmd_new(["只有一个参数"]), 1)
 
 
+class StatusRuleCountTests(unittest.TestCase):
+    """RULE-021 ③：status 的规则数按定义行统计宪法 + 全部领域，与 validate 同口径。
+
+    旧实现在根文档正则数 RULE 引用：指针行"见 RULE-010/011/013"也被算进去，
+    报出的数既不是宪法的也不是全项目的（2026-09-04：status 21 vs validate 23）。
+    """
+
+    def test_counts_definition_rows_across_constitution_and_domains(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "logic_readme.md").write_text(
+                "## 当前制度\n\n| rule_id | 规则等级 | 规则 |\n|---|---|---|\n"
+                "| RULE-001 | key | 逻辑回档 |\n| RULE-002 | key | 只留最新 |\n\n"
+                "领域规则：RULE-010/011 见领域文档；正文提到 RULE-099 不算定义\n",
+                encoding="utf-8",
+            )
+            domain = root / "logic_domains" / "sync"
+            domain.mkdir(parents=True)
+            (domain / "logic_readme.md").write_text(
+                "| RULE-010 | key | 自动同步 |\n| RULE-011 | key | 自动保存 |\n"
+                "| RULE-001 | key | 与宪法撞号也只算一次 |\n",
+                encoding="utf-8",
+            )
+            found = recall.count_rule_definitions(
+                root / "logic_readme.md", [domain / "logic_readme.md", root / "missing.md"]
+            )
+        self.assertEqual(found, {"RULE-001", "RULE-002", "RULE-010", "RULE-011"})
+
+    def test_matches_validate_count_in_this_repo(self):
+        readme = ROOT / "logic_readme.md"
+        domains = [d.readme for d in recall.registered_domains(ROOT)]
+        cli_count = len(recall.count_rule_definitions(readme, domains))
+        validate_ids = {rid for rid, _ in validate.extract_rule_definitions(readme)}
+        for domain_readme in domains:
+            validate_ids |= {rid for rid, _ in validate.extract_rule_definitions(domain_readme)}
+        self.assertEqual(cli_count, len(validate_ids))
+
+
 class StatusRecordDiscoveryTests(unittest.TestCase):
     def test_find_version_records_matches_canonical_names_only(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -484,6 +522,30 @@ class RouteDocsTests(unittest.TestCase):
         self.assertEqual(both["matched_domains"], ["logic_domains/billing", "logic_domains/sync"])
         self.assertEqual(len(both["reading_order"]), 6)
 
+    def test_keyword_ignores_boundary_lines_and_table_headers(self):
+        """"不负责"行列的是别人的职权，表头是每份文档都一样的列名——都不算命中。
+
+        2026-09-04：`route 审计` 把 git-pipeline 也拉进清单，一次因"不负责：审计/校验"，
+        一次因表头"why（仅一句可审计摘要）"；两域全读，按需导入的收益归零。
+        """
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            sync_readme = root / "logic_domains" / "sync" / "logic_readme.md"
+            sync_readme.write_text(
+                sync_readme.read_text(encoding="utf-8")
+                + "\n## 目标与边界\n\n- 负责：推送\n- 不负责：发票编号（MOD-BILLING）\n\n"
+                "## 当前制度\n\n| rule_id | why（仅一句可审计摘要） |\n|---|---|\n"
+                "| RULE-SYNC-001 | 提交后自动推送 |\n",
+                encoding="utf-8",
+            )
+            by_boundary = route_docs.build_plan(root, ["发票编号"])
+            by_header = route_docs.build_plan(root, ["审计摘要"])
+            real_hit = route_docs.build_plan(root, ["自动推送"])
+        self.assertEqual(by_boundary["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(by_header["matched_domains"], [])
+        self.assertEqual(real_hit["matched_domains"], ["logic_domains/sync"])
+
     # 按用户意图路由（宪法意图层 → 领域）
 
     def _write_intent_project(self, root: Path) -> None:
@@ -650,6 +712,34 @@ class CliGlueSmokeTests(unittest.TestCase):
         self.assertEqual(code, 0, out)
         self.assertIn("Recall 读取清单", out)
         self.assertNotIn("Traceback", out)
+
+    def test_audit_forwards_to_static_gate_with_default_profile(self):
+        # INT-20260816-008 / UXI-002：一条命令可达审计器；默认 --current-state
+        code, out = self._run("audit", cwd=ROOT / "scripts")
+        self.assertIn(code, (0, 1), out)
+        self.assertIn("Static gate:", out)
+        self.assertIn("profile: current-state", out)
+        self.assertNotIn("Traceback", out)
+
+    def test_audit_passes_profile_flags_through(self):
+        import json
+
+        code, out = self._run("audit", "--json")
+        self.assertIn(code, (0, 1), out)
+        payload = json.loads(out[out.index("{"):])
+        self.assertIn("current_integrity", payload)
+
+    def test_status_rule_count_matches_validate_and_conflicts(self):
+        """RULE-021 ③：三条命令对"规则数"只有一个答案。"""
+        import re as _re
+
+        _, status_out = self._run("status")
+        _, validate_out = self._run("validate")
+        _, conflicts_out = self._run("conflicts")
+        status_n = int(_re.search(r"现行规则: (\d+) 个", status_out).group(1))
+        validate_n = int(_re.search(r"找到 (\d+) 条规则定义", validate_out).group(1))
+        conflicts_n = int(_re.search(r"读取到 (\d+) 条规则", conflicts_out).group(1))
+        self.assertEqual((status_n, validate_n, conflicts_n), (status_n, status_n, status_n))
 
     def test_conflicts_resolves_project_root_from_subdirectory(self):
         # 0 = 无冲突，2 = 检出潜在冲突；1 才是胶水层失败（找不到 logic_readme.md）

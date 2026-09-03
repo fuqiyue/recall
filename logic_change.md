@@ -13,7 +13,7 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - last_updated: 2026-09-04
-- active_changes: none
+- active_changes: 1
 
 ## 议案规则
 
@@ -31,7 +31,44 @@
 
 ## 活跃议案索引
 
-当前无活跃修改议案。
+| change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
+|---|---|---|---|---|---|---|---|
+| CHG-20260904-004 | draft | . | self | Density 硬上限越线与无领域是否让静态门失败 | none | [CHG-20260904-004](logic_change.md#chg-20260904-004) | 2026-09-04 |
+| CHG-20260904-003 | draft | logic_domains/toolchain | self | validate 兼容消费项目的 slug 型 CHG-ID 与扩展 VER 模板 | none | [CHG-20260904-003](logic_domains/toolchain/logic_change.md#chg-20260904-003) | 2026-09-04 |
+
+<a id="chg-20260904-004"></a>
+## CHG-20260904-004: Density 硬上限越线与无领域是否让静态门失败
+
+### 元数据
+
+- status: draft
+- effective: false
+- recall_route: medium
+- proposal_revision: 1
+- decision_confirmed_by: none
+- decision_confirmed_at: none
+- owner: self
+- changed_by: Claude (AI 代理)
+- created: 2026-09-04
+- last_status_change: 2026-09-04
+- scope: .
+- affected_scopes: ., logic_domains/toolchain
+- authority_surfaces: RULE-022
+- based_on: policy: logic_readme.md#RULE-022（Density advisory）; code: commit:c3bdff7; surfaces: RULE-022
+- conflicts_with: none
+- temp_path: none（draft；进入 implementing 前按 RULE-020 建立）
+
+### 目标、理由与当前证据
+
+- raw_request: 2026-09-03 eduai 只读复跑：logic_change 越过硬上限 21 倍静态门仍 PASS；无领域项目只收 `constitution-without-domains` 提示。2026-09-04 用户认可"待立案事项立成 draft CHG"（此前只在两处"当前限制"里写着"待立案"）
+- decomposition: ① Density `exceeds-hard-limit` 是否进 current-state 门（宪法 250 / 领域 400 / 账本 300 / CHG 80）；② `constitution-without-domains` 是否进门（RULE-018 至少一个领域）；③ 若进门，消费项目一次性迁移窗口与 `--advisory-only` 逃生口；④ 用例：越线夹具 FAIL、advisory 开关 PASS
+- fit_analysis: 扩展 INT-20260816-008（审计门）与 INT-20260816-011（拆分触发）；FLOW-005#4 从"AI 建议"升级为"门禁提示"；不新增 UXI；RULE-022 ③ 文本更新，可能波及 RULE-018 ④
+- 当前证据：本仓库宪法 238/250、领域 87/400 与 112/400、账本均未越线；eduai 是唯一已知越线消费者
+
+### 方案与决策
+
+- 待用户裁决：A 硬上限进门 + 逃生开关；B 保持 advisory、只在 `recall status` 高亮；C 仅"无领域"进门、Density 不进
+- 回滚：git revert；晋升目标：RULE-022 ③（及 RULE-018 ④）文本 + VER 精简记录
 
 ---
 

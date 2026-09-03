@@ -1336,6 +1336,44 @@ class RootOnlyAuditTests(unittest.TestCase):
         )
         self.assertTrue(self.fails(report))
 
+    def _with_contract_class(self, readme_path: Path, value: str) -> None:
+        text = readme_path.read_text(encoding="utf-8")
+        header = "| 路径/稳定锚点 | artifact_class/layer | 职责 |"
+        row = "| src/app.py | source/runtime-code | "
+        self.assertIn(header, text)
+        self.assertIn(row, text)
+        text = text.replace(
+            header, "| 路径/稳定锚点 | artifact_class/layer | contract_class | 职责 |"
+        ).replace(
+            "|---|---|---|---|---|---|---|---|\n| src/app.py",
+            "|---|---|---|---|---|---|---|---|---|\n| src/app.py",
+        ).replace(row, f"| src/app.py | source/runtime-code | {value} | ")
+        readme_path.write_text(text, encoding="utf-8")
+
+    def test_code_map_accepts_optional_contract_class_column(self) -> None:
+        """SKILL"路由一问"的靶子列：写了就校验取值，不写不报（旧文档兼容）。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            self._with_contract_class(root / "src" / "logic_readme.md", "public")
+            report = self.collect(root)
+        issues = report["current_integrity"]["document_issues"]
+        self.assertFalse(
+            [issue for issue in issues if "code-map" in issue], issues
+        )
+
+    def test_code_map_rejects_unknown_contract_class_value(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            self._with_contract_class(root / "src" / "logic_readme.md", "bogus")
+            report = self.collect(root)
+        self.assertIn(
+            "src/logic_readme:code-map-row-1-invalid-contract-class:bogus",
+            report["current_integrity"]["document_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
     def test_constitution_without_domains_notice_tracks_registration(self) -> None:
         """RULE-018：宪法未分层时提示；登记一个领域后提示消失。"""
         with tempfile.TemporaryDirectory() as temporary:

@@ -62,8 +62,8 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。先读�
 审查的对象是此刻的系统，而不是过去每一次修改是否按模板完成。历史格式、旧审批字段和过往记录缺失不构成当前状态审查失败。
 
 ```bash
-python scripts/audit_logic_map.py <project-root> --current-state   # 当前状态静态门（轻量）
-python scripts/audit_logic_map.py <project-root> --formal-review   # 正式审查（完整字段 + 测试矩阵）
+recall audit                      # 当前状态静态门（轻量，= python scripts/audit_logic_map.py <root> --current-state）
+recall audit --formal-review      # 正式审查（完整字段 + 测试矩阵）；其余审计器参数原样透传，如 --json
 recall route <路径|关键词>   # 本次应读的文档清单（宪法 + 命中领域）与估算 token；--json 供代理解析
 recall validate   # 宪法与领域编号空间、跨账本 CHG 与公报、VER 一致性、漂移度量、未跟踪残留与未推送告警
 recall status     # 领域数、各账本议案计数、记录计数，分列未提交、未跟踪（待处置）、未推送

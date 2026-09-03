@@ -53,6 +53,7 @@
 | VER-20260903-003 | logic_version-20260903-003-structural-closure | 2026-09-03 | effective | ., references/, scripts/, tests/ | RULE-008, RULE-021, RULE-022, RULE-023 | 1 | 结构性收口：Git 调用与 porcelain 解析单源 + 测试级静态门、审计器大函数按检查拆分（JSON 基线逐字节不变）、CHG 字段按治理模式分档（缺则不查、写则照查）、审计 `--json` UTF-8、根文档 331→287 行；否决"只做代码三项、分档另立案" | [logic_version-20260903-003-structural-closure.md](records/logic_version-20260903-003-structural-closure.md) |
 | VER-20260903-004 | logic_version-20260903-004-two-level-docs | 2026-09-04 | effective | ., logic_domains/, scripts/, references/, tests/ | RULE-015, RULE-018, RULE-021 | 1 | 一二级拆分法：宪法（根）+ 部门法（logic_domains 领域 readme/change 成对）、根账本公报、recall route 按需导入、密度分档；本仓库拆为 2 个领域 | [logic_version-20260903-004-two-level-docs.md](records/logic_version-20260903-004-two-level-docs.md) |
 | VER-20260904-001 | logic_version-20260904-001-intent-provenance-conflicts | 2026-09-04 | effective | ., logic_domains/toolchain, references/ | RULE-014, RULE-015, RULE-018, RULE-023 | 1 | 一法多议案跨账本冲突与旧议案基线失效检查、意图层来源列（用户表述即宪法）、按意图路由 | [logic_version-20260904-001-intent-provenance-conflicts.md](records/logic_version-20260904-001-intent-provenance-conflicts.md) |
+| VER-20260904-002 | logic_version-20260904-002-docs-consolidation | 2026-09-04 | effective | ., logic_domains/toolchain, logic_domains/git-pipeline, references/, scripts/, tests/ | RULE-002, RULE-015, RULE-018, RULE-021, RULE-022 | 1 | 文档优化：宪法有效决策索引收缩为指针 + 最近 3 条（生效 VER 由规则行反链、validate 核查）、代码地图 contract_class 列、规则行子条款化、status 规则计数同源、route 跳过边界行与表头、recall audit 子命令、待立案事项立为 draft CHG | [logic_version-20260904-002-docs-consolidation.md](records/logic_version-20260904-002-docs-consolidation.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 
@@ -68,20 +69,11 @@
 
 ## 记录创建规则
 
-### 简单修复
-- ❌ 不创建记录（局部、隔离、无公共契约影响）
-
-### 中等变更
-- ⚠️ 可选创建精简记录（规则变化或用户可见行为变更）
-
-### 高风险变更
-- ✅ 必须创建完整记录（跨模块、API、数据迁移、兼容性、架构决策）
-
----
+哪条通道要不要建记录见 SKILL.md"三条变更通道"表（RULE-004，此处不重述）。
 
 **新增记录步骤**：
 
 1. 在 `records/` 目录创建 `logic_version-YYYYMMDD-NNN-<scope>.md`
-2. 在上方"不可变决策记录"表中添加索引行（`rejected`/`cancelled`/`rolled-back` 记录只登记到这里，不进有效决策索引）
-3. 在 `logic_readme.md` 的"有效决策索引"中登记生效记录，并让相关 key 规则链接该记录
+2. 在上方"不可变决策记录"表中添加索引行（`rejected`/`cancelled`/`rolled-back` 记录只登记到这里，不进宪法有效决策索引）
+3. 让相关规则行的"决策记录"列链接该记录；宪法"有效决策索引"只滚动保留最近 3 条（RULE-002），`recall validate` 对既未被规则行链接、也不在宪法索引的生效记录告警
 4. 把 CHG 的需求拆解三字段搬入记录后再删除 CHG 条目（语义见 RULE-014，步骤见 references/change-lifecycle.md §7）

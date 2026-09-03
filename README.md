@@ -21,6 +21,7 @@ recall status        # 查看系统状态
 recall new "描述" tag  # 创建决策记录
 recall sync          # 自动保存并同步（未跟踪新文件默认排除，--include-new 纳入）
 recall validate      # 验证一致性
+recall audit         # 文档审计静态门（默认 --current-state）
 recall route <路径或关键词>  # 打印本任务应读的领域文档（按需导入）
 recall query file <路径>  # 查询文件的决策历史
 recall help          # 完整帮助

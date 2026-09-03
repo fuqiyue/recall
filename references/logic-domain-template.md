@@ -76,9 +76,11 @@ RULE 编号与宪法及其他领域共用同一编号空间，不得重复；只
 
 ## 代码地图
 
-| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
-|---|---|---|---|---|---|---|---|
-| path/in/owned_paths / symbol | source/runtime-code | ... | ... | ... | ... | yes/no | ... |
+| 路径/稳定锚点 | artifact_class/layer | contract_class | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|---|
+| path/in/owned_paths / symbol | source/runtime-code | public / persisted / security / internal | ... | ... | ... | ... | yes/no | ... |
+
+`contract_class` 取值与用途见[logic_readme 模板](logic-readme-template.md)代码地图节。
 
 ## 测试与验证
 

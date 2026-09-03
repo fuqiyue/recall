@@ -61,13 +61,44 @@ def _path_matches(target: str, owned: str) -> bool:
     return fnmatchcase(target_n, owned_n) or fnmatchcase(target_n, owned_n + "/*")
 
 
+_BOUNDARY_EXCLUSION_PREFIXES = ("- 不负责", "- 不负责：", "- 不负责:")
+_TABLE_SEPARATOR_RE = re.compile(r"^\|\s*:?-{3,}")
+
+
+def _keyword_searchable_text(domain: LogicDomain) -> str:
+    """领域 readme 中参与关键词匹配的正文。
+
+    跳过两类"看起来像内容、其实是 schema 或别人职权"的行，否则关键词会把
+    不相关的领域拉进读取清单、抵消按需导入的收益（2026-09-04 实例：
+    `route 审计` 命中 git-pipeline——一次是"不负责：审计/校验"，一次是表头
+    "why（仅一句可审计摘要）"）：
+    - "目标与边界"里的"不负责"行：列出的是**别的**领域的职权；
+    - Markdown 表头行（其下一行是 `|---|` 分隔符）：每份文档都一样的列名。
+    """
+    if not domain.readme.exists():
+        return ""
+    lines = domain.readme.read_text(encoding="utf-8", errors="replace").splitlines()
+    kept = []
+    for index, line in enumerate(lines):
+        stripped = line.strip()
+        if stripped.startswith(_BOUNDARY_EXCLUSION_PREFIXES):
+            continue
+        is_header = (
+            stripped.startswith("|")
+            and index + 1 < len(lines)
+            and _TABLE_SEPARATOR_RE.match(lines[index + 1].strip())
+        )
+        if is_header or _TABLE_SEPARATOR_RE.match(stripped):
+            continue
+        kept.append(line)
+    return "\n".join(kept).casefold()
+
+
 def _keyword_matches(keyword: str, domain: LogicDomain) -> bool:
     needle = keyword.casefold()
     if needle in domain.module_id.casefold() or needle in domain.scope_path.casefold():
         return True
-    if domain.readme.exists():
-        return needle in domain.readme.read_text(encoding="utf-8", errors="replace").casefold()
-    return False
+    return needle in _keyword_searchable_text(domain)
 
 
 def _looks_like_path(root: Path, target: str) -> bool:

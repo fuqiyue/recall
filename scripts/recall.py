@@ -26,6 +26,26 @@ from recall_common import (  # noqa: E402  RULE-021：根查找/Git 调用/编�
 
 # 决策记录文件名，与 validate.py / link_ver_git.py / create_ver.py 一致（RULE-009）
 RECORD_NAME_RE = re.compile(r'^logic_version-\d{8}-\d{3}-.+\.md$', re.IGNORECASE)
+# 规则定义行：当前制度表格里以 RULE-ID 开头的行；与 validate.RULE_DEF_RE 同一口径
+RULE_DEF_RE = re.compile(r'^\|\s*(RULE-\d{3})\s*\|')
+
+
+def count_rule_definitions(readme_path, domain_readmes=()):
+    """按定义行统计规则编号：宪法 + 全部已登记领域（RULE-018 编号空间全项目唯一）。
+
+    只认"当前制度"表格里以 RULE-ID 开头的行，正文、指针行与意图层的引用不算。
+    返回去重后的 RULE-ID 集合。
+    """
+    found = set()
+    for path in [readme_path, *domain_readmes]:
+        if path is None or not Path(path).exists():
+            continue
+        text = Path(path).read_text(encoding='utf-8', errors='replace')
+        for line in text.splitlines():
+            match = RULE_DEF_RE.match(line)
+            if match:
+                found.add(match.group(1))
+    return found
 
 
 def find_version_records(records_dir):
@@ -96,6 +116,11 @@ def print_help():
     检测规则间的潜在冲突
     分析 RULE-* 和 CHG-* 是否存在逻辑矛盾（宪法 + 全部领域）
     示例: recall conflicts
+
+  audit [审计器参数 ...]
+    运行文档审计静态门（默认 --current-state；可传 --formal-review / --json 等）
+    示例: recall audit
+    示例: recall audit --json
 
   route [路径或关键词 ...] [--json]
     按需导入：列出本次任务应读的文档（宪法必读 + 命中领域的 readme/change）
@@ -271,18 +296,17 @@ def cmd_status():
         print("=" * 60 + "\n")
 
         # 检查 logic_readme.md
+        # 一二级拆分法（RULE-018）：宪法 + 已登记领域（部门法）
         readme_path = root / "logic_readme.md"
+        domains = registered_domains(root)
         if readme_path.exists():
-            with open(readme_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                rules = re.findall(r'\bRULE-\d{3}\b', content)
-                unique_rules = set(rules)
-                print(f"📋 现行规则: {len(unique_rules)} 个 RULE-ID")
+            # RULE-021：规则数按"当前制度"定义行统计宪法 + 全部领域，与 validate /
+            # conflicts 同一口径；正文/指针行里的 RULE 引用不算（旧实现只在根文档
+            # 数引用，报出的数既不是宪法的也不是全项目的）
+            unique_rules = count_rule_definitions(readme_path, [d.readme for d in domains])
+            print(f"📋 现行规则: {len(unique_rules)} 个 RULE-ID（宪法 + {len(domains)} 份领域文档）")
         else:
             print("📋 现行规则: ⚠️  logic_readme.md 不存在")
-
-        # 一二级拆分法（RULE-018）：宪法 + 已登记领域（部门法）
-        domains = registered_domains(root)
         if readme_path.exists():
             if domains:
                 print(f"🏛️  领域（部门法）: {len(domains)} 个 —— " + ", ".join(d.module_id for d in domains))
@@ -370,6 +394,32 @@ def cmd_route(args):
         return 1
 
 
+AUDIT_PROFILE_FLAGS = ("--current-state", "--formal-review", "--strict", "--strict-v2")
+
+
+def cmd_audit(args):
+    """转发到审计器（UXI-002 一条命令一个目标；INT-20260816-008 的 audit 入口）。
+
+    默认 `--current-state`（轻量静态门）；用户给了任一 profile 标志时不再追加。
+    项目根由公共根查找解析，其余参数原样透传给 audit_logic_map。
+    """
+    try:
+        import audit_logic_map
+    except ImportError:
+        print("❌ 错误: 找不到 audit_logic_map.py（须与 scripts/recall_audit/ 整目录部署）")
+        return 1
+    root = find_project_root()
+    forwarded = list(args)
+    if not any(flag in forwarded for flag in AUDIT_PROFILE_FLAGS):
+        forwarded.append("--current-state")
+    saved_argv = sys.argv
+    try:
+        sys.argv = ["audit_logic_map.py", str(root), *forwarded]
+        return audit_logic_map.main()
+    finally:
+        sys.argv = saved_argv
+
+
 def cmd_conflicts():
     """检测规则冲突"""
     try:
@@ -403,6 +453,7 @@ def main():
         'validate': lambda: cmd_validate(),
         'status': lambda: cmd_status(),
         'conflicts': lambda: cmd_conflicts(),
+        'audit': lambda: cmd_audit(args),
         'route': lambda: cmd_route(args),
         'help': lambda: print_help() or 0,
         '--help': lambda: print_help() or 0,

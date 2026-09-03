@@ -66,11 +66,11 @@
 
 ## 代码地图
 
-| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
-|---|---|---|---|---|---|---|---|
-| path/to/file / symbol-or-route | source/runtime-code | ... | ... | ... | ... | yes/no | ... |
+| 路径/稳定锚点 | artifact_class/layer | contract_class | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|---|
+| path/to/file / symbol-or-route | source/runtime-code | public / persisted / security / internal | ... | ... | ... | ... | yes/no | ... |
 
-避免依赖易漂移的行号。生成物、依赖、历史档案和临时目录不作为制度真源，但必须登记其生成来源、消费者和重建/清理方式。
+`contract_class` 是 SKILL"路由一问"的靶子：`public`（外部调用方/用户可见）、`persisted`（持久化数据与迁移）、`security`（权限与信任边界）触及即至少中等通道，`internal` 可走简单修复。列可省略（审计器只在写了时校验取值），但省略后每次都要靠人判断"是否有外部调用方"。避免依赖易漂移的行号。生成物、依赖、历史档案和临时目录不作为制度真源，但必须登记其生成来源、消费者和重建/清理方式。
 
 - coverage_policy: governed-boundaries | registry-every-folder
 - membership_policy: root-registry-first
@@ -211,10 +211,13 @@
 
 ## 有效决策索引
 
-| decision_ref | 类型 | 状态 | 关联规则/范围 | 摘要 | last_verified |
-|---|---|---|---|---|---|
-| [VER-...](logic_version/records/logic_version-...md) | VER | effective | RULE-... / ... | ... | YYYY-MM-DD |
-| [ADR-...](logic_version/decisions/ADR-...md) | ADR | active/transitional | RULE-... / ... | ... | YYYY-MM-DD |
+完整索引见 [logic_version/index.md](logic_version/index.md)；本节只留最近 3 条（RULE-002），每条生效 VER 由相关规则行的"决策记录"列直接链接，`recall validate` 核查未被引用的生效记录。
+
+| version_id | 决策摘要 | 关联规则 | 记录 |
+|---|---|---|---|
+| VER-... | ... | RULE-... | [记录](logic_version/records/logic_version-...md) |
+
+ADR（如有）登记在 `logic_version/index.md` 的"决策记录"表，由规则行直接链接，不在此重复。
 
 ## 活跃议案入口
 
