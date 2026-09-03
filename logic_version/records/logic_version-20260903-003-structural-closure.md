@@ -8,7 +8,7 @@
 - date: 2026-09-03
 - change_id: CHG-20260903-003
 - before_commit: 4fb6beb
-- after_commit:
+- after_commit: 9cdb80a
 
 ## 为什么做这个决策？
 
