@@ -1080,11 +1080,28 @@ def find_parallel_current_candidates(root: Path, excludes: set[str]) -> list[str
     return sorted(set(candidates))
 
 
-def registered_child_readme_paths(root: Path) -> set[str]:
-    """Casefolded relative paths of child readmes registered as readme-only.
+def registered_domain_scopes(root: Path) -> list[str]:
+    """根范围登记表中 in-system + paired 的非根 scope_path（二级领域文档，RULE-018）。"""
+    text, error = read_text(root / "logic_readme.md")
+    if error:
+        return []
+    scopes: list[str] = []
+    for row in markdown_table_rows(text, "范围登记表"):
+        policy = (row.get("doc_policy") or "").strip().strip("`").lower()
+        membership = (row.get("membership") or "").strip().strip("`").lower()
+        scope_norm = normalize_scope_path((row.get("scope_path") or "").strip().strip("`"))
+        if policy == "paired" and membership == "in-system" and scope_norm not in {"", "."}:
+            scopes.append(scope_norm)
+    return scopes
 
-    只有根范围登记表中 in-system + readme-only 的行才使子文档
-    `<scope_path>/logic_readme.md` 合法（RULE-018）；logic_change 永不豁免。
+
+def registered_child_document_paths(root: Path) -> set[str]:
+    """Casefolded relative paths of registered level-2 current documents.
+
+    RULE-018 一二级拆分法：根范围登记表中 in-system + paired 的非根行使
+    `<scope_path>/logic_readme.md` 与 `<scope_path>/logic_change.md`（部门法及其
+    议案账本）合法；旧式 readme-only 行只使 readme 合法。未登记的同名文件仍是
+    平行真源（INV-001/INV-002）。
     """
     text, error = read_text(root / "logic_readme.md")
     if error:
@@ -1094,12 +1111,19 @@ def registered_child_readme_paths(root: Path) -> set[str]:
         policy = (row.get("doc_policy") or "").strip().strip("`").lower()
         membership = (row.get("membership") or "").strip().strip("`").lower()
         scope_raw = (row.get("scope_path") or "").strip().strip("`")
-        if policy != "readme-only" or membership != "in-system":
+        if membership != "in-system" or policy not in {"readme-only", "paired"}:
             continue
         scope_norm = normalize_scope_path(scope_raw)
-        if scope_norm and scope_norm != ".":
-            allowed.add(f"{scope_norm}/logic_readme.md".casefold())
+        if not scope_norm or scope_norm == ".":
+            continue
+        allowed.add(f"{scope_norm}/logic_readme.md".casefold())
+        if policy == "paired":
+            allowed.add(f"{scope_norm}/logic_change.md".casefold())
     return allowed
+
+
+# 兼容旧名：VER-20260903-004 之前只豁免 readme-only 子文档
+registered_child_readme_paths = registered_child_document_paths
 
 
 def audit_root_doc_coverage(root: Path) -> dict:
@@ -1178,10 +1202,8 @@ def find_nonroot_current_documents(
         for name in file_names:
             if name.casefold() in {"logic_readme.md", "logic_change.md"}:
                 relative = (current / name).relative_to(root).as_posix()
-                if (
-                    name.casefold() == "logic_readme.md"
-                    and relative.casefold() in allowed
-                ):
+                # RULE-018：已登记领域的 readme + change 成对合法；未登记即平行真源
+                if relative.casefold() in allowed:
                     continue
                 candidates.append(relative)
     return sorted(set(candidates))
@@ -1348,95 +1370,90 @@ def audit_agent_entrypoints(root: Path) -> tuple[list[dict], list[str], list[str
     )
 
 
+def _count_lines(path: Path) -> int | None:
+    text, error = read_text(path)
+    if error:
+        return None
+    return text.count("\n") + 1
+
+
+def _density_check(
+    label: str, lines: int | None, target: int, limit: int, issues: list[str], notices: list[str], hint: str = ""
+) -> None:
+    if lines is None:
+        return
+    if lines > limit:
+        issues.append(f"{label}:exceeds-hard-limit:{lines}>{limit}")
+    elif lines > target:
+        notices.append(f"{label}:over-target:{lines}>{target} (hard limit {limit}; {hint or 'compress or archive before it bites'})")
+
+
 def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
-    """Check document density and bloat.
+    """行数密度检查（advisory，不影响静态门）。
 
-    ``issues`` 记录越过硬上限的文件；``notices`` 记录越过目标值但未到硬上限的
-    文件（VER-20260903-002：目标 250/130/150 此前只写在文档里、无机器提示，
-    根文档 323 行时没有任何信号）。两者都只是 advisory，不影响静态门。
+    RULE-018 一二级拆分法（VER-20260903-004）：每份现行文档按层级取不同阈值——
+    根 logic_readme 是宪法、每个任务必读，目标 150 / 硬上限 250；领域 readme
+    （部门法）250 / 400，越过目标提示"大部门拆小部门"；根与领域 logic_change
+    150 / 300；单条 CHG 40 / 80。全项目没有任何领域时提示宪法未分层。
+    阈值同步在 references/field-vocabulary.md。
     """
-    issues = []
-    notices = []
+    issues: list[str] = []
+    notices: list[str] = []
 
-    # Hard limits and soft targets from references/field-vocabulary.md
-    LIMITS = {
-        "SKILL.md": 200,
-        "logic_readme.md": 400,
-        "logic_change.md": 300,
-    }
-    TARGETS = {
-        "SKILL.md": 130,
-        "logic_readme.md": 250,
-        "logic_change.md": 150,
-    }
+    _density_check("SKILL.md", _count_lines(root / "SKILL.md") if (root / "SKILL.md").exists() else None, 130, 200, issues, notices)
+    _density_check(
+        "logic_readme.md", _count_lines(root / "logic_readme.md"), 150, 250, issues, notices,
+        hint="constitution is read on every task: move domain-specific rules into logic_domains/<domain>/",
+    )
+    _density_check("logic_change.md", _count_lines(root / "logic_change.md") if (root / "logic_change.md").exists() else None, 150, 300, issues, notices)
 
-    for filename, limit in LIMITS.items():
-        path = root / filename
-        if path.exists():
-            text, error = read_text(path)
-            if not error:
-                lines = text.count('\n') + 1
-                if lines > limit:
-                    issues.append(f"{filename}:exceeds-hard-limit:{lines}>{limit}")
-                elif lines > TARGETS.get(filename, limit):
-                    notices.append(
-                        f"{filename}:over-target:{lines}>{TARGETS[filename]}"
-                        f" (hard limit {limit}; compress or archive before it bites)"
-                    )
+    domain_scopes = registered_domain_scopes(root)
+    if not domain_scopes and (root / "logic_readme.md").exists():
+        notices.append(
+            "logic_readme.md:constitution-without-domains (RULE-018: register at least one "
+            "logic_domains/<domain>/ paired row so domain rules load on demand)"
+        )
+    for scope in domain_scopes:
+        readme = root / scope / "logic_readme.md"
+        change = root / scope / "logic_change.md"
+        if readme.exists():
+            _density_check(
+                f"{scope}/logic_readme.md", _count_lines(readme), 250, 400, issues, notices,
+                hint="split the domain into smaller ones (大部门拆小部门)",
+            )
+        if change.exists():
+            _density_check(f"{scope}/logic_change.md", _count_lines(change), 150, 300, issues, notices)
 
-    # RULE-018：已登记的 readme-only 子文档与根文档同受行数上限约束，
-    # 否则拆分后的子文档成为无上限的膨胀区
+    # 旧式 readme-only 子文档仍受 readme 硬上限约束
     root_readme_text, root_readme_error = read_text(root / "logic_readme.md")
     if not root_readme_error:
-        child_limit = LIMITS["logic_readme.md"]
         for row in markdown_table_rows(root_readme_text, "范围登记表"):
             policy = (row.get("doc_policy") or "").strip().strip("`").lower()
             membership = (row.get("membership") or "").strip().strip("`").lower()
-            scope_raw = (row.get("scope_path") or "").strip().strip("`")
-            if policy != "readme-only" or membership != "in-system":
-                continue
-            scope_norm = normalize_scope_path(scope_raw)
-            if not scope_norm or scope_norm == ".":
+            scope_norm = normalize_scope_path((row.get("scope_path") or "").strip().strip("`"))
+            if policy != "readme-only" or membership != "in-system" or scope_norm in {"", "."}:
                 continue
             child = root / scope_norm / "logic_readme.md"
             if child.exists():
-                text, error = read_text(child)
-                if not error:
-                    lines = text.count('\n') + 1
-                    if lines > child_limit:
-                        issues.append(
-                            f"{scope_norm}/logic_readme.md:"
-                            f"exceeds-hard-limit:{lines}>{child_limit}"
-                        )
+                _density_check(f"{scope_norm}/logic_readme.md", _count_lines(child), 250, 400, issues, notices)
 
-    # Check individual CHG density in logic_change.md
-    change_path = root / "logic_change.md"
-    if change_path.exists():
-        text, error = read_text(change_path)
-        if not error:
-            for change_id, block in change_blocks(text).items():
-                lines = block.count('\n') + 1
-                if lines > 80:
-                    issues.append(f"{change_id}:exceeds-chg-limit:{lines}>80")
-                elif lines > 40:
-                    # RULE-023：单条 CHG 目标 15-40 行（field-vocabulary），越过目标先提示
-                    notices.append(f"{change_id}:over-chg-target:{lines}>40 (hard limit 80)")
-
-    # Warn on accumulated blocked CHGs
+    # 单条 CHG 密度与 blocked 累积：跨全部账本（根 + 领域）
     blocked_count = 0
-    if change_path.exists():
-        text, error = read_text(change_path)
-        if not error:
-            for change_id, block in change_blocks(text).items():
-                values = control_values(block)
-                status = (values.get("status") or [""])[0]
-                if status == "blocked":
-                    blocked_count += 1
+    for change_id, (change_file, block) in _collect_active_change_blocks(root, audits).items():
+        lines = block.count("\n") + 1
+        shown_id = change_id.upper()
+        if lines > 80:
+            issues.append(f"{shown_id}:exceeds-chg-limit:{lines}>80")
+        elif lines > 40:
+            # RULE-023：单条 CHG 目标 15-40 行（field-vocabulary），越过目标先提示
+            notices.append(f"{shown_id}:over-chg-target:{lines}>40 (hard limit 80)")
+        if (control_values(block).get("status") or [""])[0] == "blocked":
+            blocked_count += 1
     if blocked_count > 2:
-        issues.append(f"logic_change.md:blocked-accumulation:{blocked_count}>2")
+        issues.append(f"logic_change:blocked-accumulation:{blocked_count}>2")
 
     return {
         "issues": issues,
         "notices": notices,
-        "limits_checked": list(LIMITS.keys()),
+        "limits_checked": ["SKILL.md", "logic_readme.md", "logic_change.md", *[f"{scope}/logic_readme.md" for scope in domain_scopes]],
     }

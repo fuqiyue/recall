@@ -23,6 +23,15 @@ README_ONLY_ROW = (
     "| MOD-APP | src | in-system | module/runtime-code | readme-only "
     "| [app](src/logic_readme.md) | none | self | active |\n"
 )
+PAIRED_DOMAIN_ROW = (
+    "| MOD-BILLING | logic_domains/billing | in-system | domain/runtime-code | paired "
+    "| [billing](logic_domains/billing/logic_readme.md) "
+    "| [changes](logic_domains/billing/logic_change.md) | self | active |\n"
+)
+OUT_OF_SYSTEM_PAIRED_ROW = (
+    "| MOD-VENDOR | vendor | out-of-system | foreign/runtime-code | paired "
+    "| none | none | self | active |\n"
+)
 
 
 def write_record(records_dir: Path, name: str, status: str) -> Path:
@@ -140,6 +149,102 @@ class ChildReadmeCoverageTests(unittest.TestCase):
                 if "RULE-001" in msg and "src/logic_readme.md" in msg
             ],
             result.errors,
+        )
+
+
+class DomainLedgerTests(unittest.TestCase):
+    """RULE-018 一二级拆分法：paired 领域纳入子文档检查；领域 CHG 必须登记进根公报。"""
+
+    DOMAIN_CHG = "CHG-20260903-101"
+
+    def test_paired_domain_readme_is_registered_child(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            domain = root / "logic_domains" / "billing"
+            domain.mkdir(parents=True)
+            (domain / "logic_readme.md").write_text("# billing\n", encoding="utf-8")
+            content = (
+                "# Root\n\n### 范围登记表\n\n"
+                + REGISTRY_HEADER
+                + PAIRED_DOMAIN_ROW
+                + OUT_OF_SYSTEM_PAIRED_ROW
+            )
+            paths, missing = VALIDATE.find_registered_child_readmes(content, root)
+        self.assertEqual(missing, [])
+        self.assertEqual(
+            [p.relative_to(root).as_posix() for p in paths],
+            ["logic_domains/billing/logic_readme.md"],
+        )
+
+    def _write_project(self, root: Path, *, gazette: bool) -> None:
+        (root / "logic_readme.md").write_text(
+            "# Root\n\n## 当前制度\n\n| RULE-001 | key | 根规则 |\n\n"
+            "### 范围登记表\n\n" + REGISTRY_HEADER + PAIRED_DOMAIN_ROW,
+            encoding="utf-8",
+        )
+        gazette_row = (
+            f"| {self.DOMAIN_CHG} | draft | logic_domains/billing | self | 发票 | none "
+            f"| [{self.DOMAIN_CHG}](logic_domains/billing/logic_change.md#{self.DOMAIN_CHG.lower()}) "
+            "| 2026-09-03 |\n"
+            if gazette
+            else ""
+        )
+        (root / "logic_change.md").write_text(
+            "# Root ledger\n\n## 活跃议案索引\n\n"
+            "| change_id | status | scope | owner | target/summary | blocked_by "
+            "| proposal_path | last_updated |\n|---|---|---|---|---|---|---|---|\n"
+            + gazette_row,
+            encoding="utf-8",
+        )
+        domain = root / "logic_domains" / "billing"
+        domain.mkdir(parents=True)
+        (domain / "logic_readme.md").write_text(
+            "# Billing\n\n| RULE-002 | ordinary | 领域规则 |\n", encoding="utf-8"
+        )
+        (domain / "logic_change.md").write_text(
+            f"# Billing ledger\n\n## {self.DOMAIN_CHG}: 发票编号\n\n- status: draft\n",
+            encoding="utf-8",
+        )
+
+    def _validate(self, root: Path):
+        old_cwd = Path.cwd()
+        os.chdir(root)
+        try:
+            return VALIDATE.validate_recall()
+        finally:
+            os.chdir(old_cwd)
+
+    def test_domain_chg_missing_from_root_gazette_warns(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_project(root, gazette=False)
+            result = self._validate(root)
+        hits = [
+            msg
+            for msg in result.warnings
+            if self.DOMAIN_CHG in msg and "未登记进根 logic_change.md 活跃议案索引" in msg
+        ]
+        self.assertEqual(len(hits), 1, result.warnings)
+        self.assertIn("logic_domains/billing/logic_change.md", hits[0])
+        self.assertTrue(
+            [msg for msg in result.info if "1 份领域账本" in msg], result.info
+        )
+
+    def test_domain_chg_registered_in_root_gazette_is_silent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_project(root, gazette=True)
+            result = self._validate(root)
+        self.assertFalse(
+            [msg for msg in result.warnings if "未登记进根 logic_change.md" in msg],
+            result.warnings,
+        )
+        # 领域 readme 的规则定义与根共用编号空间：RULE-001 / RULE-002 各定义一次
+        self.assertFalse(
+            [msg for msg in result.errors if "被定义多次" in msg], result.errors
+        )
+        self.assertTrue(
+            [msg for msg in result.info if "找到 2 条规则定义" in msg], result.info
         )
 
 

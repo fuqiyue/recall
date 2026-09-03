@@ -15,8 +15,10 @@ SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from recall_common import (  # noqa: E402  RULE-021：根查找/Git 调用/编码防护只此一份
+    change_ledgers,
     classify_porcelain,
     find_project_root,
+    registered_domains,
     force_utf8_output,
     run_git,
     unpushed_commit_count,
@@ -92,8 +94,14 @@ def print_help():
 
   conflicts
     检测规则间的潜在冲突
-    分析 RULE-* 和 CHG-* 是否存在逻辑矛盾
+    分析 RULE-* 和 CHG-* 是否存在逻辑矛盾（宪法 + 全部领域）
     示例: recall conflicts
+
+  route [路径或关键词 ...] [--json]
+    按需导入：列出本次任务应读的文档（宪法必读 + 命中领域的 readme/change）
+    并给出行数与估算 token；不给参数时列出全部领域
+    示例: recall route scripts/git_sync.py
+    示例: recall route 同步 --json
 
   help
     显示此帮助信息
@@ -273,14 +281,25 @@ def cmd_status():
         else:
             print("📋 现行规则: ⚠️  logic_readme.md 不存在")
 
-        # 检查 logic_change.md
-        change_path = root / "logic_change.md"
-        if change_path.exists():
-            with open(change_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-                changes = re.findall(r'\bCHG-\d{8}-\d{3}\b', content)
-                unique_changes = set(changes)
-                print(f"🔄 活跃变更: {len(unique_changes)} 个 CHG-ID")
+        # 一二级拆分法（RULE-018）：宪法 + 已登记领域（部门法）
+        domains = registered_domains(root)
+        if readme_path.exists():
+            if domains:
+                print(f"🏛️  领域（部门法）: {len(domains)} 个 —— " + ", ".join(d.module_id for d in domains))
+            else:
+                print("🏛️  领域（部门法）: 0 个 ⚠️  宪法未分层（RULE-018 要求至少一个 logic_domains/<domain>/）")
+
+        # 活跃议案：根账本（修宪议案）+ 每个领域账本，按 CHG 标题计数
+        ledgers = change_ledgers(root)
+        if ledgers:
+            total = 0
+            parts = []
+            for label, ledger_path in ledgers:
+                content = ledger_path.read_text(encoding='utf-8', errors='replace')
+                ids = set(re.findall(r'^##\s+(CHG-[A-Za-z0-9][A-Za-z0-9-]*)', content, re.MULTILINE))
+                total += len(ids)
+                parts.append(f"{label} {len(ids)}")
+            print(f"🔄 活跃变更: {total} 个 CHG 正文（" + "；".join(parts) + "）")
         else:
             print("🔄 活跃变更: ⚠️  logic_change.md 不存在")
 
@@ -341,6 +360,16 @@ def cmd_status():
         print(f"❌ 错误: {e}")
         return 1
 
+def cmd_route(args):
+    """按目标路径/关键词给出读取清单（RULE-018 一二级拆分法按需导入）"""
+    try:
+        import route_docs
+        return route_docs.main(args)
+    except ImportError:
+        print("❌ 错误: 找不到 route_docs.py")
+        return 1
+
+
 def cmd_conflicts():
     """检测规则冲突"""
     try:
@@ -374,6 +403,7 @@ def main():
         'validate': lambda: cmd_validate(),
         'status': lambda: cmd_status(),
         'conflicts': lambda: cmd_conflicts(),
+        'route': lambda: cmd_route(args),
         'help': lambda: print_help() or 0,
         '--help': lambda: print_help() or 0,
         '-h': lambda: print_help() or 0,

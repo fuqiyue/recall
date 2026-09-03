@@ -689,6 +689,7 @@ MEMBERSHIP_STATUSES = {
 }
 SCOPE_TYPES = {
     "root",
+    "domain",  # RULE-018 二级领域文档（部门法）
     "module",
     "data-boundary",
     "preprocess",

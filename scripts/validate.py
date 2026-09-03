@@ -11,7 +11,8 @@ from pathlib import Path
 from typing import List, Dict, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from recall_common import (  # noqa: E402  RULE-021
+from recall_common import (
+    change_ledgers,  # noqa: E402  RULE-021
     classify_porcelain,
     find_project_root,
     force_utf8_output,
@@ -141,11 +142,11 @@ def markdown_section(content: str, heading: str) -> str:
 def find_registered_child_readmes(
     readme_content: str, root: Path
 ) -> Tuple[List[Path], List[str]]:
-    """范围登记表中 readme-only 行对应的子文档路径（RULE-018）。
+    """范围登记表中二级文档（paired 领域 + 旧式 readme-only）的 readme 路径（RULE-018）。
 
-    返回 (存在的子文档, 登记了但文件缺失的 scope 列表)。子文档与根文档
+    返回 (存在的子文档, 登记了但文件缺失的 scope 列表)。部门法与宪法
     共用同一 RULE/INT 编号空间，必须纳入同一套一致性检查，否则拆分后
-    的模块进入无检查区。
+    的领域进入无检查区。
     """
     paths: List[Path] = []
     missing: List[str] = []
@@ -154,8 +155,14 @@ def find_registered_child_readmes(
         if not stripped.startswith('|'):
             continue
         cells = [cell.strip() for cell in stripped.strip('|').split('|')]
-        if len(cells) >= 5 and cells[2] == 'in-system' and cells[4] == 'readme-only':
+        if (
+            len(cells) >= 5
+            and cells[2] == 'in-system'
+            and cells[4] in ('readme-only', 'paired')
+        ):
             scope = cells[1].strip().strip('/').replace('\\', '/')
+            if scope in ('', '.'):
+                continue
             candidate = root / scope / 'logic_readme.md'
             if candidate.exists():
                 paths.append(candidate)
@@ -590,7 +597,7 @@ def validate_recall() -> ValidationResult:
     )
     for scope in missing_children:
         result.add_error(
-            f"范围登记表登记了 readme-only 子文档但文件不存在: {scope}/logic_readme.md"
+            f"范围登记表登记了二级文档但文件不存在: {scope}/logic_readme.md"
         )
 
     labeled_defs: List[Tuple[str, str, int]] = [
@@ -635,9 +642,28 @@ def validate_recall() -> ValidationResult:
             seen_int_ids=seen_int_ids,
         )
 
-    # 2. 提取所有 CHG-ID
-    chg_records = extract_chg_ids(change_path)
-    result.add_info(f"在 logic_change.md 中找到 {len(chg_records)} 个变更议案")
+    # 2. 提取所有 CHG-ID：根账本（修宪议案 + 全项目索引）+ 每个领域账本（RULE-018）
+    ledgers = change_ledgers(root)
+    chg_records: List[Dict] = []
+    root_change_text = change_path.read_text(encoding='utf-8') if change_path.exists() else ''
+    for label, ledger_path in ledgers:
+        found = extract_chg_ids(ledger_path)
+        for chg in found:
+            chg['ledger'] = label
+        chg_records.extend(found)
+        if label != 'logic_change.md':
+            # 领域 CHG 必须在根账本公报（活跃议案索引）登记一行
+            for chg in found:
+                if chg['id'] not in root_change_text:
+                    result.add_warning(
+                        f"{chg['id']} 在 {label} 有正文但未登记进根 logic_change.md 活跃议案索引"
+                        "（RULE-018：根账本是全项目公报）"
+                    )
+    domain_ledgers = len(ledgers) - (1 if change_path.exists() else 0)
+    result.add_info(
+        f"在 {len(ledgers)} 份议案账本中找到 {len(chg_records)} 个变更议案"
+        + (f"（含 {domain_ledgers} 份领域账本）" if domain_ledgers else "")
+    )
 
     # 检查 CHG 状态
     for chg in chg_records:
@@ -646,8 +672,9 @@ def validate_recall() -> ValidationResult:
         elif '进行中' in chg['status'] or '待' in chg['status']:
             result.add_info(f"{chg['id']}: {chg['title']} - 状态: {chg['status']}")
 
-    # 2b. medium/high CHG 的需求拆解字段（RULE-014）
-    check_chg_analysis_fields(change_path, result)
+    # 2b. medium/high CHG 的需求拆解字段（RULE-014），每份账本都查
+    for _label, ledger_path in ledgers:
+        check_chg_analysis_fields(ledger_path, result)
 
     # 3. 检查决策记录
     version_records = find_version_records(version_dir)

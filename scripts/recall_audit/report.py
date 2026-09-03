@@ -52,7 +52,9 @@ from .archive import (
     find_nonroot_current_documents,
     find_parallel_current_candidates,
     find_scattered_backup_candidates,
+    registered_child_document_paths,
     registered_child_readme_paths,
+    registered_domain_scopes,
     unscanned_archive_report,
 )
 
@@ -274,7 +276,7 @@ def collect_audit(args: argparse.Namespace) -> dict:
         misplaced_versions, misplaced_decisions = find_misplaced_records(root, excludes)
     parallel_current = find_parallel_current_candidates(root, excludes)
     nonroot_current_documents = find_nonroot_current_documents(
-        root, excludes, registered_child_readme_paths(root)
+        root, excludes, registered_child_document_paths(root)
     )
     misplaced_temp = find_misplaced_temp_records(root, excludes)
     entrypoints, private_knowledge, private_candidates = audit_agent_entrypoints(root)

@@ -1,6 +1,6 @@
 # logic_change.md 模板
 
-项目根只有一份，并与根 `logic_readme.md` 绑定。所有未生效议案都在本文件中；用 `CHG-ID`、范围和状态区分事项，不创建模块、`v2` 或 `final` 副本。本文不是当前制度的执行依据。
+每份 `logic_readme.md` 配一份 `logic_change.md`（RULE-018）：根账本承载修宪议案（改全局规则、INT 层、登记表行、INV 的 CHG）正文与全项目活跃议案索引；领域账本 `logic_domains/<domain>/logic_change.md` 承载本领域一事一议的 CHG 正文，精简形态见[领域文档模板](logic-domain-template.md)。本模板以根账本为例；用 `CHG-ID`、范围和状态区分事项，不创建 `v2`、`final` 或未登记的副本。本文不是当前制度的执行依据。
 
 目录：文档控制与索引；议案正文；决策确认、影响、兼容、测试与晋升。
 
@@ -45,7 +45,7 @@
 - `decision_gate: required` 的 CHG 必须在生效后创建不可变版本记录，保存最终议案快照、确认、实现、审查、验证和回滚信息；不能因关闭条目而丢失决策逻辑。
 - `logic_change.md` 只承担活跃变更的决策正文。高风险 CHG 在关闭前先创建 `VER-*`，必要时创建 ADR；随后由 `logic_readme.md` 的生效关键规则链接该记录，不能把活跃 CHG 当作长期引用目标。
 - 旧的 `approved`、`reviewed_by`/`review_ref` 和 `AUTH-*` 字段直接迁移到当前真实阶段的 `decision_*` 与 `semantic_review_*` 字段；不保留兼容字段、双状态或平行版本文件。
-- 同一 CHG-ID 的正文只能存在一处，即本文件。`affected_scopes` 列出全部受影响根登记 scope_path。
+- 同一 CHG-ID 的正文只能存在一处（所属账本）：触及宪法内容的立在根账本，领域事项立在该领域账本，跨领域正文放主领域、其余领域列入 `affected_scopes`。`affected_scopes` 列出全部受影响根登记 scope_path；领域账本中的 CHG 必含自身领域 scope_path 且不得含 `.`。
 - 本文件不提供实际权限控制；真实权限由 Git、CODEOWNERS、分支保护或外部系统承担。它适合单人或低并发小团队；频繁并行编辑、跨团队排队或组织级审批应转交 Issue、Spec、PR 或变更系统，CHG 只保留提炼和稳定引用。
 
 ## 讨论主题索引
@@ -62,7 +62,7 @@
 |---|---|---|---|---|---|---|---|
 | CHG-YYYYMMDD-NNN | draft | ... | ... | ... | none | [CHG-YYYYMMDD-NNN](logic_change.md#chg-yyyymmdd-nnn) | YYYY-MM-DD |
 
-每一行的 `proposal_path` 都指向本文件内对应的 `#chg-id` 小写锚点，且锚点在文件内唯一。跨范围协调在同一 CHG 正文的 `affected_scopes`、`related_modules` 和影响表中说明，不另建正文或回链文件。
+本文件的正文行 `proposal_path` 指向本文件内对应的 `#chg-id` 小写锚点，且锚点在文件内唯一。根账本的索引同时是全项目公报：任何领域账本中的每个活跃 CHG 也在此占一行，`proposal_path` 写 `[CHG-...](logic_domains/<domain>/logic_change.md#chg-...)`，正文不复制；`recall validate` 提示缺少公报行的领域 CHG。领域账本的索引只列本领域正文。跨范围协调在同一 CHG 正文的 `affected_scopes`、`related_modules` 和影响表中说明，不另建正文或回链文件。
 
 普通追踪至少保留索引，以及正文中的 `status`、`effective`、`topic_id`、`proposal_revision`、决策门槛/状态、`owner`、`changed_by`、`scope`、`affected_scopes`、`intent_source_refs`、`intent_digest`、`intent_status`、`authority_surfaces`、`based_on`、依赖/冲突、运行暴露、历史保留级别、当前证据、拟议规则、验证/验收、回滚和开放问题；`medium`/`high` 条目另须保留 `raw_request`、`decomposition`、`fit_analysis`。下面的完整字段与矩阵只在用户明确要求正式审查或表单合规时全部填写。
 
@@ -100,7 +100,7 @@
 - review_due: YYYY-MM-DD | event-driven
 - target_effective: YYYY-MM-DD | event-driven | unknown
 - scope: <路径、契约、Schema 或用户行为>
-- affected_scopes: <全部根登记 scope_path；至少一个；不要用 . 代替实际受影响子范围>
+- affected_scopes: <全部根登记 scope_path；至少一个；不要用 . 代替实际受影响子范围；领域账本中必含自身 logic_domains/<domain> 且不得含 .>
 - related_modules: <根 logic_readme.md 的范围/代码章节锚点>
 - related_decisions: <ADR ID 或 none>
 - authority_surfaces: <精确 RULE/API/DB/FLAG/行为 ID；用 ; 分隔；不能只写目录或 .>
@@ -223,7 +223,7 @@
 
 ### 晋升与归档
 
-- target_logic_sections: <生效后更新根 logic_readme.md 的哪些章节>
+- target_logic_sections: <生效后更新所属 logic_readme.md（宪法或领域）的哪些章节>
 - version_record: <logic_version/records/logic_version-...md；decision_record=required 时不得为 none>
 - close_condition: <代码语义审查通过、当前制度已更新、不可变记录和索引已创建后移除本 CHG 正文；不得把单个 CHG 置为 none>
 - temp_cleanup: <删除 working/<version_slug> 临时目录的负责人和条件；前提是 logic_temp 工作区产物台账已清零（RULE-020）>

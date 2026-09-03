@@ -64,14 +64,15 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 | 对象 | 目标 | 硬上限 |
 |---|---|---|
 | 单条活跃 CHG | 15-40 行 | 80 行 |
-| `logic_change.md` 全文 | < 150 行 | 300 行 |
-| `logic_readme.md` | < 250 行 | 400 行 |
+| 宪法（根 `logic_readme.md`） | < 150 行 | 250 行 |
+| 领域 `logic_readme.md`（`logic_domains/<domain>/`） | < 250 行 | 400 行（越过目标 → 拆分领域，大部门拆小部门） |
+| 根 / 领域 `logic_change.md` 全文 | < 150 行 | 300 行 |
 | 单条 `VER-*` | 50-150 行 | 200 行 |
 | `SKILL.md` | < 130 行 | 200 行 |
 
-超过硬上限时按顺序处理：压缩失效细节 → 把已结束内容归档到 `logic_version/` → 降低字段层级。不要靠新建文件解决长度问题。
+超过硬上限时按顺序处理：压缩失效细节 → 把已结束内容归档到 `logic_version/` → 降低字段层级。不要靠未登记的新文件解决长度问题；正确出口是按 RULE-018 新建或拆分已登记领域（宪法过长 → 把领域内部规则下放到部门法；领域过长 → 拆成更小领域）。
 
-`python scripts/audit_logic_map.py <project-root> --current-state` 的 Density 段会报告越过硬上限的文件（`exceeds-hard-limit`）与越过目标值的文件（`over-target`）；两者都是 advisory，不影响静态门。
+`python scripts/audit_logic_map.py <project-root> --current-state` 的 Density 段按层级报告越过硬上限的文件（`exceeds-hard-limit`）与越过目标值的文件（`over-target`，领域 readme 附拆分提示），并在宪法未登记任何领域时报告 `constitution-without-domains`；均为 advisory，不影响静态门。
 
 ## 反模式
 

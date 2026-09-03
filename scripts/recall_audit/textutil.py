@@ -294,6 +294,9 @@ def is_immutable_decision_record_link(cell: str) -> bool:
     normalized = target.removeprefix("./").replace("\\", "/")
     path = Path(normalized)
     parts = tuple(part.casefold() for part in path.parts)
+    # RULE-018：领域文档（logic_domains/<domain>/）向上引用根 logic_version，去掉前导 ..
+    while parts and parts[0] == "..":
+        parts = parts[1:]
     if parts[:2] == ("logic_version", "records"):
         return bool(CANONICAL_VERSION_RE.fullmatch(path.name))
     if parts[:2] == ("logic_version", "decisions"):

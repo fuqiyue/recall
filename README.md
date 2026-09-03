@@ -21,18 +21,20 @@ recall status        # 查看系统状态
 recall new "描述" tag  # 创建决策记录
 recall sync          # 自动保存并同步（未跟踪新文件默认排除，--include-new 纳入）
 recall validate      # 验证一致性
+recall route <路径或关键词>  # 打印本任务应读的领域文档（按需导入）
 recall query file <路径>  # 查询文件的决策历史
 recall help          # 完整帮助
 ```
 
 ## 工作方式
 
-三份文档承载全部项目逻辑：
+两级文档承载全部项目逻辑（一二级拆分法）：
 
 | 文档 | 角色 |
 |---|---|
-| `logic_readme.md` | 当前生效的规则、代码地图与功能意图（唯一现行制度） |
-| `logic_change.md` | 尚未生效的活跃议案（临时工作区） |
+| `logic_readme.md` | 宪法：全局规则、功能意图与领域目录，每个任务必读 |
+| `logic_change.md` | 修宪议案 + 全项目活跃议案索引 |
+| `logic_domains/<domain>/` | 部门法：领域规则、代码地图与其议案账本，按需导入（`recall route`） |
 | `logic_version/` | 不可变决策记录：为什么改、方案取舍、如何回滚 |
 
 代码变化由 Git 管理，决策记录通过 commit hash 与代码双向关联。

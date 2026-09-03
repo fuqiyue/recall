@@ -24,7 +24,7 @@ blocked ←────┴─────────────────┴
 | `awaiting-decision` | 等待用户或授权决策方选择当前 `proposal_revision` |
 | `implementing` | 确认已获得且基线有效，正在实施 |
 | `verifying` | 代码已写，正在核对语义、测试、消费者 |
-| `promoting` | 验收通过，正在晋升：写 `logic_readme.md`、创建 `VER-*`、更新索引、关闭 CHG。这是合法的过渡状态 |
+| `promoting` | 验收通过，正在晋升：写所属 `logic_readme.md`（宪法或领域）、创建 `VER-*`、更新索引、关闭 CHG。这是合法的过渡状态 |
 | `blocked` | 依赖失效、冲突未解决、外部阻塞，或发现基线已变 |
 
 ## 晋升窗口（promoting 状态）
@@ -38,14 +38,14 @@ blocked ←────┴─────────────────┴
 CHG 进入 `promoting` 时建立以下清单：
 
 - [ ] 目标环境已启用
-- [ ] `logic_readme.md` 最终规则已写入，旧规则已删除
+- [ ] 所属 `logic_readme.md`（宪法或领域）最终规则已写入，旧规则已删除
 - [ ] `VER-*` / ADR 已创建
 - [ ] `logic_version/index.md` 索引行已添加
 - [ ] 关键规则已链接到 `VER-*` / ADR
 - [ ] `logic_temp.md` 工作区产物台账已清零（`delete` 项均已删除、无 `pending`），随后整个 working 目录已删除（RULE-020）
-- [ ] 可以从 `logic_change.md` 移除 CHG 条目
+- [ ] 可以从所属账本移除 CHG 条目，并删除根账本公报中的对应行
 
-全部完成后执行关闭动作：从 `logic_change.md` 移除该 CHG。
+全部完成后执行关闭动作：从所属 `logic_change.md` 移除该 CHG，并删除根账本公报行。
 
 ### 中断恢复
 
@@ -55,7 +55,7 @@ CHG 进入 `promoting` 时建立以下清单：
 
 ### 1. 写议案
 
-在 `logic_change.md` 同一 `CHG-ID` 内写出：
+在所属账本（领域事项写该领域的 `logic_domains/<domain>/logic_change.md`，修宪案写根 `logic_change.md`；RULE-018）同一 `CHG-ID` 内写出，并在根账本的全项目活跃议案索引加一行（领域 CHG 的 `proposal_path` 指向领域账本锚点）：
 
 - `proposal_revision`
 - 当前事实、方案取舍
@@ -124,7 +124,7 @@ CHG 转为 `promoting` 状态，建立晋升检查清单。
 
 审查和验收通过后，在启用目标环境前或同一受控发布变更中：
 
-- 把实际规则写入唯一的 `logic_readme.md`
+- 把实际规则写入所属 `logic_readme.md`（全局规则、INT 层、登记表、INV 入宪法；领域规则、代码地图、测试入该领域文档）
 - 删除被替代的规则
 - 让每条生效关键规则直接链接到其 `VER-*` 或 ADR
 
@@ -132,9 +132,9 @@ CHG 转为 `promoting` 状态，建立晋升检查清单。
 
 ### 9. 关闭 CHG
 
-最后从 `logic_change.md` 移除已结束条目。移除前先核对 `logic_temp.md` 的工作区产物台账已清零（RULE-020：`delete` 项全部执行、无 `pending`），再删除整个 working 目录，并把结果写入 `VER-*` 的 `logic_temp_cleanup`。
+最后从所属账本移除已结束条目，并删除根账本公报中的对应行。移除前先核对 `logic_temp.md` 的工作区产物台账已清零（RULE-020：`delete` 项全部执行、无 `pending`），再删除整个 working 目录，并把结果写入 `VER-*` 的 `logic_temp_cleanup`。
 
-回滚时先让 `logic_readme.md` 反映实际恢复状态，再记录回滚结论和后续限制。
+回滚时先让所属 `logic_readme.md` 反映实际恢复状态，再记录回滚结论和后续限制。
 
 ## CHG 边界
 

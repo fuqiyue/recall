@@ -23,6 +23,7 @@ import create_ver
 import detect_conflicts
 import link_ver_git
 import recall
+import route_docs
 import validate
 
 
@@ -278,6 +279,100 @@ class StatusLeftoverTests(unittest.TestCase):
         self.assertEqual(recall.classify_porcelain(None), ([], []))
 
 
+CONSTITUTION_WITH_DOMAINS = """# Constitution
+
+### 范围登记表
+
+| module_id | scope_path | membership | scope_type/layer | doc_policy | logic_readme | logic_change | owner | status |
+|---|---|---|---|---|---|---|---|---|
+| MOD-ROOT | . | in-system | root/runtime-code | paired | [root](logic_readme.md) | [changes](logic_change.md) | self | active |
+| MOD-BILLING | logic_domains/billing | in-system | domain/runtime-code | paired | [billing](logic_domains/billing/logic_readme.md) | [changes](logic_domains/billing/logic_change.md) | self | active |
+| MOD-SYNC | logic_domains/sync | in-system | domain/runtime-code | paired | [sync](logic_domains/sync/logic_readme.md) | [changes](logic_domains/sync/logic_change.md) | self | active |
+"""
+
+
+class RouteDocsTests(unittest.TestCase):
+    """RULE-018 按需导入：宪法必读，命中职权或关键词的领域才进入读取清单。"""
+
+    def _write_project(self, root: Path) -> None:
+        (root / "logic_readme.md").write_text(CONSTITUTION_WITH_DOMAINS, encoding="utf-8")
+        (root / "logic_change.md").write_text(
+            "# Root ledger\n\n## 活跃议案索引\n\n"
+            "| change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |\n"
+            "|---|---|---|---|---|---|---|---|\n"
+            "| CHG-20260903-101 | draft | logic_domains/billing | self | 发票 | none "
+            "| [CHG-20260903-101](logic_domains/billing/logic_change.md#chg-20260903-101) | 2026-09-03 |\n",
+            encoding="utf-8",
+        )
+        for slug, owned, body in (
+            ("billing", "src/billing, scripts/bill_*.py", "发票编号规则"),
+            ("sync", "scripts/git_sync.py", "自动同步规则"),
+        ):
+            domain = root / "logic_domains" / slug
+            domain.mkdir(parents=True)
+            (domain / "logic_readme.md").write_text(
+                f"# {slug}\n\n- owned_paths: {owned}\n\n{body}\n", encoding="utf-8"
+            )
+            (domain / "logic_change.md").write_text(f"# {slug} ledger\n", encoding="utf-8")
+        (root / "src" / "billing").mkdir(parents=True)
+
+    def test_constitution_always_first_and_domains_listed(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            plan = route_docs.build_plan(root, [])
+        self.assertEqual(
+            [item["path"] for item in plan["reading_order"]],
+            ["logic_readme.md", "logic_change.md"],
+        )
+        self.assertEqual(plan["matched_domains"], [])
+        self.assertEqual(
+            sorted(d["module_id"] for d in plan["domains"]), ["MOD-BILLING", "MOD-SYNC"]
+        )
+        self.assertGreater(plan["total_tokens_estimate"], 0)
+        self.assertTrue(all(item["exists"] for item in plan["reading_order"]))
+
+    def test_path_target_matches_owned_paths_by_prefix_and_glob(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            prefix = route_docs.build_plan(root, ["src/billing/invoice.py"])
+            glob_hit = route_docs.build_plan(root, ["scripts/bill_report.py"])
+            exact = route_docs.build_plan(root, ["scripts/git_sync.py"])
+            miss = route_docs.build_plan(root, ["docs/unrelated.md"])
+        self.assertEqual(prefix["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(
+            [item["path"] for item in prefix["reading_order"]],
+            [
+                "logic_readme.md",
+                "logic_change.md",
+                "logic_domains/billing/logic_readme.md",
+                "logic_domains/billing/logic_change.md",
+            ],
+        )
+        self.assertEqual(prefix["in_flight_changes"], ["CHG-20260903-101 (draft) -> logic_domains/billing"])
+        self.assertEqual(glob_hit["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(exact["matched_domains"], ["logic_domains/sync"])
+        self.assertEqual(miss["matched_domains"], [])
+        self.assertEqual(len(miss["reading_order"]), 2)
+
+    def test_keyword_target_searches_domain_readme_and_module_id(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            by_text = route_docs.build_plan(root, ["发票"])
+            by_id = route_docs.build_plan(root, ["mod-sync"])
+            both = route_docs.build_plan(root, ["发票", "同步"])
+        self.assertEqual(by_text["matched_domains"], ["logic_domains/billing"])
+        self.assertEqual(by_id["matched_domains"], ["logic_domains/sync"])
+        self.assertEqual(both["matched_domains"], ["logic_domains/billing", "logic_domains/sync"])
+        self.assertEqual(len(both["reading_order"]), 6)
+
+    def test_estimate_tokens_counts_cjk_per_char(self):
+        self.assertEqual(route_docs.estimate_tokens("abcd" * 10), 10)
+        self.assertEqual(route_docs.estimate_tokens("中文"), 2)
+
+
 class UnpushedHintTests(unittest.TestCase):
     """RULE-010：status 把本地领先上游的提交数变成一行提示；无上游时沉默。"""
 
@@ -324,7 +419,29 @@ class CliGlueSmokeTests(unittest.TestCase):
         code, out = self._run("status")
         self.assertEqual(code, 0, out)
         self.assertIn("Recall 系统状态", out)
+        # RULE-018：状态页报告领域（部门法）数量，活跃变更按账本分列 CHG 正文
+        self.assertIn("🏛️  领域（部门法）:", out)
+        self.assertIn("个 CHG 正文（logic_change.md", out)
         self.assertNotIn("错误", out)
+        self.assertNotIn("Traceback", out)
+
+    def test_route_json_exits_zero(self):
+        import json
+
+        code, out = self._run("route", "--json")
+        self.assertEqual(code, 0, out)
+        payload = json.loads(out[out.index("{"):])
+        self.assertIn("reading_order", payload)
+        self.assertEqual(
+            [item["path"] for item in payload["reading_order"][:2]],
+            ["logic_readme.md", "logic_change.md"],
+        )
+        self.assertIn("total_tokens_estimate", payload)
+
+    def test_route_text_mode_from_subdirectory(self):
+        code, out = self._run("route", "scripts/git_sync.py", cwd=ROOT / "scripts")
+        self.assertEqual(code, 0, out)
+        self.assertIn("Recall 读取清单", out)
         self.assertNotIn("Traceback", out)
 
     def test_conflicts_resolves_project_root_from_subdirectory(self):

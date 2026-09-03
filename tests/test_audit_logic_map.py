@@ -560,6 +560,61 @@ def append_active_change(
     return document + "\n" + block
 
 
+# RULE-018 一二级拆分法（VER-20260903-004）：非根 paired 行是部门法——
+# readme + change 成对；根 logic_change.md 的活跃议案索引是全项目公报，
+# 每条领域 CHG 在其中占一行并链接到领域账本的锚点。
+DOMAIN_CHANGE_ID = "CHG-20260722-002"
+
+DOMAIN_GAZETTE_ROW = (
+    f"| {DOMAIN_CHANGE_ID} | implementing | src | self | domain test | none | "
+    f"[{DOMAIN_CHANGE_ID}](src/logic_change.md#{DOMAIN_CHANGE_ID.casefold()}) | 2026-07-22 |"
+)
+
+
+def domain_readme() -> str:
+    """部门法 readme：paired 策略、canonical_* 位于文档控制、scope_type: domain。"""
+    text = child_readme(policy="paired")
+    text = text.replace("- scope_type: module", "- scope_type: domain")
+    text = text.replace(
+        "- validity_evidence: user-confirmed:2026-07-22\n",
+        "- validity_evidence: user-confirmed:2026-07-22\n"
+        "- canonical_readme: src/logic_readme.md\n"
+        "- canonical_change: src/logic_change.md\n",
+    )
+    text = text.replace(
+        "- canonical_readme: src/logic_readme.md\n- canonical_change: none\n", ""
+    )
+    text = text.replace(
+        "- 唯一入口：[logic_change.md](../logic_change.md)",
+        "- 唯一入口：[logic_change.md](logic_change.md)",
+    )
+    return text.replace("- 相关 CHG-ID：none", f"- 相关 CHG-ID：{DOMAIN_CHANGE_ID}")
+
+
+def domain_change(*, affected_scopes: str = "src") -> str:
+    """领域账本：镜像根账本结构，scope 绑定到 src，一条一事一议的 CHG。"""
+    document = change_document(
+        full=False,
+        affected_scopes=affected_scopes,
+        authority_surfaces="RULE-APP-OUTPUT",
+    )
+    document = document.replace(
+        "- scope: .\n- scope_path: .\n- module_id: MOD-ROOT",
+        "- scope: src\n- scope_path: src\n- module_id: MOD-APP",
+    )
+    document = document.replace("CHG-20260722-001", DOMAIN_CHANGE_ID).replace(
+        "chg-20260722-001", DOMAIN_CHANGE_ID.casefold()
+    )
+    document = document.replace(
+        "- related_modules: [MOD-APP](logic_readme.md#scope-mod-app)",
+        "- related_modules: MOD-APP",
+    )
+    return document.replace(
+        "policy: logic_readme.md#rule-output",
+        "policy: src/logic_readme.md#rule-app-output",
+    )
+
+
 class RootOnlyAuditTests(unittest.TestCase):
     def write_project(
         self,
@@ -611,6 +666,41 @@ class RootOnlyAuditTests(unittest.TestCase):
         return AUDIT.strict_failure(
             report, current_state=not formal, formal_review=formal
         )
+
+    def write_domain_project(
+        self,
+        root: Path,
+        *,
+        registry_row: str = PAIRED_APP_ROW,
+        affected_scopes: str = "src",
+        gazette_row: str | None = DOMAIN_GAZETTE_ROW,
+    ) -> None:
+        """根宪法 + src 部门法（readme/change 成对）+ 根公报行。"""
+        self.write_project(root)
+        readme_path = root / "logic_readme.md"
+        text = readme_path.read_text(encoding="utf-8")
+        self.assertIn(INHERITED_APP_ROW, text)
+        readme_path.write_text(
+            text.replace(INHERITED_APP_ROW, registry_row), encoding="utf-8"
+        )
+        (root / "src" / "logic_readme.md").write_text(
+            domain_readme(), encoding="utf-8"
+        )
+        (root / "src" / "logic_change.md").write_text(
+            domain_change(affected_scopes=affected_scopes), encoding="utf-8"
+        )
+        change_path = root / "logic_change.md"
+        proposal = change_path.read_text(encoding="utf-8").replace(
+            "- related_modules: [MOD-APP](logic_readme.md#scope-mod-app)",
+            "- related_modules: MOD-APP",
+        )
+        if gazette_row is not None:
+            proposal = proposal.replace(
+                '\n\n<a id="chg-20260722-001"></a>',
+                "\n" + gazette_row + '\n\n<a id="chg-20260722-001"></a>',
+                1,
+            )
+        change_path.write_text(proposal, encoding="utf-8")
 
     def test_current_state_accepts_lightweight_root_only_map(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -971,32 +1061,233 @@ class RootOnlyAuditTests(unittest.TestCase):
         )
         self.assertFalse(self.fails(report))
 
-    def test_nonroot_paired_registration_is_rejected(self) -> None:
+    def test_registered_paired_domain_passes(self) -> None:
+        """RULE-018：已登记的部门法（readme + change）与根公报行一起通过现状门。"""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.write_project(root)
-            readme_path = root / "logic_readme.md"
-            text = readme_path.read_text(encoding="utf-8")
-            readme_path.write_text(
-                text.replace(INHERITED_APP_ROW, PAIRED_APP_ROW),
-                encoding="utf-8",
+            self.write_domain_project(root)
+            report = self.collect(root)
+
+        self.assertNotIn(
+            "src/logic_readme.md", report["current_state_nonroot_documents"]
+        )
+        self.assertNotIn(
+            "src/logic_change.md", report["current_state_nonroot_documents"]
+        )
+        self.assertFalse(
+            [
+                issue
+                for issue in report["module_routes"]["route_issues"]
+                if issue.startswith("mod-app:")
+            ],
+            report["module_routes"]["route_issues"],
+        )
+        self.assertNotIn(
+            "mod-app:paired-policy-root-only",
+            report["module_routes"]["route_issues"],
+        )
+        integrity = report["current_integrity"]
+        self.assertFalse(integrity["proposal_issues"], integrity["proposal_issues"])
+        self.assertFalse(integrity["document_issues"], integrity["document_issues"])
+        self.assertFalse(self.fails(report))
+
+    def test_unregistered_domain_directory_is_rejected(self) -> None:
+        """未登记的 logic_domains/<x>/ readme + change 仍是平行真源。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            rogue = root / "logic_domains" / "billing"
+            rogue.mkdir(parents=True)
+            (rogue / "logic_readme.md").write_text("# rogue\n", encoding="utf-8")
+            (rogue / "logic_change.md").write_text("# rogue\n", encoding="utf-8")
+            report = self.collect(root)
+
+        self.assertIn(
+            "logic_domains/billing/logic_readme.md",
+            report["current_state_nonroot_documents"],
+        )
+        self.assertIn(
+            "logic_domains/billing/logic_change.md",
+            report["current_state_nonroot_documents"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_domain_change_touching_root_scope_is_constitution_amendment(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root, affected_scopes=".")
+            report = self.collect(root)
+
+        self.assertIn(
+            f"{DOMAIN_CHANGE_ID}:constitution-amendment-must-live-in-root-change",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_domain_change_must_include_own_scope(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root, affected_scopes=".")
+            report = self.collect(root)
+
+        self.assertIn(
+            f"{DOMAIN_CHANGE_ID}:domain-proposal-must-include-own-scope:src",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_domain_change_missing_from_root_gazette_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root, gazette_row=None)
+            report = self.collect(root)
+
+        self.assertIn(
+            f"{DOMAIN_CHANGE_ID}:domain-change-missing-from-root-index:src",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_root_gazette_row_must_link_domain_change_anchor(self) -> None:
+        wrong_anchor = DOMAIN_GAZETTE_ROW.replace(
+            f"#{DOMAIN_CHANGE_ID.casefold()})", "#chg-20260722-999)"
+        )
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root, gazette_row=wrong_anchor)
+            report = self.collect(root)
+
+        self.assertIn(
+            f"{DOMAIN_CHANGE_ID}:root-index-must-link-domain-change:src/logic_change.md",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_root_gazette_rows_are_not_counted_as_root_bodies(self) -> None:
+        """公报行指向领域账本，不参与根正文<->索引比对，也不能指向不存在的正文。"""
+        orphan = DOMAIN_GAZETTE_ROW.replace(
+            DOMAIN_CHANGE_ID, "CHG-20260722-003"
+        ).replace(DOMAIN_CHANGE_ID.casefold(), "chg-20260722-003")
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(
+                root, gazette_row=DOMAIN_GAZETTE_ROW + "\n" + orphan
             )
-            (root / "src" / "logic_readme.md").write_text(
-                child_readme(policy="paired"), encoding="utf-8"
-            )
-            (root / "src" / "logic_change.md").write_text(
-                "# module changes\n", encoding="utf-8"
+            report = self.collect(root)
+
+        issues = report["current_integrity"]["proposal_issues"]
+        self.assertFalse(
+            [issue for issue in issues if issue.startswith("index-ids-without-body")],
+            issues,
+        )
+        self.assertIn(
+            "CHG-20260722-003:root-index-target-body-not-found:src/logic_change.md",
+            issues,
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_out_of_system_paired_row_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(
+                root,
+                registry_row=PAIRED_APP_ROW.replace(
+                    "| in-system |", "| out-of-system |"
+                ),
             )
             report = self.collect(root)
 
         self.assertIn(
+            "mod-app:paired-policy-needs-in-system",
+            report["module_routes"]["route_issues"],
+        )
+        self.assertNotIn(
             "mod-app:paired-policy-root-only",
             report["module_routes"]["route_issues"],
         )
+        self.assertTrue(self.fails(report))
+
+    def test_domain_readme_tables_are_checked_like_root(self) -> None:
+        """规则行搬进部门法后不能降级：列/等级/决策链接同受根表检查。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            readme_path = root / "src" / "logic_readme.md"
+            text = readme_path.read_text(encoding="utf-8").replace(
+                "| RULE-APP-OUTPUT | ordinary |", "| RULE-APP-OUTPUT | key |"
+            )
+            readme_path.write_text(text, encoding="utf-8")
+            report = self.collect(root)
+
         self.assertIn(
-            "src/logic_change.md", report["current_state_nonroot_documents"]
+            "src/logic_readme:current-policy-row-1-key-needs-immutable-decision-link",
+            report["current_integrity"]["document_issues"],
         )
         self.assertTrue(self.fails(report))
+
+    def test_domain_ledger_active_changes_count_is_enforced(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            change_path = root / "src" / "logic_change.md"
+            text = change_path.read_text(encoding="utf-8").replace(
+                "- active_changes: 1", "- active_changes: 2"
+            )
+            change_path.write_text(text, encoding="utf-8")
+            report = self.collect(root)
+
+        self.assertIn(
+            "src/logic_change:active_changes-count-mismatch:2!=1",
+            report["current_integrity"]["proposal_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+    def test_constitution_without_domains_notice_tracks_registration(self) -> None:
+        """RULE-018：宪法未分层时提示；登记一个领域后提示消失。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            plain = self.collect(root)
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            layered = self.collect(root)
+
+        self.assertTrue(
+            any(
+                notice.startswith("logic_readme.md:constitution-without-domains")
+                for notice in plain["density"]["notices"]
+            ),
+            plain["density"]["notices"],
+        )
+        self.assertFalse(
+            any(
+                notice.startswith("logic_readme.md:constitution-without-domains")
+                for notice in layered["density"]["notices"]
+            ),
+            layered["density"]["notices"],
+        )
+        self.assertFalse(self.fails(plain))
+        self.assertFalse(self.fails(layered))
+
+    def test_domain_chg_block_density_is_measured(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            change_path = root / "src" / "logic_change.md"
+            change_path.write_text(
+                change_path.read_text(encoding="utf-8") + "\n" + "filler\n" * 60,
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        self.assertTrue(
+            any(
+                issue.startswith(f"{DOMAIN_CHANGE_ID}:exceeds-chg-limit:")
+                for issue in report["density"]["issues"]
+            ),
+            report["density"]["issues"],
+        )
 
     def test_agent_private_current_document_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -2058,7 +2349,100 @@ class RootDocCoverageTests(unittest.TestCase):
 
 
 class ChildReadmeDensityTests(unittest.TestCase):
-    """RULE-018：已登记 readme-only 子文档与根文档同受行数硬上限。"""
+    """RULE-018：宪法 150/250、部门法 250/400；旧式 readme-only 子文档按部门法阈值。"""
+
+    @staticmethod
+    def _write_registry(root: Path, row: str) -> None:
+        (root / "logic_readme.md").write_text(
+            "# Root\n\n### 范围登记表\n\n" + REGISTRY_HEADER + row + "\n",
+            encoding="utf-8",
+        )
+
+    def test_registered_child_document_paths_cover_paired_pair(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_registry(root, PAIRED_APP_ROW)
+            paired = AUDIT.registered_child_document_paths(root)
+            self._write_registry(root, README_ONLY_APP_ROW)
+            readme_only = AUDIT.registered_child_document_paths(root)
+            self.assertEqual(readme_only, AUDIT.registered_child_readme_paths(root))
+
+        self.assertEqual(paired, {"src/logic_readme.md", "src/logic_change.md"})
+        self.assertEqual(readme_only, {"src/logic_readme.md"})
+
+    def test_constitution_thresholds_are_150_and_250(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_registry(root, PAIRED_APP_ROW)
+            base = (root / "logic_readme.md").read_text(encoding="utf-8")
+            (root / "logic_readme.md").write_text(
+                base + "line\n" * 160, encoding="utf-8"
+            )
+            over_target = AUDIT.audit_density(root, [])
+            (root / "logic_readme.md").write_text(
+                base + "line\n" * 260, encoding="utf-8"
+            )
+            over_limit = AUDIT.audit_density(root, [])
+
+        self.assertTrue(
+            any(n.startswith("logic_readme.md:over-target:") for n in over_target["notices"]),
+            over_target["notices"],
+        )
+        self.assertFalse(
+            [i for i in over_target["issues"] if i.startswith("logic_readme.md:")],
+            over_target["issues"],
+        )
+        self.assertTrue(
+            any(
+                i.startswith("logic_readme.md:exceeds-hard-limit:")
+                for i in over_limit["issues"]
+            ),
+            over_limit["issues"],
+        )
+
+    def test_domain_readme_over_target_suggests_splitting(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_registry(root, PAIRED_APP_ROW)
+            (root / "src").mkdir()
+            (root / "src" / "logic_readme.md").write_text(
+                "line\n" * 300, encoding="utf-8"
+            )
+            (root / "src" / "logic_change.md").write_text("# c\n", encoding="utf-8")
+            result = AUDIT.audit_density(root, [])
+
+        notice = next(
+            (n for n in result["notices"] if n.startswith("src/logic_readme.md:over-target:")),
+            None,
+        )
+        self.assertIsNotNone(notice, result["notices"])
+        self.assertIn("大部门拆小部门", notice)
+        self.assertFalse(
+            [i for i in result["issues"] if i.startswith("src/logic_readme.md")],
+            result["issues"],
+        )
+        self.assertFalse(
+            any(n.startswith("logic_readme.md:constitution-without-domains") for n in result["notices"]),
+            result["notices"],
+        )
+
+    def test_domain_readme_over_hard_limit_is_an_issue(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self._write_registry(root, PAIRED_APP_ROW)
+            (root / "src").mkdir()
+            (root / "src" / "logic_readme.md").write_text(
+                "line\n" * 450, encoding="utf-8"
+            )
+            result = AUDIT.audit_density(root, [])
+
+        self.assertTrue(
+            any(
+                i.startswith("src/logic_readme.md:exceeds-hard-limit:")
+                for i in result["issues"]
+            ),
+            result["issues"],
+        )
 
     def test_oversized_registered_child_readme_reports_issue(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:

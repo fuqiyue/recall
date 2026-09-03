@@ -149,3 +149,113 @@ def classify_porcelain(porcelain_output: Optional[str]) -> Tuple[List[str], List
     for code, path in parse_porcelain(porcelain_output):
         (untracked if code == "??" else tracked).append(path)
     return tracked, untracked
+
+
+# ---------------------------------------------------------------------------
+# 一二级文档模型（RULE-018）：宪法（根）+ 部门法（logic_domains/<domain>/）
+# ---------------------------------------------------------------------------
+
+REGISTRY_HEADING = "范围登记表"
+
+
+def _table_rows_under_heading(text: str, heading_fragment: str) -> List[dict]:
+    """返回 Markdown 标题（含 heading_fragment）之下第一张表的行，按表头取列。
+
+    只做最小解析：一行一条，单元格以 ``|`` 分隔；表头行决定键名。
+    读不到表返回空列表。此实现与审计器的 ``markdown_table_rows`` 独立，
+    审计包是自洽的分层包，这里只服务 CLI 胶水层（validate / status / route / conflicts）。
+    """
+    lines = text.splitlines()
+    start = None
+    for index, line in enumerate(lines):
+        if line.lstrip().startswith("#") and heading_fragment in line:
+            start = index + 1
+            break
+    if start is None:
+        return []
+    headers: Optional[List[str]] = None
+    rows: List[dict] = []
+    for line in lines[start:]:
+        stripped = line.strip()
+        if stripped.startswith("#"):
+            break
+        if not stripped.startswith("|"):
+            if headers is not None and rows:
+                break
+            continue
+        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        if headers is None:
+            headers = cells
+            continue
+        if all(set(cell) <= set("-: ") for cell in cells):
+            continue
+        rows.append({headers[i]: cells[i] for i in range(min(len(headers), len(cells)))})
+    return rows
+
+
+class LogicDomain:
+    """一条已登记的二级（部门法）文档：readme + change 成对（doc_policy: paired）。"""
+
+    def __init__(self, module_id: str, scope_path: str, root: Path, doc_policy: str):
+        self.module_id = module_id
+        self.scope_path = scope_path
+        self.doc_policy = doc_policy
+        self.readme = root / scope_path / "logic_readme.md"
+        self.change = root / scope_path / "logic_change.md" if doc_policy == "paired" else None
+
+    def owned_paths(self) -> List[str]:
+        """领域 readme 声明的职权路径（``owned_paths`` 字段，逗号/分号分隔）。"""
+        if not self.readme.exists():
+            return []
+        text = self.readme.read_text(encoding="utf-8", errors="replace")
+        for line in text.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("- owned_paths:"):
+                value = stripped.split(":", 1)[1]
+                return [
+                    item.strip().strip("`").rstrip("/")
+                    for item in value.replace("；", ";").replace("，", ",").replace(";", ",").split(",")
+                    if item.strip() and item.strip().lower() != "none"
+                ]
+        return []
+
+
+def registered_domains(root: Path) -> List[LogicDomain]:
+    """宪法（根 logic_readme.md）范围登记表里登记的二级文档。
+
+    ``paired`` 的非根行是部门法（readme + change）；``readme-only`` 是旧式
+    只有 readme 的子文档（工具继续接受，文档不再推荐）。未登记的
+    ``logic_domains/*`` 目录不在此列——审计器把它当平行真源。
+    """
+    readme = root / ROOT_MARKER
+    if not readme.exists():
+        return []
+    text = readme.read_text(encoding="utf-8", errors="replace")
+    domains: List[LogicDomain] = []
+    for row in _table_rows_under_heading(text, REGISTRY_HEADING):
+        policy = (row.get("doc_policy") or "").strip().strip("`").lower()
+        membership = (row.get("membership") or "").strip().strip("`").lower()
+        scope = (row.get("scope_path") or "").strip().strip("`").replace("\\", "/").strip("/")
+        module_id = (row.get("module_id") or "").strip()
+        if membership != "in-system" or policy not in {"paired", "readme-only"}:
+            continue
+        if not scope or scope == ".":
+            continue
+        domains.append(LogicDomain(module_id, scope, root, policy))
+    return domains
+
+
+def change_ledgers(root: Path) -> List[Tuple[str, Path]]:
+    """全部议案账本：``[("logic_change.md", 根), ("logic_domains/x/logic_change.md", 领域), ...]``。
+
+    根账本承载修宪议案与全项目活跃议案索引；领域账本承载本领域一事一议的 CHG 正文。
+    只返回文件存在的账本。
+    """
+    ledgers: List[Tuple[str, Path]] = []
+    root_change = root / "logic_change.md"
+    if root_change.exists():
+        ledgers.append(("logic_change.md", root_change))
+    for domain in registered_domains(root):
+        if domain.change is not None and domain.change.exists():
+            ledgers.append((f"{domain.scope_path}/logic_change.md", domain.change))
+    return ledgers

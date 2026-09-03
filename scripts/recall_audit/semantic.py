@@ -673,7 +673,10 @@ def audit_module(path: Path, files: list[Path], root: Path) -> ModuleAudit:
                 module_binding_issues.append(
                     "inherited-policy-forbids-local-logic-docs"
                 )
-            canonical = (raw_values.get("canonical_readme") or [""])[0].strip("<>")
+            # canonical_* 按模板位于"范围登记与归属"，文档控制找不到时回退全文（与根检查一致）
+            canonical = (
+                raw_values.get("canonical_readme") or all_raw_values.get("canonical_readme") or [""]
+            )[0].strip("<>")
             expected_readme = (
                 "logic_readme.md" if relative == "." else f"{relative}/logic_readme.md"
             )
@@ -683,9 +686,9 @@ def audit_module(path: Path, files: list[Path], root: Path) -> ModuleAudit:
                 )
             elif normalize_scope_path(canonical) != expected_readme:
                 module_binding_issues.append(f"canonical_readme-mismatch:{canonical}")
-            canonical_change = (raw_values.get("canonical_change") or [""])[0].strip(
-                "<>"
-            )
+            canonical_change = (
+                raw_values.get("canonical_change") or all_raw_values.get("canonical_change") or [""]
+            )[0].strip("<>")
             expected_change = (
                 "logic_change.md" if relative == "." else f"{relative}/logic_change.md"
             )

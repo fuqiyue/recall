@@ -101,6 +101,95 @@ class RunGitTests(unittest.TestCase):
         self.assertNotIn("�" * 3, out)  # 不应整段变成替换字符
 
 
+REGISTRY_README = """# Constitution
+
+## 范围登记与归属
+
+### 范围登记表
+
+| module_id | scope_path | membership | scope_type/layer | doc_policy | logic_readme | logic_change | owner | status |
+|---|---|---|---|---|---|---|---|---|
+| MOD-ROOT | . | in-system | root/runtime-code | paired | [root](logic_readme.md) | [changes](logic_change.md) | self | active |
+| MOD-BILLING | logic_domains/billing | in-system | domain/runtime-code | paired | [billing](logic_domains/billing/logic_readme.md) | [changes](logic_domains/billing/logic_change.md) | self | active |
+| MOD-LEGACY | src/legacy | in-system | module/runtime-code | readme-only | [legacy](src/legacy/logic_readme.md) | none | self | active |
+| MOD-INHERIT | src/app | in-system | module/runtime-code | inherited | [app](logic_readme.md#scope-app) | [changes](logic_change.md) | self | active |
+| MOD-VENDOR | vendor | out-of-system | foreign/runtime-code | paired | none | none | self | active |
+
+## 当前制度
+"""
+
+
+class RegisteredDomainsTests(unittest.TestCase):
+    """RULE-018 一二级拆分法：宪法登记表 -> 部门法（readme + change）与旧式 readme-only。"""
+
+    def _write_project(self, root: Path) -> None:
+        (root / "logic_readme.md").write_text(REGISTRY_README, encoding="utf-8")
+        (root / "logic_change.md").write_text("# root ledger\n", encoding="utf-8")
+        billing = root / "logic_domains" / "billing"
+        billing.mkdir(parents=True)
+        (billing / "logic_readme.md").write_text(
+            "# Billing\n\n## 范围登记与归属\n\n"
+            "- owned_paths: src/billing, scripts/bill_*.py; docs/billing/\n",
+            encoding="utf-8",
+        )
+        (billing / "logic_change.md").write_text("# billing ledger\n", encoding="utf-8")
+        legacy = root / "src" / "legacy"
+        legacy.mkdir(parents=True)
+        (legacy / "logic_readme.md").write_text(
+            "# Legacy\n\n- owned_paths: none\n", encoding="utf-8"
+        )
+
+    def test_registered_domains_returns_paired_and_readme_only_rows(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            domains = recall_common.registered_domains(root)
+            by_id = {d.module_id: d for d in domains}
+
+            self.assertEqual(sorted(by_id), ["MOD-BILLING", "MOD-LEGACY"])
+            billing = by_id["MOD-BILLING"]
+            self.assertEqual(billing.scope_path, "logic_domains/billing")
+            self.assertEqual(billing.doc_policy, "paired")
+            self.assertEqual(billing.readme, root / "logic_domains" / "billing" / "logic_readme.md")
+            self.assertEqual(billing.change, root / "logic_domains" / "billing" / "logic_change.md")
+            self.assertEqual(
+                billing.owned_paths(), ["src/billing", "scripts/bill_*.py", "docs/billing"]
+            )
+            legacy = by_id["MOD-LEGACY"]
+            self.assertEqual(legacy.doc_policy, "readme-only")
+            self.assertIsNone(legacy.change)
+            self.assertEqual(legacy.owned_paths(), [])
+
+    def test_registered_domains_without_constitution_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            self.assertEqual(recall_common.registered_domains(Path(tmp)), [])
+
+    def test_owned_paths_of_missing_readme_is_empty(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            domain = recall_common.LogicDomain("MOD-X", "logic_domains/x", Path(tmp), "paired")
+            self.assertEqual(domain.owned_paths(), [])
+
+    def test_change_ledgers_lists_root_first_then_existing_domain_ledgers(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            ledgers = recall_common.change_ledgers(root)
+            self.assertEqual(
+                ledgers,
+                [
+                    ("logic_change.md", root / "logic_change.md"),
+                    (
+                        "logic_domains/billing/logic_change.md",
+                        root / "logic_domains" / "billing" / "logic_change.md",
+                    ),
+                ],
+            )
+            # 领域账本文件缺失时不列出，根账本缺失时也不列出
+            (root / "logic_domains" / "billing" / "logic_change.md").unlink()
+            (root / "logic_change.md").unlink()
+            self.assertEqual(recall_common.change_ledgers(root), [])
+
+
 class SingleGitInfrastructureGateTests(unittest.TestCase):
     """RULE-021 的机器门：scripts/ 下只有 recall_common 可以直接用 subprocess 调 git。
 

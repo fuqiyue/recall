@@ -1,0 +1,110 @@
+# Toolchain Domain Logic
+
+部门法（二级 readme，RULE-018）：管辖 CLI 入口与公共基础设施、审计器、校验器、记录/查询/冲突/路由脚本与测试套件。宪法是根 `logic_readme.md`，根规章优先于本文档。Git 管道见 MOD-GIT-PIPELINE。
+
+## 文档控制
+
+- doc_id: LOGIC-RECALL-TOOLCHAIN
+- module_id: MOD-TOOLCHAIN
+- scope: logic_domains/toolchain
+- scope_path: logic_domains/toolchain
+- parent: ../../logic_readme.md
+- parent_module_id: MOD-ROOT
+- membership: in-system
+- scope_type: domain
+- layer: runtime-code
+- module_doc_policy: paired
+- status: active
+- owner: self
+- governance_mode: personal
+- governance_ref: git:https://github.com/fuqiyue/recall@main
+- governance_evidence: git:https://github.com/fuqiyue/recall@main
+- governance_verification: recorded
+- governance_verified_at: 2026-08-08
+- effective_from: 2026-09-04
+- last_verified: 2026-09-04
+- review_trigger: interval:90d; event:major-refactor
+- source_of_truth: scripts/recall.py, scripts/recall_common.py, scripts/recall_audit/, scripts/validate.py
+- source_decisions: VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004
+- intent_summary: 全部 CLI 在非交互与重定向环境可用、跨平台入口不错行、机器检查只此一份实现且自身有测试
+- intent_sources: INT-20260816-004, INT-20260816-006, INT-20260816-007, INT-20260816-008, INT-20260816-009, INT-20260903-002（宪法功能意图登记）
+- decision_validity: valid
+- validity_evidence: 用户确认 2026-09-03（两级拆分）；规则行随 VER 链接
+
+## 目标与边界
+
+- 负责：`recall` 双平台入口与调度、`recall_common` 公共基础设施、审计器（`audit_logic_map.py` + `recall_audit/`）、`validate`、`new`/`query`/`list`/`conflicts`/`route` 子命令、tests/ 与审计夹具
+- 不负责：Git 管道（MOD-GIT-PIPELINE）、文档制度本身（宪法）
+- 上级制度：根 logic_readme.md（RULE-001..004、RULE-014、RULE-016..020、RULE-022）
+- 允许的例外：none
+
+## 范围登记与归属
+
+- canonical_readme: logic_domains/toolchain/logic_readme.md
+- canonical_change: logic_domains/toolchain/logic_change.md
+- owned_paths: scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, references/examples/
+- child_policy: inherit
+- data_owner: none
+- registry_status: registered
+
+## 当前制度
+
+| rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
+|---|---|---|---|---|---|---|---|---|---|
+| RULE-005 | key | 批处理入口必须纯 ASCII + CRLF | cmd.exe 按字节偏移定位命令，多字节字符加 LF 换行会错行执行注释片段 | [VER-20260808-002](../../logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | .gitattributes + recall.bat 实测 | valid | 2026-08-08 | self |
+| RULE-006 | key | 脚本调用外部命令必须用 argv 列表，禁止 shell=True | 多行 commit message 会被 shell 截断，用户输入可注入命令 | [VER-20260808-002](../../logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | init_recall.py / link_ver_git.py 注入测试 | valid | 2026-08-08 | self |
+| RULE-007 | key | 嵌套项目根不计入本项目审计 | 自带 `scope: .` 的子目录属于另一个项目，按模块审计会用其 module_id 顶掉真实根文档 | [VER-20260808-002](../../logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | audit_logic_map.py 静态门 | valid | 2026-08-08 | self |
+| RULE-008 | ordinary | CLI 必须可非交互运行，且重定向下不崩 | CI、容器和 AI 代理环境没有 tty；Windows 重定向后 stdout 走 ANSI 代码页 | [VER-20260808-002](../../logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | 空 stdin 与重定向实测；审计器 `--json` 重定向落盘为 UTF-8（VER-20260903-003） | valid | 2026-09-03 | self |
+| RULE-009 | ordinary | 校验脚本的字段名以 references/ 模板为准 | schema 漂移会让检查静默失效或报假错误 | [VER-20260808-002](../../logic_version/records/logic_version-20260808-002-toolchain-hardening.md) | 复现验证 | validate.py 记录发现测试 | valid | 2026-08-08 | self |
+| RULE-012 | key | 决策记录文件名统一为 `logic_version-YYYYMMDD-NNN-*.md`，创建方与所有发现方共用同一正则 | create_ver/status/validate/list 曾各用一套命名，记录对部分工具静默不可见 | [VER-20260811-002](../../logic_version/records/logic_version-20260811-002-cli-interface-repair.md) | 复现验证 | tests/test_recall_cli.py | valid | 2026-08-11 | self |
+| RULE-015 | ordinary | `recall validate` 覆盖一致性对账：VER 三处登记与撞号（`rejected`/`cancelled`/`rolled-back` 记录豁免有效决策索引、登记进 index.md 即可，反向登记告警）、INT/FLOW/UXI 引用有效性与代码锚点存在性、medium/high CHG 三字段、VER 需求保全三字段、字段行占位符未回填、RULE/INT 重复按定义行判定且**宪法与全部已登记领域文档纳入同一套检查、CHG 跨全部账本提取、领域 CHG 未进根公报告警**（RULE-018）；漂移度量：统计自上次触及 logic 文档以来累积的提交数，超过 10 个升级为警告；post-commit hook 保留非阻断漂移提醒 | 文档是代码理解的持久缓存，缓存腐烂与登记缺失静默失效是本系统反复出现的失败模式；被否决的方案不得登记为"有效决策"，拆分后的领域文档不得进入无检查区，无人阅读的提醒需要可观测数字 | [VER-20260816-005](../../logic_version/records/logic_version-20260816-005-audit-remediation.md)；[VER-20260903-004](../../logic_version/records/logic_version-20260903-004-two-level-docs.md) | 复现验证 | scripts/validate.py + tests/test_validate.py | valid | 2026-09-04 | self |
+| RULE-021 | key | CLI 基础设施只此一份：项目根查找、Git 子进程调用（argv 列表 + 固定 utf-8 解码、只去尾部空白）、`git status --porcelain` 解析（`parse_porcelain`/`classify_porcelain`）、输出流编码防护与**领域登记表读取（`registered_domains`/`change_ledgers`）**统一在 `scripts/recall_common.py`，各脚本（含 `recall_audit` 包）导入使用、不得自行实现，**`scripts/` 下除 recall_common 外禁止直接 `subprocess` 调用**（测试级静态门）；`recall.py` 每条子命令都有以子进程方式真跑的胶水层冒烟测试（断言退出码与关键输出），纯函数测试不能替代 | 五份脚本各写一份根查找、七份各写一份编码防护，坏掉的总是没测试的那一份：`recall status` 在中文 Windows 因 git 子进程未指定 utf-8 崩溃、`recall conflicts` 把子命令名当项目根永远失败而 CI 全绿；公共封装建立后仍有 7 处绕过，`strip()` 吃掉 porcelain 首行空格使路径错位——文字规则拦不住第二份实现，只有机器门能 | [VER-20260903-002](../../logic_version/records/logic_version-20260903-002-structure-context-cost.md)；[VER-20260903-003](../../logic_version/records/logic_version-20260903-003-structural-closure.md) | 复现验证 + 用户确认 2026-09-03 | scripts/recall_common.py + tests/test_recall_common.py（`SingleGitInfrastructureGateTests` 静态扫描、porcelain 用例、领域登记表用例）+ tests/test_recall_cli.py `CliGlueSmokeTests` | valid | 2026-09-04 | self |
+| RULE-023 | key | CHG 字段要求按治理模式分档：审计器 current-state 门对 `governance_mode: personal` 的 CHG 块只强制 `status`、`effective: false`、`proposal_revision`、`recall_route`、`changed_by`，以及进入 implementing/verifying/promoting 前的 `decision_confirmed_by` + `decision_confirmed_at`（用户确认不随治理模式降级）；collaborative/compliance 层字段（协调、决策门、语义审查、运行暴露、历史保留、追溯链等，清单见 `PERSONAL_OPTIONAL_CHANGE_FIELDS`）**缺则不查、写则照查**；块自身 governance_mode 优先于账本模式，两者都缺按完整要求处理；collaborative 模式与 `--formal-review` 要求不变；领域账本的 CHG 块同受此门 | 审计器此前对活跃 CHG 无差别要求 9 个协调字段与完整决策/审查字段，与 references/field-vocabulary.md "personal 8 个字段"矛盾，personal CHG 普遍 100+ 行 | [VER-20260903-003](../../logic_version/records/logic_version-20260903-003-structural-closure.md) | 用户确认 2026-09-03 | scripts/recall_audit/changes.py `change_field_tier` + tests/test_audit_logic_map.py `GovernanceTierTests` | valid | 2026-09-04 | self |
+
+## 代码地图
+
+| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|
+| recall.bat / recall.sh / .gitattributes | source/runtime-code+config | 双平台 CLI 入口（探测 python/py/python3 后转发）；.gitattributes 固定 *.bat CRLF、*.sh LF（RULE-005） | 命令行参数 | 子命令输出与退出码 | 入口文件 | yes | none |
+| scripts/recall_common.py | source/runtime-code | 公共基础设施（RULE-021）：`find_project_root`、`run_git`/`git_output`、`parse_porcelain`/`classify_porcelain`、`force_utf8_output`、`unpushed_commit_count`、`registered_domains`/`change_ledgers`（RULE-018 领域登记表读取） | 起点路径 / git 参数 / porcelain 文本 / 项目根 | 项目根 / (ok, stdout, stderr) / 分类路径 / 计数 / 领域与账本列表 | 脚本文件 | yes | tests/test_recall_common.py |
+| scripts/recall.py | source/runtime-code | CLI 调度器；转发到各子命令；`status` 分列领域数、各账本 CHG 计数、已跟踪变更、未跟踪待处置文件（RULE-020）与未推送提交（RULE-010） | 子命令与参数 | 退出码 | 脚本文件 | yes | tests/test_recall_cli.py（含子进程冒烟） |
+| scripts/route_docs.py | source/runtime-code | `recall route`：按目标路径/关键词匹配领域 `owned_paths`，输出宪法 + 命中领域 readme/change 的读取清单、行数与估算 token（RULE-018 按需导入） | 路径或关键词、`--json` | 读取清单 | 脚本文件 | yes | tests/test_recall_cli.py |
+| scripts/audit_logic_map.py | source/runtime-code | 审计器入口 facade（RULE-022）：重新导出 `recall_audit` 包全部公开名字，保持命令行、`--json` 与测试访问路径不变；须与 `scripts/recall_audit/` 整目录部署 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
+| scripts/recall_audit/ | source/runtime-code | 审计器分层包：constants → textutil → fsclassify → changes（CHG 检查、`change_field_tier` 分档 RULE-023）→ semantic → integrity（路由/议案/current-state 门，含领域文档与根公报核查 RULE-018）→ formal → archive（归档/索引/入口/密度分档）→ report → cli（强制 UTF-8 输出）；只许向下依赖，新写函数 ≤150 行 | 项目根路径 | 审计报告 dict | 包目录 | yes | tests/test_audit_logic_map.py |
+| scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态、宪法 + 领域编号空间、跨账本 CHG 与公报登记、漂移度量、未跟踪残留告警（RULE-015/018/020） | 项目根路径 | 验证报告 | 脚本文件 | yes | tests/test_validate.py |
+| scripts/create_ver.py | source/runtime-code | 按模板创建 VER-* 决策记录（规范文件名取号） | 描述与 scope | 记录文件 | 脚本文件 | yes | tests/test_recall_cli.py |
+| scripts/link_ver_git.py | source/runtime-code | 关联查询：文件/提交 ↔ 决策记录；intent 反向查询（意图 → 规则 → 记录 → 代码锚点） | 文件路径、commit 或 INT-ID | 关联报告 | 脚本文件 | yes | tests/test_recall_cli.py |
+| scripts/detect_conflicts.py | source/runtime-code | 规则间与议案-规则冲突的启发式检测（宪法 + 全部领域、全部账本）；`main(argv)` 经公共根查找定位文档 | logic 文档 | 冲突报告与退出码（0 无冲突 / 2 有潜在冲突） | 脚本文件 | yes | tests/test_recall_cli.py |
+| tests/ | test/test-fixture | test_audit_logic_map（审计器）、test_git_sync（同步/回填，MOD-GIT-PIPELINE）、test_recall_cli（CLI 胶水 + 子进程冒烟）、test_validate（validate 检查函数）、test_recall_common（公共基础设施 + RULE-021 静态门） | unittest | 断言 | 测试文件 | yes | `python -m unittest discover -s tests` |
+| references/examples/audit-repro-legacy/ | test/test-fixture | 审计复现夹具；自带 `scope: .`，按嵌套项目根排除（RULE-007） | 审计脚本读取 | 复现场景 | 夹具文件 | yes | none |
+
+## 旧行为消费者
+
+- `scripts/audit_logic_map.py` 单文件拷贝部署：VER-20260903-002 起不再支持，必须与 `scripts/recall_audit/` 整目录部署；已知消费者只有指向本仓库的技能目录符号链接（`~/.claude/skills/recall`），无需迁移
+- 审计 JSON：collaborative 项目输出不变；personal 项目自 VER-20260903-003 起 `proposal_issues` 只会减少（RULE-023）；VER-20260903-004 起无领域的项目多出 advisory 提示 `constitution-without-domains`，退出码不变
+
+## 测试与验证
+
+| test_level | 规则/不变量 | 当前验证命令/检查 | expected | authoritative_evidence |
+|---|---|---|---|---|
+| unit | 审计器行为：INV-001/002 平行真源与已登记领域豁免、RULE-007 嵌套根、RULE-009 记录 schema、RULE-018 领域路由/公报/密度分档、RULE-019 覆盖对账、RULE-022 分包后行为不变、RULE-023 字段分档 | `python tests/test_audit_logic_map.py`；`python scripts/audit_logic_map.py . --current-state` / `--formal-review` / `--json --current-state` | 全部 OK；静态门 PASS；无 parallel/nonroot 报告；夹具不在 Non-root 列表；JSON 可解析 | unittest 输出 + 审计报告 |
+| integration | RULE-009/RULE-015 validate 一致性对账 | `python scripts/validate.py` | 决策记录被发现且无假缺失字段；三处登记、撞号、意图层引用、CHG 三字段、占位符、领域公报检查出现且无假错误 | 验证报告 |
+| runtime | RULE-005 批处理入口不错行 | `recall status` / `recall help` | 无 `is not recognized` 输出 | 终端输出 |
+| runtime | RULE-008 非交互可用与重定向不崩 | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive`；`recall help > out.txt`；`recall status > out.txt`；`python scripts/audit_logic_map.py . --json --current-state > out.json` | 均退出 0，无 UnicodeEncodeError，落盘为 UTF-8 | 终端输出 / 输出文件 |
+| integration | RULE-010/012/014/015/018/020/021 CLI 胶水层与 validate 检查函数：接口一致性、子进程冒烟（help/status/conflicts/validate/route 真跑）、未推送提示、status 领域与账本计数、rejected 豁免、领域编号空间与公报告警 | `python -m unittest tests.test_recall_cli tests.test_validate` | 全部 OK；status 退出 0 且无 Traceback；route --json 输出可解析；有残留→warning，无残留→无告警 | unittest 输出 |
+| unit | RULE-021 公共基础设施与机器门 | `python -m unittest tests.test_recall_common` | 全部 OK：根查找/回退、run_git 非仓库不抛异常、porcelain 首行前导空格保留、parse/classify_porcelain、无上游返回 None、utf-8 解码、registered_domains/change_ledgers、scripts/ 下无直接 subprocess 调用 | unittest 输出 |
+| runtime | RULE-020 status 待处置提示 | 新建一个未跟踪文件后 `recall status` | 输出单列"未跟踪文件（待处置候选）"并列出路径；删除后消失 | 终端输出 |
+
+## 当前限制
+
+- 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为；Density 与 logic_temp 检查只是 advisory，不使静态门失败——消费项目 logic_change 越过硬上限 21 倍仍 PASS（2026-09-03 eduai 实测），是否让硬上限越线进门属待立案议题
+- 收尾归零依赖代理自律：`recall status` / `recall validate` 只能看见未跟踪且未被忽略的文件；已被 `git add` 或已提交的垃圾机器识别不到（RULE-020）
+- 审计器函数长度：integrity.py / archive.py 已按检查拆分，changes.py（334/152）、semantic.py（398/248）、formal.py（296/178）、report.py（459/350/165）仍有 9 个函数超过 150 行，按同一方法（先冻结 JSON 基线、拆分后逐字节对比）分批处理
+- `recall validate` 的 CHG 发现只认 `CHG-YYYYMMDD-NNN`，消费项目使用 `CHG-YYYYMMDD-<slug>` 时 validate 的三字段检查静默跳过（审计器与 `recall status` 可识别）；validate 的 VER 必填段与 after_commit 正则只认最小模板与裸 SHA，扩展模板项目会得到假错误——两者为待立案的工具缺口（2026-09-03 eduai 实测）
+- `recall route` 的关键词匹配是子串级：命中领域文档正文即算命中，不判断语义；路径匹配依赖领域 `owned_paths` 的完整性，未声明的路径不会路由到任何领域
+- `recall conflicts` 为关键词级启发式，语义冲突仍需人工澄清
+
+## 活跃议案入口
+
+- 唯一入口：[logic_change.md](logic_change.md)
+- 相关 CHG-ID：none

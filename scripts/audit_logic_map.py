@@ -193,7 +193,9 @@ from recall_audit.archive import (  # noqa: F401
     find_nonroot_current_documents,
     find_parallel_current_candidates,
     find_scattered_backup_candidates,
+    registered_child_document_paths,
     registered_child_readme_paths,
+    registered_domain_scopes,
     unscanned_archive_report,
 )
 from recall_audit.report import (  # noqa: F401

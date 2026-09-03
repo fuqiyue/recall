@@ -14,7 +14,12 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from recall_common import find_project_root, force_utf8_output  # noqa: E402
+from recall_common import (  # noqa: E402
+    change_ledgers,
+    find_project_root,
+    force_utf8_output,
+    registered_domains,
+)
 
 
 def extract_rules(content: str) -> List[Dict[str, str]]:
@@ -204,19 +209,27 @@ def main(argv=None):
         print(f"❌ 未找到 logic_readme.md: {readme_path}", file=sys.stderr)
         return 1
 
+    # 一二级拆分法（RULE-018）：议案分布在根账本与各领域账本
+    ledgers = change_ledgers(project_root)
     if not change_path.exists():
-        print("ℹ️  未找到 logic_change.md，跳过议案检查")
-        changes = []
-    else:
-        with open(change_path, 'r', encoding='utf-8') as f:
-            changes = extract_changes(f.read())
+        print("ℹ️  未找到 logic_change.md，跳过根账本议案检查")
+    changes = []
+    for _label, ledger_path in ledgers:
+        with open(ledger_path, 'r', encoding='utf-8') as f:
+            changes.extend(extract_changes(f.read()))
 
-    # 读取规则
+    # 读取规则：宪法（根）+ 全部领域 readme（部门法）
     with open(readme_path, 'r', encoding='utf-8') as f:
         readme_content = f.read()
         rules = extract_rules(readme_content)
+    domain_readmes = [d.readme for d in registered_domains(project_root) if d.readme.exists()]
+    for domain_readme in domain_readmes:
+        rules.extend(extract_rules(domain_readme.read_text(encoding='utf-8')))
 
-    print(f"📋 读取到 {len(rules)} 条规则，{len(changes)} 个活跃议案\n")
+    print(
+        f"📋 读取到 {len(rules)} 条规则（宪法 + {len(domain_readmes)} 份领域文档），"
+        f"{len(changes)} 个活跃议案（{len(ledgers)} 份账本）\n"
+    )
 
     # 检测冲突
     rule_conflicts = detect_keyword_conflicts(rules)

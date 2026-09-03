@@ -51,7 +51,7 @@ Recall 的根文档模型默认适合单人或低并发小团队。`logic_change
 
 | Plan 模式环节 | Recall 对应物 |
 |---|---|
-| 规划前的只读探索 | 默认上下文读取：`logic_readme.md`（含功能意图与用户流程）→ `logic_change.md` → 代码/测试 |
+| 规划前的只读探索 | 默认上下文读取：`logic_readme.md`（含功能意图与用户流程）→ `logic_change.md` → `recall route` 命中的领域文档 → 代码/测试 |
 | 计划中的需求拆解与影响范围 | 中等/高风险通道要求的修改计划；CHG 的 `raw_request` / `decomposition` / `fit_analysis` |
 | 用户批准计划 | 该 CHG 当前 `proposal_revision` 的决策确认（`decision_ref: plan-approved:YYYY-MM-DD`） |
 | 计划执行完成 | 更新 `logic_readme.md` 受影响章节；`compact`/`full` 固化 `VER-*` |

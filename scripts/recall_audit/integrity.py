@@ -142,15 +142,19 @@ def _check_route_row_attributes(
 
 
 def _check_route_policy_placement(ctx: _RouteContext, info: _RouteRow) -> None:
-    """核查根行必须 in-system/paired，且 paired 仅限根（INV-002）。"""
+    """核查根行必须 in-system/paired；非根 paired 行是二级领域文档（部门法）。
+
+    RULE-018 一二级拆分法（VER-20260903-004）：根 logic_readme 是宪法，
+    ``doc_policy: paired`` 的非根登记行是部门法——readme + change 成对，
+    领域 CHG 正文只在领域账本，根账本保留全项目索引（公报）。
+    out-of-system 行不得声称 paired。
+    """
     if info.scope_value == ".":
         ctx.root_rows += 1
         if info.membership != "in-system" or info.doc_policy != "paired":
             ctx.route_issues.append("root-route-must-be-in-system-paired")
-    elif info.membership == "in-system" and info.doc_policy == "paired":
-        # 非根模块可 inherited（默认）或 readme-only（经确认拆分的子文档）。
-        # paired 仅限根：logic_change 全项目唯一（INV-002）。
-        ctx.route_issues.append(f"{info.module_id}:paired-policy-root-only")
+    elif info.membership != "in-system" and info.doc_policy == "paired":
+        ctx.route_issues.append(f"{info.module_id}:paired-policy-needs-in-system")
 
 
 def _check_route_local_docs(ctx: _RouteContext, info: _RouteRow) -> None:
@@ -742,10 +746,16 @@ def _check_module_proposal_owners(ctx: _ProposalContext) -> None:
                 owner_scopes.add(
                     owner_path.parent.relative_to(ctx.root).as_posix() or "."
                 )
-            if owner_scopes != {proposal_scope}:
+            # RULE-018 两级模型：领域议案必须影响自身领域；可再列其他领域
+            # （跨领域），但触及根（宪法）就是修宪案，正文须在根账本。
+            if proposal_scope not in owner_scopes:
                 ctx.cross_module_link_issues.append(
-                    f"{change_id}:module-proposal-must-be-root-canonical:"
+                    f"{change_id}:domain-proposal-must-include-own-scope:"
                     f"proposal={proposal_scope};owners={','.join(sorted(owner_scopes)) or 'none'}"
+                )
+            if "." in owner_scopes or "." in affected_scopes:
+                ctx.cross_module_link_issues.append(
+                    f"{change_id}:constitution-amendment-must-live-in-root-change:{proposal_scope}"
                 )
 
 
@@ -1034,6 +1044,8 @@ class _CurrentStateContext:
     module_scopes: dict[str, str] = field(default_factory=dict)
     module_anchor_scopes: dict[str, str] = field(default_factory=dict)
     index_rows: list[dict[str, str]] = field(default_factory=list)
+    gazette_rows: list[dict[str, str]] = field(default_factory=list)
+    domain_change_ids: dict[str, str] = field(default_factory=dict)
     body_ids: set[str] = field(default_factory=set)
     topic_members: dict[str, set[str]] = field(default_factory=dict)
     topics_by_change: dict[str, set[str]] = field(default_factory=dict)
@@ -1471,7 +1483,16 @@ def _check_change_body_index(ctx: _CurrentStateContext) -> None:
             "active_changes-count-mismatch:"
             f"{declared_active_changes or 'missing'}!={expected_active_changes}"
         )
-    index_rows = markdown_table_rows(ctx.change_text, "活跃议案索引")
+    all_index_rows = markdown_table_rows(ctx.change_text, "活跃议案索引")
+    # RULE-018：根索引是全项目公报——指向领域账本的行（proposal_path 目标不是
+    # 本文件）在 _check_gazette_rows 单独核查，不参与"正文 <-> 索引"双向比对。
+    index_rows = []
+    for row in all_index_rows:
+        target, _fragment = cell_link_parts(row.get("proposal_path", ""))
+        if target and normalize_scope_path(target) != "logic_change.md":
+            ctx.gazette_rows.append(row)
+        else:
+            index_rows.append(row)
     ctx.index_rows = index_rows
     index_ids = {
         change_id
@@ -1781,6 +1802,184 @@ def _check_topic_memberships(ctx: _CurrentStateContext) -> None:
             )
 
 
+# ---------------------------------------------------------------------------
+# RULE-018 一二级拆分法：领域（部门法）文档与根公报核查
+# ---------------------------------------------------------------------------
+
+
+def _registered_domain_rows(ctx: _CurrentStateContext) -> list[tuple[str, str]]:
+    """范围登记表中 in-system + paired 的非根行 -> [(module_id, scope_path)]。"""
+    domains: list[tuple[str, str]] = []
+    for row in ctx.module_routes.get("rows", []):
+        policy = (row.get("doc_policy") or "").strip().strip("`").casefold()
+        membership = (row.get("membership") or "").strip().strip("`").casefold()
+        scope = normalize_scope_path(row.get("scope_path", ""))
+        if policy != "paired" or membership != "in-system" or scope in {"", "."}:
+            continue
+        domains.append((row.get("module_id", "").strip(), scope))
+    return domains
+
+
+def _check_domain_readme(ctx: _CurrentStateContext, scope: str) -> None:
+    """领域 readme 的"当前制度"与"代码地图"表同受根表列/行检查（规则行搬迁不降级）。"""
+    readme = ctx.root / scope / "logic_readme.md"
+    text, error = read_text(readme)
+    if error:
+        ctx.document_issues.append(f"{scope}/logic_readme:unreadable:{error}")
+        return
+    label = f"{scope}/logic_readme"
+    headers = markdown_table_headers(text, "当前制度")
+    if headers != CURRENT_POLICY_HEADERS:
+        ctx.document_issues.append(f"{label}:current-policy-invalid-columns")
+    for index, row in enumerate(markdown_table_rows(text, "当前制度"), start=1):
+        rule_id = row.get("rule_id", "").strip()
+        rule_level = row.get("规则等级", "").strip().casefold()
+        rule = row.get("当前有效规则/行为", "").strip()
+        why = row.get("why（仅一句可审计摘要）", "").strip()
+        if any(
+            not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value
+            for value in (rule_id, rule, why)
+        ):
+            ctx.document_issues.append(f"{label}:current-policy-row-{index}-needs-rule-and-why")
+        if rule_level not in {"key", "ordinary"}:
+            ctx.document_issues.append(
+                f"{label}:current-policy-row-{index}-invalid-rule-level:{rule_level or 'empty'}"
+            )
+        if rule_level == "key" and not is_immutable_decision_record_link(row.get("决策记录", "")):
+            ctx.document_issues.append(
+                f"{label}:current-policy-row-{index}-key-needs-immutable-decision-link"
+            )
+        if not is_iso_date(row.get("last_reviewed", "").strip()):
+            ctx.document_issues.append(f"{label}:current-policy-row-{index}-last-reviewed-must-be-date")
+    for index, row in enumerate(markdown_table_rows(text, "代码地图"), start=1):
+        for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
+            value = row.get(column, "").strip()
+            if not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value:
+                ctx.document_issues.append(f"{label}:code-map-row-{index}-missing-{column}")
+
+
+def _check_domain_block(
+    ctx: _CurrentStateContext,
+    scope: str,
+    change_id: str,
+    block: str,
+    local_rows: list[dict[str, str]],
+    ledger_mode: str,
+) -> None:
+    """核查一条领域 CHG：责任字段、范围归属、本地索引行与根公报行。"""
+    values = control_values(block)
+    raw_values = control_values_raw(block)
+    _check_block_responsibility(ctx, change_id, values, raw_values)
+    affected_scopes = change_affected_scopes(raw_values)
+    if not affected_scopes:
+        ctx.proposal_issues.append(f"{change_id}:missing-affected-scopes")
+    for affected_scope in sorted(affected_scopes):
+        if affected_scope not in ctx.registered_scopes:
+            ctx.proposal_issues.append(f"{change_id}:affected-scope-not-registered:{affected_scope}")
+    if affected_scopes and scope not in affected_scopes:
+        ctx.proposal_issues.append(f"{change_id}:domain-proposal-must-include-own-scope:{scope}")
+    if "." in affected_scopes:
+        ctx.proposal_issues.append(f"{change_id}:constitution-amendment-must-live-in-root-change")
+    matching = [
+        row for row in local_rows if normalize_change_id(row.get("change_id", "")) == change_id
+    ]
+    if len(matching) != 1:
+        ctx.proposal_issues.append(f"{change_id}:index-row-count-must-be-one:{len(matching)}")
+    else:
+        target, fragment = cell_link_parts(matching[0].get("proposal_path", ""))
+        if target != "logic_change.md" or fragment != change_id.casefold():
+            ctx.proposal_issues.append(f"{change_id}:proposal-path-must-target-logic_change-anchor")
+        indexed_status = matching[0].get("status", "").strip().casefold()
+        if indexed_status != (values.get("status") or [""])[0]:
+            ctx.proposal_issues.append(f"{change_id}:index-status-mismatch:{indexed_status or 'empty'}")
+    gazette = [
+        row for row in ctx.gazette_rows if normalize_change_id(row.get("change_id", "")) == change_id
+    ]
+    if len(gazette) != 1:
+        ctx.proposal_issues.append(f"{change_id}:domain-change-missing-from-root-index:{scope}")
+    else:
+        target, fragment = cell_link_parts(gazette[0].get("proposal_path", ""))
+        expected = f"{scope}/logic_change.md"
+        if normalize_scope_path(target or "") != expected or fragment != change_id.casefold():
+            ctx.proposal_issues.append(f"{change_id}:root-index-must-link-domain-change:{expected}")
+        gazette_status = gazette[0].get("status", "").strip().casefold()
+        if gazette_status != (values.get("status") or [""])[0]:
+            ctx.proposal_issues.append(f"{change_id}:root-index-status-mismatch:{gazette_status or 'empty'}")
+    ctx.proposal_issues.extend(
+        change_coordination_issues({change_id: block}, ledger_mode=ledger_mode)
+    )
+
+
+def _check_domain_change(ctx: _CurrentStateContext, scope: str) -> None:
+    """核查一份领域账本：文档控制绑定、正文计数、每条 CHG。"""
+    change = ctx.root / scope / "logic_change.md"
+    text, error = read_text(change)
+    if error:
+        ctx.document_issues.append(f"{scope}/logic_change:unreadable:{error}")
+        return
+    label = f"{scope}/logic_change"
+    control_text = markdown_section_text(text, "文档控制")
+    control = control_values(control_text)
+    raw_control = control_values_raw(control_text)
+    declared_scope = normalize_scope_path(
+        (raw_control.get("scope_path") or raw_control.get("scope") or [""])[0]
+    )
+    if declared_scope != scope:
+        ctx.document_issues.append(f"{label}:scope_path-must-be-{scope}")
+    current_policy = normalize_scope_path((raw_control.get("current_policy") or [""])[0])
+    if current_policy not in {"logic_readme.md", f"{scope}/logic_readme.md"}:
+        ctx.document_issues.append(f"{label}:current_policy-must-be-domain-logic_readme")
+    ledger_mode = (control.get("governance_mode") or [""])[0]
+    if ledger_mode and ctx.readme_governance_mode and ledger_mode != ctx.readme_governance_mode:
+        ctx.document_issues.append(f"{label}:governance-mode-must-match-root:{ledger_mode}")
+    body_ids = change_heading_ids(text)
+    for change_id in body_ids:
+        if change_id in ctx.body_ids or change_id in ctx.domain_change_ids:
+            ctx.proposal_issues.append(f"duplicate-change-body:{change_id}")
+        ctx.domain_change_ids[change_id] = scope
+    declared = (control.get("active_changes") or [""])[0]
+    expected = str(len(body_ids)) if body_ids else "none"
+    if declared.casefold() != expected:
+        ctx.proposal_issues.append(
+            f"{label}:active_changes-count-mismatch:{declared or 'missing'}!={expected}"
+        )
+    local_rows = markdown_table_rows(text, "活跃议案索引")
+    for change_id, block in change_blocks(text).items():
+        _check_domain_block(ctx, scope, change_id, block, local_rows, ledger_mode)
+
+
+def _check_gazette_rows(ctx: _CurrentStateContext) -> None:
+    """根公报行必须指向已登记领域账本中确有正文的 CHG。"""
+    for row in ctx.gazette_rows:
+        change_id = normalize_change_id(row.get("change_id", ""))
+        target, _fragment = cell_link_parts(row.get("proposal_path", ""))
+        if not change_id or not target:
+            continue
+        if ctx.domain_change_ids.get(change_id) is None:
+            ctx.proposal_issues.append(f"{change_id}:root-index-target-body-not-found:{target}")
+
+
+def _check_domain_documents(ctx: _CurrentStateContext, audits: list[ModuleAudit]) -> None:
+    """RULE-018：逐个已登记领域核查 readme 表格、账本与公报一致性，并并入模块语义问题。"""
+    domain_scopes = {scope for _, scope in _registered_domain_rows(ctx)}
+    for scope in sorted(domain_scopes):
+        if (ctx.root / scope / "logic_readme.md").is_file():
+            _check_domain_readme(ctx, scope)
+        if (ctx.root / scope / "logic_change.md").is_file():
+            _check_domain_change(ctx, scope)
+    _check_gazette_rows(ctx)
+    for audit in audits:
+        if audit.path not in domain_scopes:
+            continue
+        for issue in audit.semantic_issues + audit.module_binding_issues + audit.broken_links:
+            if issue.startswith("logic_change:CHG-"):
+                ctx.proposal_issues.append(issue.removeprefix("logic_change:"))
+            elif "missing-changed-by" in issue:
+                ctx.responsibility_issues.append(f"{audit.path}:{issue}")
+            else:
+                ctx.document_issues.append(f"{audit.path}:{issue}")
+
+
 def audit_current_state_integrity(
     root: Path,
     audits: list[ModuleAudit],
@@ -1825,6 +2024,7 @@ def audit_current_state_integrity(
     _check_topic_index(ctx)
     _check_change_blocks(ctx)
     _check_topic_memberships(ctx)
+    _check_domain_documents(ctx, audits)
 
     # RULE-023：账本的 governance_mode 决定 CHG 块的字段档位
     ledger_mode = (control_values(change_text).get("governance_mode") or [""])[0]
