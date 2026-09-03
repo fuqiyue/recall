@@ -65,7 +65,11 @@ def find_project_root(
 def run_git(
     args: Iterable[str], cwd: Optional[Path] = None, timeout: int = 60
 ) -> Tuple[bool, str, str]:
-    """运行 Git 并返回 ``(ok, stdout, stderr)``，输出已 strip。
+    """运行 Git 并返回 ``(ok, stdout, stderr)``，输出只去尾部空白。
+
+    不能 ``strip()`` 前导空白：``git status --porcelain`` 用首列空格表示
+    "工作区已修改、暂存区干净"（`` M path``），整体 strip 会让首行状态码
+    与路径各错一位（``.github/x`` 变成 ``github/x``）。
 
     参数以列表传入且不经过 shell（RULE-006）；固定 utf-8 解码并替换非法
     字节（RULE-008）。中文提交信息在 GBK 默认编码下会让 ``subprocess``
@@ -86,8 +90,8 @@ def run_git(
         return False, "", str(exc)
     return (
         result.returncode == 0,
-        (result.stdout or "").strip(),
-        (result.stderr or "").strip(),
+        (result.stdout or "").rstrip(),
+        (result.stderr or "").rstrip(),
     )
 
 

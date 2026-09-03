@@ -55,6 +55,20 @@ class RunGitTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             self.assertIsNone(recall_common.unpushed_commit_count(Path(tmp)))
 
+    def test_run_git_keeps_porcelain_leading_space(self):
+        """首行 `` M path`` 的前导空格不能被 strip 掉，否则状态码和路径各错一位。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            for args in (["init", "-q"], ["config", "user.email", "t@t"], ["config", "user.name", "t"]):
+                self.assertTrue(recall_common.run_git(args, cwd=root, timeout=10)[0])
+            (root / ".marker").write_text("a", encoding="utf-8")
+            recall_common.run_git(["add", ".marker"], cwd=root, timeout=10)
+            recall_common.run_git(["commit", "-q", "-m", "init"], cwd=root, timeout=10)
+            (root / ".marker").write_text("b", encoding="utf-8")
+            ok, out, _ = recall_common.run_git(["status", "--porcelain"], cwd=root, timeout=10)
+            self.assertTrue(ok)
+            self.assertEqual(out.splitlines()[0], " M .marker")
+
     def test_run_git_decodes_non_ascii_as_utf8(self):
         """中文提交信息在 GBK 默认编码下曾让 status 崩溃；这里直接在本仓库读一次。"""
         ok, out, _ = recall_common.run_git(["log", "-1", "--format=%s"], cwd=ROOT, timeout=10)
