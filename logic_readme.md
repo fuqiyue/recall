@@ -297,7 +297,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 ## 活跃议案入口
 
 - 唯一入口：[logic_change.md](logic_change.md)
-- 相关 CHG-ID：CHG-20260903-001
+- 相关 CHG-ID：none
 
 ## 当前限制
 
