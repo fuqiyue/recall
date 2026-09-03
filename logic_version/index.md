@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-08-16
+- last_updated: 2026-09-03
 - owner: self
 
 ## 关于逻辑回档
@@ -48,6 +48,7 @@
 | VER-20260831-001 | logic_version-20260831-001-entry-slim-skill-front | 2026-08-31 | effective | SKILL.md, references/ | RULE-018, RULE-019 | none | 入口模板短路由化（保留 RECALL_* 标记与五条最小协议）、SKILL 首屏重排（路由一问 + 三通道前置）、跨仓库 RULE 指针改指本技能目录、personal 模式 ADR 可选显式化 | [logic_version-20260831-001-entry-slim-skill-front.md](records/logic_version-20260831-001-entry-slim-skill-front.md) |
 | VER-20260831-002 | logic_version-20260831-002-arch-simplify | 2026-08-31 | effective | CLAUDE.md, SKILL.md, references/, scripts/, logic_change.md | RULE-008, RULE-014, RULE-019 | none | 自身 CLAUDE.md 裁剪为短路由、意图层维护深度按治理模式分档（personal 轻量档）、create_ver 编码防护对齐；Git 表面收缩与已确认规则冲突，立案 CHG-20260831-002 待决 | [logic_version-20260831-002-arch-simplify.md](records/logic_version-20260831-002-arch-simplify.md) |
 | VER-20260831-003 | logic_version-20260831-003-git-surface-rejected | 2026-08-31 | rejected | scripts/ | RULE-010, RULE-011 | CHG-20260831-002 | 否决 Git 同步表面收缩：用户选方案 A 保持现状，RULE-010/011 与 UXI-001/002 维持原状；三字段与方案分析随本记录归档 | [logic_version-20260831-003-git-surface-rejected.md](records/logic_version-20260831-003-git-surface-rejected.md) |
+| VER-20260903-001 | logic_version-20260903-001-cleanup-ledger | 2026-09-03 | effective | ., references/, scripts/, tests/ | RULE-020 | 1 | 收尾归零：logic_temp 增工作区产物台账（medium/high 必建、清零才关 CHG）、SKILL 核心原则 12、status/validate 单列未跟踪残留；否决"根目录第三份 logic_temp"方案 | [logic_version-20260903-001-cleanup-ledger.md](records/logic_version-20260903-001-cleanup-ledger.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 

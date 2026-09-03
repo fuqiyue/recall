@@ -243,6 +243,30 @@ def cmd_validate():
         print(f"❌ 错误: {e}")
         return 1
 
+def classify_porcelain(porcelain_output):
+    """把 ``git status --porcelain`` 输出分成已跟踪变更与未跟踪文件两组路径。
+
+    RULE-020（收尾归零）：未跟踪文件是 AI 解题过程残留（探针脚本、临时
+    测试、草稿）的主要形态，而 RULE-011 让它们默认不进自动保存提交，
+    因此必须单列提示，不能与已跟踪修改混成一个"未提交变更"计数。
+    只分类、不删除。
+    """
+    tracked = []
+    untracked = []
+    for raw_line in (porcelain_output or "").splitlines():
+        if not raw_line.strip():
+            continue
+        code = raw_line[:2]
+        path = raw_line[3:].strip() if len(raw_line) > 3 else raw_line.strip()
+        if " -> " in path:  # 重命名：只关心新路径
+            path = path.split(" -> ", 1)[1]
+        if code == "??":
+            untracked.append(path)
+        else:
+            tracked.append(path)
+    return tracked, untracked
+
+
 def cmd_status():
     """显示系统状态"""
     try:
@@ -324,11 +348,19 @@ def cmd_status():
                 timeout=5
             )
             if status_result.returncode == 0:
-                uncommitted = status_result.stdout.strip()
-                if uncommitted:
-                    lines = uncommitted.split('\n')
-                    print(f"⚠️  未提交变更: {len(lines)} 个文件")
-                else:
+                tracked, untracked = classify_porcelain(status_result.stdout)
+                if tracked:
+                    print(f"⚠️  未提交变更: {len(tracked)} 个已跟踪文件")
+                if untracked:
+                    # RULE-020：未跟踪文件单列，只提示不删除
+                    print(f"🧹 未跟踪文件（待处置候选，RULE-020 收尾归零）: {len(untracked)} 个")
+                    shown = untracked[:10]
+                    for path in shown:
+                        print(f"   • {path}")
+                    if len(untracked) > len(shown):
+                        print(f"   … 另 {len(untracked) - len(shown)} 个")
+                    print("   交付物请 git add；非交付物请删除或加入 .gitignore")
+                if not tracked and not untracked:
                     print(f"✅ 工作区状态: 干净")
         except (OSError, subprocess.SubprocessError):
             print(f"\n🔖 Git: ⚠️  未安装或不可用")

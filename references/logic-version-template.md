@@ -245,7 +245,7 @@ recall new "添加暗色模式支持" "add-dark-mode"
 - rollback: ...
 - rollback_or_restore_verified: yes | no | not-applicable + 证据
 - temporary_structure_removed: yes | no | not-applicable
-- logic_temp_cleanup: <删除 working 临时目录的路径、日期和结果；没有填 none>
+- logic_temp_cleanup: <删除 working 临时目录的路径、日期和结果，并注明台账处置件数（keep/delete）；没有填 none>
 - remaining_deprecation_end: <仍有过渡规则时填写>
 
 ## 测试与审核

@@ -115,7 +115,7 @@
 - unblock_condition: <解除阻塞的可验证条件；非 blocked 填 none>
 - reserved_version_id: <VER-YYYYMMDD-NNN 或 none>
 - version_slug: <logic_version-YYYYMMDD-NNN-<scope> 或 none>
-- temp_path: <logic_version/working/<version_slug>/logic_temp.md 或 none>
+- temp_path: <logic_version/working/<version_slug>/logic_temp.md；medium/high 必填（RULE-020 收尾台账），simple 填 none>
 - docs_impact: <logic_readme 规则/代码地图/验证入口、logic_version/ADR 的 update/create/none + 原因>
 
 ### 当前状态、代码逻辑与差距
@@ -224,7 +224,7 @@
 - target_logic_sections: <生效后更新根 logic_readme.md 的哪些章节>
 - version_record: <logic_version/records/logic_version-...md；decision_record=required 时不得为 none>
 - close_condition: <代码语义审查通过、当前制度已更新、不可变记录和索引已创建后移除本 CHG 正文；不得把单个 CHG 置为 none>
-- temp_cleanup: <删除 working/<version_slug> 临时目录的负责人和条件>
+- temp_cleanup: <删除 working/<version_slug> 临时目录的负责人和条件；前提是 logic_temp 工作区产物台账已清零（RULE-020）>
 ~~~
 
 状态和关闭规则：

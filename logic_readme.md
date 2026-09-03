@@ -20,10 +20,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-08-07
-- last_verified: 2026-08-16
+- last_verified: 2026-09-03
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002, VER-20260903-001
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀
 - intent_sources: 用户访谈 2026-08-07
 - decision_validity: valid
@@ -68,6 +68,7 @@
 | RULE-017 | key | 会话默认延续：新会话或上下文压缩后以现行 logic 文档与活跃议案为准继续（新会话视作新人接手，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度；模糊点先按现行逻辑分析并给出建议再咨询（SKILL 原则 5/11） | 协作协议此前只活在对话历史，每次压缩后用户被迫重讲元规则，正是 Recall 要消灭的 rescan | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | SKILL.md 核心原则 11 | valid | 2026-08-16 | self |
 | RULE-018 | key | 层级化子文档：根 logic_readme 为总规章与路由中台；子模块复杂度达标时由 AI 提出拆分建议、经用户确认后在模块目录建 `logic_readme.md` 并以 `doc_policy: readme-only` 登记进范围登记表；修改子模块先读根再读子文档，跨模块变更在同一变更中更新全部相关文档；根规章优先于子文档；**RULE/INT 编号空间全项目唯一（含子文档）**；子文档与根文档同受行数上限与 validate 一致性检查约束；logic_change 与 logic_version 全项目唯一；未登记子文档仍为平行真源违规 | 单文件+锚点适合小项目，大项目全量阅读低效；按需分批披露上下文，但未经登记的拆分会重演平行真源失败模式，无检查的子文档会成为膨胀区与撞号区 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认 | scripts/audit_logic_map.py 范围路由 + scripts/validate.py 子文档检查 | valid | 2026-08-16 | self |
 | RULE-019 | key | 文档引用纪律：规范的语义正文只存在于 logic_readme 的规则行；SKILL、模板、生命周期文档、CLAUDE/AGENTS 入口等其他位置只保留"见 RULE-XXX"式指针与纯操作步骤；审计对账"git 跟踪的顶层 Markdown 入口 ⊆ owned_paths ∪ unmapped_paths"，未登记条目使静态门失败 | 同一语义散布多处（曾达 5 处）每次更新需 N 连改、漏一处即漂移；改名换姓的制度副本（README 重述通道、SUMMARY 总结）平行真源检测抓不到，只能靠登记对账机器可见 | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md) | 用户确认 | scripts/audit_logic_map.py 根目录覆盖对账 + tests/test_audit_logic_map.py | valid | 2026-08-16 | self |
+| RULE-020 | key | 收尾归零：任务完成态 = 交付物就位 + 本次新建的非交付物（探针脚本、临时测试、草稿、调试输出）已删除或经用户同意保留 + 最终汇报列出处置清单；`medium`/`high` 通道必建 `logic_version/working/` 下以 version_slug 命名目录内的 `logic_temp.md`（位置由审计器校验），在其"工作区产物台账"登记 path / artifact_kind / disposition / reason / cleaned_at，台账清零（无未执行的 delete、无 pending）方可关闭 CHG 并删除 working 目录；`simple` 通道不建文件，只在最终汇报列清单；`recall status` 把未跟踪文件单列为待处置候选，`recall validate` 对未被 .gitignore 覆盖的未跟踪文件非阻断告警；**任何工具都不自动删除文件**，处置由代理逐项执行并对用户可见 | AI 解题产生的临时文件在任务"完成"后无人负责；RULE-011 默认排除未跟踪文件保住了远端却让本地垃圾隐形累积，status/validate 此前只报笼统的"未提交变更"；只有把收尾写进"完成"的定义才能覆盖不建 CHG 的 simple 通道 | [VER-20260903-001](logic_version/records/logic_version-20260903-001-cleanup-ledger.md) | 用户确认 2026-09-03（A/B 二选一选 B） | references/logic-temp-template.md 台账表 + scripts/recall.py `classify_porcelain` + scripts/validate.py `report_untracked_leftovers` + tests/test_recall_cli.py + tests/test_validate.py；**已被 git add 的垃圾无自动检测**，只能靠台账或汇报清单 | valid | 2026-09-03 | self |
 
 ## 代码地图
 
@@ -82,9 +83,9 @@
 | recall.bat | source/runtime-code | Windows CLI 入口；探测 python/py/python3 后转发 | 命令行参数 | 子命令输出与退出码 | recall.bat | yes | none |
 | recall.sh | source/runtime-code | Linux/macOS CLI 入口；同上 | 命令行参数 | 子命令输出与退出码 | recall.sh | yes | none |
 | .gitattributes | source/runtime-config | 固定 *.bat 为 CRLF、*.sh 为 LF | Git 检出 | 换行符 | .gitattributes | yes | none |
-| scripts/recall.py | source/runtime-code | CLI 调度器；转发到各子命令 | 子命令与参数 | 退出码 | 脚本文件 | yes | tests/test_recall_cli.py |
+| scripts/recall.py | source/runtime-code | CLI 调度器；转发到各子命令；`status` 分列已跟踪变更与未跟踪待处置文件（RULE-020） | 子命令与参数 | 退出码 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/audit_logic_map.py | source/runtime-code | 审计脚本：检查文档结构、唯一性、依赖、密度（含子文档行数上限）、范围路由（含 readme-only 子文档）与根目录 Markdown 覆盖对账 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
-| scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态、子文档编号空间、漂移度量 | 项目根路径 | 验证报告 | 脚本文件 | yes | tests/test_validate.py |
+| scripts/validate.py | source/runtime-code | 一致性校验：RULE/CHG/VER 与 Git 状态、子文档编号空间、漂移度量、未跟踪残留告警（RULE-020） | 项目根路径 | 验证报告 | 脚本文件 | yes | tests/test_validate.py |
 | scripts/init_recall.py | source/runtime-code | 首次初始化：Git 仓库、身份、.gitignore、首次提交 | CLI 参数或环境变量 | 初始化结果 | 脚本文件 | yes | none |
 | scripts/git_sync.py | source/runtime-code | 配置 Git 自动同步策略、安装受管理 hook、自动保存提交、回填 after_commit、拉取变基并推送 | CLI 参数、仓库 Git 配置、远端 | 同步结果与退出码 | 脚本文件 | yes | tests/test_git_sync.py |
 | scripts/create_ver.py | source/runtime-code | 按模板创建 VER-* 决策记录（规范文件名取号） | 描述与 scope | 记录文件 | 脚本文件 | yes | tests/test_recall_cli.py |
@@ -144,13 +145,14 @@
 | INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | none | scripts/detect_conflicts.py | 2026-08-16 |
 | INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建根骨架，按触发时机逐模块补全 | FLOW-005#2 | RULE-016 | references/project-onboarding.md | 2026-08-16 |
 | INT-20260816-011 | 层级化子文档拆分（RULE-018） | 大项目按模块分批披露上下文：改哪个模块读哪份子文档，跨模块才读全量 | FLOW-005#4 | RULE-018 | references/project-onboarding.md; scripts/audit_logic_map.py | 2026-08-16 |
+| INT-20260903-001 | 收尾归零（logic_temp 工作区产物台账 + status/validate 残留提示） | 任务结束时工作区只剩交付物，AI 不遗留探针脚本、临时测试与草稿 | FLOW-002#6 | RULE-020 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | 2026-09-03 |
 
 编号使用 `INT-YYYYMMDD-NNN`，与 CHG/VER 的 `intent_traceability` 链共用同一编号空间与格式（登记日期为条目首次登记日）。"代码锚点"列支撑反向查询 `recall query intent <INT-ID>`（意图 → 规则 → 决策记录 → 文件）；validate 检查锚点路径存在性。
 
 ### 用户流程
 
 - FLOW-001 首次接入：1. recall init → INT-20260816-002；2. 配置远端（可选）；3. recall sync → INT-20260816-005
-- FLOW-002 日常修改：1. 读文档 → INT-20260816-001, INT-20260816-003；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-20260816-004；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-20260816-005
+- FLOW-002 日常修改：1. 读文档 → INT-20260816-001, INT-20260816-003；2. 判定通道并修改代码；3. recall new（medium/high）→ INT-20260816-004；4. git commit（带 Ref 行）；5. recall sync（hook 回填 after_commit）→ INT-20260816-005；6. 收尾归零：medium/high 清零 logic_temp 台账并删除 working，simple 在汇报列处置清单，`recall status` 核对无待处置文件 → INT-20260903-001
 - FLOW-003 追溯审查：1. recall status/list → INT-20260816-006；2. recall query → INT-20260816-007；3. recall validate → INT-20260816-008
 - FLOW-004 冲突澄清：1. recall conflicts → INT-20260816-009；2. 在 logic_change.md 标注；3. 用户裁决后按通道实施
 - FLOW-005 项目接入（文档初稿）：1. recall init → INT-20260816-002；2. 建根骨架 + 意图访谈（存量模块登记 pending-docs）→ INT-20260816-010；3. 按触发时机（新项目使用时/用户单独要求时）逐模块补全 → INT-20260816-010；4. 模块复杂度达标时 AI 建议拆分子文档、用户确认后登记 readme-only → INT-20260816-011
@@ -162,6 +164,7 @@
 - UXI-003: hook 与自动化绝不提交用户未提交的其他文件；自动保存只提交已跟踪文件的变更，未跟踪新文件默认排除并列出（`--include-new` 或 `git add` 才是用户的明确要求）；来源：VER-20260816-005；影响：INT-20260816-005
 - UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：全部 INT 条目
 - UXI-005: 新会话默认延续：用户不需要重述项目哲学与背景，文档即交接；现行规则仅在用户明确否定时才修改；来源：VER-20260816-004；影响：INT-20260816-001, INT-20260816-003
+- UXI-006: 工具绝不静默删除文件：status/validate 只列出未跟踪待处置文件，台账是给代理和用户看的处置清单而非删除脚本输入，清理由代理逐项执行并在汇报中可见；来源：VER-20260903-001；影响：INT-20260903-001, INT-20260816-006, INT-20260816-008
 
 ## 责任记录约定
 
@@ -264,8 +267,10 @@ AI 更新 logic_readme.md（如规则变化）
 | unit | RULE-009 决策记录字段名与模板一致 | `python tests/test_audit_logic_map.py` | 记录 schema 检查通过 | unittest 输出 |
 | unit | RULE-010/RULE-011/RULE-013 自动同步、自动保存与回填 | `python -m unittest tests.test_git_sync` | 全部 OK；配置、hook、pull/push、自动保存提交（已跟踪变更）、未跟踪新文件默认排除与 `--include-new` 纳入、手动模式、hook 不提交脏文件、递归防护、回填双通道、旧占位符兼容、字段行锚定、漂移哨兵、recall new 端到端回填 | unittest 输出 |
 | integration | RULE-015 validate 一致性对账 | `python scripts/validate.py` | 三处登记对账、撞号、意图层引用、CHG 三字段、占位符检查出现且无假错误 | 验证报告 |
-| unit | RULE-012/RULE-014 CLI 胶水层接口一致性与反向查询（new/status/conflicts/query intent/记录发现） | `python -m unittest tests.test_recall_cli` | 13 tests OK；记录命名、必填字段、CHG 标题提取、项目根查找、query intent 解析、需求保全与锚点检查通过 | unittest 输出 |
+| unit | RULE-012/RULE-014 CLI 胶水层接口一致性与反向查询（new/status/conflicts/query intent/记录发现） | `python -m unittest tests.test_recall_cli` | 15 tests OK；记录命名、必填字段、CHG 标题提取、项目根查找、query intent 解析、需求保全与锚点检查、status 未跟踪分类通过 | unittest 输出 |
 | runtime | RULE-010 自动同步 CLI 可发现 | `python scripts/recall.py help`; `python scripts/git_sync.py --help` | 帮助包含 `sync`、`--auto`、`--manual`、`--no-auto-sync` 和 `--disable` | 终端输出 |
+| unit | RULE-020 status 分列已跟踪/未跟踪与 validate 未跟踪残留告警 | `python -m unittest tests.test_recall_cli tests.test_validate` | `classify_porcelain` 按 `??` 前缀分组并处理重命名；有残留→warning 且列出路径，无残留→无告警 | unittest 输出 |
+| runtime | RULE-020 status 待处置提示 | 新建一个未跟踪文件后 `recall status` | 输出单列"未跟踪文件（待处置候选）"并列出路径；删除后消失 | 终端输出 |
 
 INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能人工审查，列在“不可破坏约束”里。此表只登记可执行的验证命令。
 
@@ -285,13 +290,14 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 | VER-20260816-005 | 审查整改：自动保存排除新文件、rejected 豁免、子文档检查覆盖、漂移度量、脱管归档与覆盖对账、双模板合并、引用纪律 | RULE-011, RULE-015, RULE-018..019 | [记录](logic_version/records/logic_version-20260816-005-audit-remediation.md) |
 | VER-20260831-001 | 入口模板短路由化、SKILL 首屏重排与 personal 模式 ADR 可选澄清 | RULE-018..019 | [记录](logic_version/records/logic_version-20260831-001-entry-slim-skill-front.md) |
 | VER-20260831-002 | 自身入口瘦身收尾、意图层按治理模式分档、create_ver 编码合规；Git 表面收缩立案待决 | RULE-008, RULE-014, RULE-019 | [记录](logic_version/records/logic_version-20260831-002-arch-simplify.md) |
+| VER-20260903-001 | 收尾归零：logic_temp 工作区产物台账（medium/high 必建）、status/validate 未跟踪残留提示、"完成"定义纳入清理 | RULE-020 | [记录](logic_version/records/logic_version-20260903-001-cleanup-ledger.md) |
 
 完整索引见 [logic_version/index.md](logic_version/index.md)。
 
 ## 活跃议案入口
 
 - 唯一入口：[logic_change.md](logic_change.md)
-- 相关 CHG-ID：none
+- 相关 CHG-ID：CHG-20260903-001
 
 ## 当前限制
 
@@ -301,6 +307,7 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 - 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为
 - 功能意图层随功能数线性增长：personal 模式先用轻量档（RULE-014 分档，见 references/governance-modes.md）；接近行数上限（目标 250 / 硬 400）时先按 scope 锚点压缩 FLOW 描述、合并同类 UXI；压缩仍不足且模块复杂度达标时按 RULE-018 经用户确认拆分子文档，禁止未登记的第二现行文档（INV-001/002）
 - 自动保存提交（"自动保存本地修改"）无 Ref 行、不承载 why：积累过多会稀释追溯链，medium/high 变更应使用带 Ref 行的语义提交（validate 的漂移度量会量化累积并在超过 10 个时告警，RULE-015）；`recall conflicts` 为关键词级启发式，语义冲突仍需人工澄清
+- 收尾归零依赖代理自律：`recall status` / `recall validate` 只能看见未跟踪且未被忽略的文件；已被 `git add` 或已提交的垃圾、以及为调试改动后未还原的已跟踪文件，机器识别不到，只能靠 logic_temp 台账或汇报清单（RULE-020）
 
 ## 修改检查清单
 
@@ -313,3 +320,4 @@ INV-004（VER-* 不含代码快照）不在此表：它是内容判断，只能�
 - [ ] 是否先完成代码逻辑、数据边界和现有实现可并入性分析？
 - [ ] 是否在修改后生成/补齐测试案例并审核前后结果？
 - [ ] 是否存在未被更高优先级指令裁定的新旧需求矛盾？
+- [ ] 本次新建的临时/探针/草稿文件是否已删除或登记保留理由（RULE-020：medium/high 台账清零，simple 汇报清单，`recall status` 无待处置文件）？

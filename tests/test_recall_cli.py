@@ -255,5 +255,28 @@ class ProjectRootTests(unittest.TestCase):
             self.assertNotEqual(found, Path(tmp).resolve())
 
 
+class StatusLeftoverTests(unittest.TestCase):
+    """RULE-020 收尾归零：status 必须把未跟踪文件与已跟踪修改分开列。"""
+
+    def test_classify_porcelain_splits_tracked_and_untracked(self):
+        porcelain = (
+            " M scripts/recall.py\n"
+            "A  logic_version/records/new.md\n"
+            "?? scratch_probe.py\n"
+            "?? tmp/debug.log\n"
+            "R  old.md -> new_name.md\n"
+        )
+        tracked, untracked = recall.classify_porcelain(porcelain)
+        self.assertEqual(
+            tracked,
+            ["scripts/recall.py", "logic_version/records/new.md", "new_name.md"],
+        )
+        self.assertEqual(untracked, ["scratch_probe.py", "tmp/debug.log"])
+
+    def test_classify_porcelain_empty_is_clean(self):
+        self.assertEqual(recall.classify_porcelain(""), ([], []))
+        self.assertEqual(recall.classify_porcelain(None), ([], []))
+
+
 if __name__ == "__main__":
     unittest.main()

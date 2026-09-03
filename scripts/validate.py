@@ -554,6 +554,30 @@ def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
         result.add_info(f"自上次触及 logic 文档以来累积 {count} 个提交")
 
 
+LEFTOVER_LIST_LIMIT = 10
+
+
+def report_untracked_leftovers(paths: List[str], result: 'ValidationResult') -> None:
+    """未跟踪且未被 .gitignore 覆盖的文件 → 非阻断告警（RULE-020 收尾归零）。
+
+    RULE-011 让未跟踪新文件默认不进自动保存提交，保住了远端，却让 AI 解题
+    过程残留的探针脚本、临时测试与草稿在本地隐形累积。这里只把它们列出来
+    交给代理/用户处置，绝不删除（UXI-003/UXI-006）。
+    """
+    cleaned = [p.strip() for p in paths if p and p.strip()]
+    if not cleaned:
+        return
+    shown = cleaned[:LEFTOVER_LIST_LIMIT]
+    listing = "、".join(shown)
+    if len(cleaned) > len(shown):
+        listing += f" 等（另 {len(cleaned) - len(shown)} 个）"
+    result.add_warning(
+        f"{len(cleaned)} 个未跟踪且未被 .gitignore 覆盖的文件: {listing}"
+        "（RULE-020 收尾归零：交付物请 git add，非交付物请删除或加入 .gitignore；"
+        "medium/high 变更在 logic_temp.md 台账登记去留）"
+    )
+
+
 def validate_recall() -> ValidationResult:
     """执行完整的验证流程"""
     result = ValidationResult()
@@ -694,8 +718,29 @@ def validate_recall() -> ValidationResult:
         result.add_warning("Git 不可用或未安装")
     else:
         if git_status.returncode == 0:
-            if (git_status.stdout or '').strip():
-                result.add_warning("有未提交的文件变更")
+            tracked_dirty = [
+                line for line in (git_status.stdout or '').splitlines()
+                if line.strip() and not line.startswith('??')
+            ]
+            if tracked_dirty:
+                result.add_warning(f"有 {len(tracked_dirty)} 个已跟踪文件的未提交变更")
+            # 4b. 收尾归零（RULE-020）：未跟踪且未被忽略的文件单列告警
+            try:
+                untracked = subprocess.run(
+                    ['git', 'ls-files', '--others', '--exclude-standard'],
+                    capture_output=True,
+                    text=True,
+                    encoding='utf-8',
+                    errors='replace',
+                    cwd=root,
+                    timeout=5
+                )
+            except (OSError, subprocess.SubprocessError):
+                untracked = None
+            if untracked is not None and untracked.returncode == 0:
+                report_untracked_leftovers(
+                    (untracked.stdout or '').splitlines(), result
+                )
         else:
             result.add_warning("无法检查 Git 状态（可能未初始化 Git）")
 

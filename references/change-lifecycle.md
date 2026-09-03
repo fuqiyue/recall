@@ -42,7 +42,7 @@ CHG 进入 `promoting` 时建立以下清单：
 - [ ] `VER-*` / ADR 已创建
 - [ ] `logic_version/index.md` 索引行已添加
 - [ ] 关键规则已链接到 `VER-*` / ADR
-- [ ] `logic_temp.md` 已清理
+- [ ] `logic_temp.md` 工作区产物台账已清零（`delete` 项均已删除、无 `pending`），随后整个 working 目录已删除（RULE-020）
 - [ ] 可以从 `logic_change.md` 移除 CHG 条目
 
 全部完成后执行关闭动作：从 `logic_change.md` 移除该 CHG。
@@ -132,7 +132,7 @@ CHG 转为 `promoting` 状态，建立晋升检查清单。
 
 ### 9. 关闭 CHG
 
-最后从 `logic_change.md` 移除已结束条目，清理相应 `logic_temp.md`。
+最后从 `logic_change.md` 移除已结束条目。移除前先核对 `logic_temp.md` 的工作区产物台账已清零（RULE-020：`delete` 项全部执行、无 `pending`），再删除整个 working 目录，并把结果写入 `VER-*` 的 `logic_temp_cleanup`。
 
 回滚时先让 `logic_readme.md` 反映实际恢复状态，再记录回滚结论和后续限制。
 

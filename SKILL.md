@@ -23,6 +23,8 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 
 分析后可以下调但需记录理由，上调无需说明。如 `logic_readme.md` 还没标注 `contract_class`，先判断目标路径是否有外部调用方，并在本次 `docs_impact` 中补齐。
 
+三条通道的收尾义务相同（核心原则 12）：`simple` 在最终汇报列出本次新建文件的处置清单；`medium`/`high` 在 `logic_temp.md` 的工作区产物台账登记并清零后才能关闭 CHG。
+
 简单通道不等于跳过上下文；高风险通道也不等于自动输出完整 Recall Brief。只有用户明确要求正式审查或表单合规时，才使用完整 Brief 与严格审计。
 
 各家 plan 模式产出的计划按通道落盘：批准后、动代码前，`medium`/`high` 先把计划中的需求拆解与融入分析写入 CHG（`raw_request`/`decomposition`/`fit_analysis`），`simple` 直接实施不留痕；详见[外部工作流适配](references/workflow-integration.md)。
@@ -40,7 +42,7 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 
 在实际修改前，先确定所属通道，再按风险相称地完成判断。中等变更先交付计划与影响范围；高风险必须读取相关历史决策，完成迁移/回滚设计，并在实施前获得当前 `proposal_revision` 的确认。
 
-## 核心原则（11 条）
+## 核心原则（12 条）
 
 1. 遵守用户的当前授权。未经授权不修改代码、制度或议案
 2. 严格分离状态：`logic_readme.md` 是当前已生效制度；`logic_change.md` 是尚未生效的活跃议案；`logic_version/records/` 是关闭后的不可变决策记录。目标环境一旦实际启用新行为，必须在同一发布变更中更新 `logic_readme.md`、固化所需 `VER-*` 并关闭对应 CHG
@@ -53,6 +55,7 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。读取�
 9. 实施后的代码语义审查独立记录。它核对当前代码、调用方、Schema、测试结果和运行证据是否支持已确认方案；不能用用户确认、测试文件存在或静态审计通过替代
 10. 先按简单、中等、高风险三条通道确定分析深度；不确定项若会改变方案、兼容性、数据安全或长期复杂度，则升级通道
 11. 会话默认延续：新会话或上下文压缩后，以现行 logic 文档与活跃议案为准继续工作（新会话视作新人接手既有项目，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度。模糊点按原则 5 先分析、给出建议，再咨询
+12. 收尾归零：任务的完成态是"交付物就位 + 本次新建的非交付物（探针脚本、临时测试、草稿、调试输出）已删除或经用户同意保留 + 最终汇报列出处置清单"，做完菜还要洗碗。`medium`/`high` 通道必建 `logic_version/working/<version_slug>/logic_temp.md`，在其"工作区产物台账"登记每个产物的去留，台账清零才能关闭 CHG 并删除 working 目录；`simple` 通道不建文件，只在汇报中列清单。未跟踪文件默认不进提交（RULE-011）不等于已处置；清理由代理逐项执行并对用户可见，工具绝不静默删除文件。权威语义：本技能目录 logic_readme.md 的 RULE-020
 
 ## 调用模式
 
@@ -75,6 +78,8 @@ python scripts/audit_logic_map.py <project-root> --formal-review
 
 审计器只能检查文档和静态线索，不能证明未声明的代码依赖、消费者、部署、外部权限控制、测试真实覆盖，或用户咨询确实发生。机器命令通过不等于代码审查通过。
 
+收尾核对（核心原则 12）：`recall status` 把未跟踪文件单列为"待处置候选"，`recall validate` 对未被 .gitignore 覆盖的未跟踪文件给出非阻断告警。两者只提示、不删除；已被 `git add` 的垃圾机器识别不到，仍要靠台账或汇报清单。
+
 ## 治理模式与字段层级
 
 详见 [治理模式](references/governance-modes.md) 和 [字段词汇分层](references/field-vocabulary.md)。
@@ -96,6 +101,7 @@ python scripts/audit_logic_map.py <project-root> --formal-review
     |-- index.md                 # 历史索引，不是当前制度
     |-- records/                 # 不可变决策记录：logic_version-YYYYMMDD-NNN-<scope>.md
     |-- decisions/               # ADR（可选；personal 模式默认为空）
+    |-- working/<version_slug>/  # 议案期 logic_temp.md：工作笔记 + 收尾台账（gitignore，关闭即删）
     `-- backups/                 # 受控快照和 manifest
 ```
 

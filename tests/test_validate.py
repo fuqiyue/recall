@@ -153,5 +153,37 @@ class DocDriftTests(unittest.TestCase):
         self.assertFalse(result.info)
 
 
+class UntrackedLeftoverTests(unittest.TestCase):
+    """RULE-020 收尾归零：未跟踪且未被忽略的文件只告警、不阻断、不删除。"""
+
+    def test_no_leftovers_is_silent(self) -> None:
+        result = VALIDATE.ValidationResult()
+        VALIDATE.report_untracked_leftovers([], result)
+        VALIDATE.report_untracked_leftovers(["", "   "], result)
+        self.assertFalse(result.warnings)
+        self.assertFalse(result.errors)
+
+    def test_leftovers_are_listed_as_warning_not_error(self) -> None:
+        result = VALIDATE.ValidationResult()
+        VALIDATE.report_untracked_leftovers(
+            ["scratch_probe.py", "notes/draft.md"], result
+        )
+        self.assertFalse(result.errors)
+        self.assertEqual(len(result.warnings), 1)
+        message = result.warnings[0]
+        self.assertIn("2 个未跟踪", message)
+        self.assertIn("scratch_probe.py", message)
+        self.assertIn("notes/draft.md", message)
+        self.assertIn("RULE-020", message)
+
+    def test_long_lists_are_truncated(self) -> None:
+        result = VALIDATE.ValidationResult()
+        paths = [f"junk_{i}.tmp" for i in range(VALIDATE.LEFTOVER_LIST_LIMIT + 3)]
+        VALIDATE.report_untracked_leftovers(paths, result)
+        message = result.warnings[0]
+        self.assertIn("另 3 个", message)
+        self.assertNotIn(paths[-1], message)
+
+
 if __name__ == "__main__":
     unittest.main()
