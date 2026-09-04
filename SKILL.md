@@ -37,7 +37,7 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。先读�
 4. 目标代码、调用方、配置、Schema、测试和可获得的运行证据
 5. 只有当前文件按 ID 引用、发生冲突或需要确定兼容策略时，读取对应的 ADR 或 `logic_version` 单条记录
 
-根文档不存在时，报告知识基础缺失；可从代码、测试和既有文档重建当前事实，但不能声称已恢复设计原因。宪法未登记任何领域时（`constitution-without-domains` 提示），先按[项目接入流程](references/project-onboarding.md)建至少一个领域再补规则。中等变更先交付计划与影响范围；高风险必须读取相关历史决策，完成迁移/回滚设计，并在实施前获得当前 `proposal_revision` 的确认。
+根文档不存在时，报告知识基础缺失；可从代码、测试和既有文档重建当前事实，但不能声称已恢复设计原因。宪法未登记任何领域时（`constitution-without-domains`，静态门失败），先按[项目接入流程](references/project-onboarding.md)建至少一个领域再补规则。中等变更先交付计划与影响范围；高风险必须读取相关历史决策，完成迁移/回滚设计，并在实施前获得当前 `proposal_revision` 的确认。
 
 ## 核心原则（12 条）
 
@@ -64,6 +64,7 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。先读�
 ```bash
 recall audit                      # 当前状态静态门（轻量，= python scripts/audit_logic_map.py <root> --current-state）
 recall audit --formal-review      # 正式审查（完整字段 + 测试矩阵）；其余审计器参数原样透传，如 --json
+recall audit --advisory-only      # 存量项目迁移窗口：硬上限越线 / 无领域只提示、不改退出码（RULE-022 ③）
 recall route <路径|关键词>   # 本次应读的文档清单（宪法 + 命中领域）与估算 token；--json 供代理解析
 recall validate   # 宪法与领域编号空间、跨账本 CHG 与公报、VER 一致性、漂移度量、未跟踪残留与未推送告警
 recall status     # 领域数、各账本议案计数、记录计数，分列未提交、未跟踪（待处置）、未推送

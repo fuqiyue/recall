@@ -57,6 +57,9 @@ RECALL_AGENT_CONFIG_ROOT: <project-root>/{config_root}
 
 INHERITED_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | inherited | [app policy](logic_readme.md#scope-mod-app) | [changes](logic_change.md) | self | active |"
 
+# 默认夹具自带的领域行：RULE-018 ④ 要求至少一个领域，否则 current-state 门失败（VER-20260904-005）
+CORE_DOMAIN_ROW = "| MOD-CORE | logic_domains/core | in-system | domain/runtime-code | paired | [core](logic_domains/core/logic_readme.md) | [changes](logic_domains/core/logic_change.md) | self | active |"
+
 README_ONLY_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | readme-only | [app policy](src/logic_readme.md) | none | self | active |"
 
 PAIRED_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | paired | [app policy](src/logic_readme.md) | [changes](src/logic_change.md) | self | active |"
@@ -128,6 +131,7 @@ def root_readme(
     scope_path: str = ".",
     governance_mode: str = "personal",
     governance_ref: str = "git:demo-repository",
+    with_domain: bool = True,
 ) -> str:
     controls = f"""## 文档控制
 
@@ -178,12 +182,13 @@ def root_readme(
 |---|---|---|---|---|---|---|---|---|
 | MOD-ROOT | . | in-system | root/runtime-code | paired | [root](logic_readme.md) | [changes](logic_change.md) | self | active |
 | MOD-APP | src | in-system | module/runtime-code | inherited | [app policy](logic_readme.md#scope-mod-app) | [changes](logic_change.md) | self | active |
+{core_row}
 
 <a id="scope-mod-app"></a>
 ### MOD-APP: Application
 
 - scope_path: src
-"""
+""".replace("{core_row}", CORE_DOMAIN_ROW if with_domain else "")
     minimal_sections = """## 当前制度
 
 | rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
@@ -571,6 +576,98 @@ DOMAIN_GAZETTE_ROW = (
 )
 
 
+def core_domain_readme() -> str:
+    """默认夹具的 core 领域 readme（最小部门法）。"""
+    return """# Core Domain Logic
+
+## 文档控制
+
+- module_id: MOD-CORE
+- scope: logic_domains/core
+- scope_path: logic_domains/core
+- parent: ../../logic_readme.md
+- parent_module_id: MOD-ROOT
+- membership: in-system
+- scope_type: domain
+- layer: runtime-code
+- module_doc_policy: paired
+- status: active
+- owner: self
+- governance_mode: personal
+- governance_ref: git:demo-repository
+- governance_evidence: git:demo-repository
+- governance_verification: recorded
+- governance_verified_at: 2026-07-22
+- effective_from: 2026-07-22
+- last_verified: 2026-07-22
+- review_trigger: interval:90d; event:release
+- source_of_truth: src/core
+- source_decisions: none
+- intent_summary: keep the core module logic discoverable
+- intent_sources: user-confirmed:2026-07-22
+- decision_validity: valid
+- validity_evidence: user-confirmed:2026-07-22
+- canonical_readme: logic_domains/core/logic_readme.md
+- canonical_change: logic_domains/core/logic_change.md
+- owned_paths: src/core
+- child_policy: inherit
+- data_owner: none
+- registry_status: registered
+
+## 当前制度
+
+| rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
+|---|---|---|---|---|---|---|---|---|---|
+| RULE-CORE-STABLE | ordinary | Keep the core entry point stable. | Callers import it directly. | none | user-confirmed:2026-07-22 | src/core | valid | 2026-07-22 | self |
+
+## 代码地图
+
+| 路径/稳定锚点 | artifact_class/layer | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
+|---|---|---|---|---|---|---|---|
+| src/core | source/runtime-code | core | input | output | code | yes | none |
+
+## 活跃议案入口
+
+- 唯一入口：[logic_change.md](logic_change.md)
+- 相关 CHG-ID：none
+"""
+
+
+def core_domain_change() -> str:
+    """默认夹具的 core 领域空账本。"""
+    return """# Core Domain Active Changes
+
+## 文档控制
+
+- scope: logic_domains/core
+- scope_path: logic_domains/core
+- module_id: MOD-CORE
+- current_policy: logic_readme.md
+- owner: self
+- governance_mode: personal
+- governance_ref: git:demo-repository
+- governance_evidence: git:demo-repository
+- governance_verification: recorded
+- governance_verified_at: 2026-07-22
+- last_updated: 2026-07-22
+- active_changes: none
+
+## 议案规则
+
+- All entries are non-effective until promoted.
+
+## 讨论主题索引
+
+| topic_id | 同类议题/共享问题 | coordinator | discussion_refs | related_changes | status |
+|---|---|---|---|---|---|
+
+## 活跃议案索引
+
+| change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
+|---|---|---|---|---|---|---|---|
+"""
+
+
 def domain_readme() -> str:
     """部门法 readme：paired 策略、canonical_* 位于文档控制、scope_type: domain。"""
     text = child_readme(policy="paired")
@@ -720,6 +817,7 @@ class ProjectFixtureMixin:
         write_agent: bool = True,
         governance_mode: str = "personal",
         governance_ref: str = "git:demo-repository",
+        with_domain: bool = True,
         **change_kwargs: object,
     ) -> None:
         (root / "src").mkdir()
@@ -737,9 +835,15 @@ class ProjectFixtureMixin:
                 full=full,
                 governance_mode=governance_mode,
                 governance_ref=governance_ref,
+                with_domain=with_domain,
             ),
             encoding="utf-8",
         )
+        if with_domain:
+            core = root / "logic_domains" / "core"
+            core.mkdir(parents=True)
+            (core / "logic_readme.md").write_text(core_domain_readme(), encoding="utf-8")
+            (core / "logic_change.md").write_text(core_domain_change(), encoding="utf-8")
         (root / "logic_change.md").write_text(
             change_document(
                 full=full,
@@ -1378,11 +1482,11 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
         )
         self.assertTrue(self.fails(report))
 
-    def test_constitution_without_domains_notice_tracks_registration(self) -> None:
-        """RULE-018：宪法未分层时提示；登记一个领域后提示消失。"""
+    def test_constitution_without_domains_fails_gate_unless_advisory_only(self) -> None:
+        """RULE-018 ④（VER-20260904-005）：宪法未登记任何领域时静态门失败；--advisory-only 只提示。"""
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            self.write_project(root)
+            self.write_project(root, with_domain=False)
             plain = self.collect(root)
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -1391,20 +1495,46 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
 
         self.assertTrue(
             any(
-                notice.startswith("logic_readme.md:constitution-without-domains")
-                for notice in plain["density"]["notices"]
+                issue.startswith("logic_readme.md:constitution-without-domains")
+                for issue in plain["density"]["issues"]
             ),
-            plain["density"]["notices"],
+            plain["density"]["issues"],
         )
         self.assertFalse(
-            any(
-                notice.startswith("logic_readme.md:constitution-without-domains")
-                for notice in layered["density"]["notices"]
-            ),
-            layered["density"]["notices"],
+            any("constitution-without-domains" in item for item in layered["density"]["issues"] + layered["density"]["notices"]),
+            layered["density"],
         )
-        self.assertFalse(self.fails(plain))
+        self.assertTrue(self.fails(plain))
+        self.assertFalse(
+            AUDIT.strict_failure(plain, current_state=True, advisory_only=True)
+        )
         self.assertFalse(self.fails(layered))
+
+    def test_hard_limit_violation_fails_gate_unless_advisory_only(self) -> None:
+        """RULE-022 ③（VER-20260904-005）：越过硬上限使静态门失败；越过目标值仍只是提示。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            readme_path = root / "logic_readme.md"
+            base = readme_path.read_text(encoding="utf-8")
+            readme_path.write_text(base + "\n" + "note\n" * 160, encoding="utf-8")
+            over_target = self.collect(root)
+            readme_path.write_text(base + "\n" + "note\n" * 260, encoding="utf-8")
+            over_limit = self.collect(root)
+
+        self.assertTrue(
+            any(n.startswith("logic_readme.md:over-target:") for n in over_target["density"]["notices"]),
+            over_target["density"],
+        )
+        self.assertFalse(self.fails(over_target))
+        self.assertTrue(
+            any(i.startswith("logic_readme.md:exceeds-hard-limit:") for i in over_limit["density"]["issues"]),
+            over_limit["density"],
+        )
+        self.assertTrue(self.fails(over_limit))
+        self.assertFalse(
+            AUDIT.strict_failure(over_limit, current_state=True, advisory_only=True)
+        )
 
     def test_domain_chg_block_density_is_measured(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -1420,9 +1550,9 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
         self.assertTrue(
             any(
                 issue.startswith(f"{DOMAIN_CHANGE_ID}:exceeds-chg-limit:")
-                for issue in report["density"]["issues"]
+                for issue in report["density"]["notices"]
             ),
-            report["density"]["issues"],
+            report["density"]["notices"],
         )
 
     # ------------------------------------------------------------------

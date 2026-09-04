@@ -14,7 +14,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 只在上层条件真实成立时才启用上层字段。没有真实分工就填 `collaborative` 字段，等于制造第 9 条警告的"为符合流程造表单"。
 
-## personal 层（8 个必填）
+## personal 层（8 项内容；审计器机器强制的字段名见下方"审计器口径"段，本表的散文项是内容要求而非字段名）
 
 | 字段 | 含义 |
 |---|---|
@@ -72,7 +72,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 超过硬上限时按顺序处理：压缩失效细节 → 把已结束内容归档到 `logic_version/` → 降低字段层级。不要靠未登记的新文件解决长度问题；正确出口是按 RULE-018 新建或拆分已登记领域（宪法过长 → 把领域内部规则下放到部门法；领域过长 → 拆成更小领域）。
 
-`python scripts/audit_logic_map.py <project-root> --current-state` 的 Density 段按层级报告越过硬上限的文件（`exceeds-hard-limit`）与越过目标值的文件（`over-target`，领域 readme 附拆分提示），并在宪法未登记任何领域时报告 `constitution-without-domains`；均为 advisory，不影响静态门。
+`recall audit`（`audit_logic_map.py --current-state`）的 Density 段按层级报告：`exceeds-hard-limit`（文档越过硬上限）与 `constitution-without-domains`（宪法未登记任何领域）使 current-state / formal-review 静态门失败；`over-target`（领域 readme 附拆分提示）、单条 CHG 越过 80 行（`exceeds-chg-limit`）与 blocked 累积只提示。`--advisory-only` 让前两类也只提示，是存量项目的迁移窗口（RULE-022 ③，VER-20260904-005）。
 
 ## 反模式
 

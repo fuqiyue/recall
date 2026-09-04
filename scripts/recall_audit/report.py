@@ -859,10 +859,12 @@ def print_text(report: dict) -> None:
             print(f"  - {path}")
 
     density = report.get("density") or {}
-    if density.get("issues") or density.get("notices"):
-        print("\nDensity (advisory; limits in references/field-vocabulary.md):")
+    if density.get("issues"):
+        print("\nDensity hard limits (fail the current-state gate unless --advisory-only; limits in references/field-vocabulary.md):")
         for item in density.get("issues", []):
             print(f"  - {item}")
+    if density.get("notices"):
+        print("\nDensity (advisory; limits in references/field-vocabulary.md):")
         for item in density.get("notices", []):
             print(f"  - {item}")
 
@@ -878,6 +880,7 @@ def strict_failure(
     current_state: bool = False,
     formal_review: bool = False,
     require_test_matrix: bool = False,
+    advisory_only: bool = False,
 ) -> bool:
     root_module = next(
         (module for module in report["modules"] if module["path"] == "."), None
@@ -915,6 +918,10 @@ def strict_failure(
         if report["missing_required_agent_entries"] or report.get(
             "missing_default_agent_entry", False
         ):
+            return True
+        # RULE-018 ④ / RULE-022 ③（VER-20260904-005）：硬上限越线与无领域进门；
+        # --advisory-only 是存量项目的迁移窗口，只影响退出码，报告内容不变。
+        if not advisory_only and (report.get("density") or {}).get("issues"):
             return True
         if formal_review:
             formal = report.get("formal_review", {})

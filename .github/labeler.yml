@@ -20,6 +20,3 @@ ci-cd:
   - changed-files:
     - any-glob-to-any-file: ['.github/**/*']
 
-dependencies:
-  - changed-files:
-    - any-glob-to-any-file: ['requirements.txt', 'setup.py']

@@ -30,7 +30,7 @@
 
 **读取顺序（按需导入）**：1) 根 `logic_readme.md`（宪法，必读）→ 2) 根 `logic_change.md`（修宪案 + 公报，必读，体量小）→ 3) `recall route <目标路径或关键词>` 打印应读的领域 readme/change 及行数与估算 token，只读命中的领域 → 4) 代码与测试 → 5) `logic_version/` 仅在现行文档引用时按 ID 读取。
 
-各级文档的长度目标与硬上限见[字段词汇分层](field-vocabulary.md)的"长度上限"；`audit_logic_map.py --current-state` 的 Density 段按层级报告越过目标值的文件，领域 readme 越过目标即提示拆分，宪法未登记任何领域时报告 `constitution-without-domains`。规范的语义正文只存在于 logic_readme 的规则行，其他文档只保留指针与操作步骤（RULE-019）；领域划分与拆分的操作流程见[项目接入流程](project-onboarding.md)，领域文档模板见[领域文档模板](logic-domain-template.md)。
+各级文档的长度目标与硬上限见[字段词汇分层](field-vocabulary.md)的"长度上限"；`recall audit` 的 Density 段按层级报告：越过目标值提示（领域 readme 附拆分提示），越过硬上限或宪法未登记任何领域（`constitution-without-domains`）使静态门失败，`--advisory-only` 为存量项目迁移窗口（RULE-022 ③）。规范的语义正文只存在于 logic_readme 的规则行，其他文档只保留指针与操作步骤（RULE-019）；领域划分与拆分的操作流程见[项目接入流程](project-onboarding.md)，领域文档模板见[领域文档模板](logic-domain-template.md)。
 
 ## logic_readme.md（每级一份现行制度）
 

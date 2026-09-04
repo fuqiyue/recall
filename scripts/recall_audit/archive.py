@@ -1389,7 +1389,11 @@ def _density_check(
 
 
 def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
-    """行数密度检查（advisory，不影响静态门）。
+    """行数密度检查：``issues`` 使 current-state / formal-review 静态门失败，``notices`` 只提示。
+
+    VER-20260904-005（CHG-20260904-004 选 A）：硬上限越线（exceeds-hard-limit /
+    exceeds-chg-limit）与宪法未登记任何领域（constitution-without-domains）进门；
+    ``--advisory-only`` 恢复旧退出码作为存量项目的迁移窗口。越过目标值仍是 notice。
 
     RULE-018 一二级拆分法（VER-20260903-004）：每份现行文档按层级取不同阈值——
     根 logic_readme 是宪法、每个任务必读，目标 150 / 硬上限 250；领域 readme
@@ -1409,7 +1413,7 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
 
     domain_scopes = registered_domain_scopes(root)
     if not domain_scopes and (root / "logic_readme.md").exists():
-        notices.append(
+        issues.append(
             "logic_readme.md:constitution-without-domains (RULE-018: register at least one "
             "logic_domains/<domain>/ paired row so domain rules load on demand)"
         )
@@ -1443,14 +1447,17 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
         lines = block.count("\n") + 1
         shown_id = change_id.upper()
         if lines > 80:
-            issues.append(f"{shown_id}:exceeds-chg-limit:{lines}>80")
+            # 单条 CHG 上限不进门：compliance 档完整字段本身就是 80-200 行（field-vocabulary），
+            # 进门会让 --formal-review 自相矛盾；账本 300 行硬上限间接兜底
+            notices.append(f"{shown_id}:exceeds-chg-limit:{lines}>80 (advisory; ledger hard limit 300 still gates)")
         elif lines > 40:
             # RULE-023：单条 CHG 目标 15-40 行（field-vocabulary），越过目标先提示
             notices.append(f"{shown_id}:over-chg-target:{lines}>40 (hard limit 80)")
         if (control_values(block).get("status") or [""])[0] == "blocked":
             blocked_count += 1
     if blocked_count > 2:
-        issues.append(f"logic_change:blocked-accumulation:{blocked_count}>2")
+        # 决策卫生提示而非体量硬上限：不进静态门（field-vocabulary 反模式）
+        notices.append(f"logic_change:blocked-accumulation:{blocked_count}>2 (hand the decision back to the user)")
 
     return {
         "issues": issues,

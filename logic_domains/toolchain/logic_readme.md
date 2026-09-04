@@ -25,7 +25,7 @@
 - last_verified: 2026-09-04
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: scripts/recall.py, scripts/recall_common.py, scripts/recall_audit/, scripts/validate.py
-- source_decisions: VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004
+- source_decisions: VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005
 - intent_summary: 全部 CLI 在非交互与重定向环境可用、跨平台入口不错行、机器检查只此一份实现且自身有测试
 - intent_sources: INT-20260816-004, INT-20260816-006, INT-20260816-007, INT-20260816-008, INT-20260816-009, INT-20260903-002（宪法功能意图登记）
 - decision_validity: valid
@@ -81,13 +81,13 @@
 ## 旧行为消费者
 
 - `scripts/audit_logic_map.py` 单文件拷贝部署：VER-20260903-002 起不再支持，必须与 `scripts/recall_audit/` 整目录部署；已知消费者只有指向本仓库的技能目录符号链接（`~/.claude/skills/recall`），无需迁移
-- 审计 JSON：collaborative 项目输出不变；personal 项目自 VER-20260903-003 起 `proposal_issues` 只会减少（RULE-023）；VER-20260903-004 起无领域的项目多出 advisory 提示 `constitution-without-domains`，退出码不变
+- 审计 JSON：collaborative 项目输出不变；personal 项目自 VER-20260903-003 起 `proposal_issues` 只会减少（RULE-023）；VER-20260903-004 起无领域的项目多出提示 `constitution-without-domains`；VER-20260904-005 起硬上限越线（`exceeds-hard-limit`）与 `constitution-without-domains` 使 current-state / formal-review 退出码变 1（`--advisory-only` 恢复旧退出码），`exceeds-chg-limit` 与 `blocked-accumulation` 从 `density.issues` 移到 `density.notices`
 
 ## 测试与验证
 
 | test_level | 规则/不变量 | 当前验证命令/检查 | expected | authoritative_evidence |
 |---|---|---|---|---|
-| unit | 审计器行为：INV-001/002 平行真源与已登记领域豁免、RULE-007 嵌套根、RULE-009 记录 schema、RULE-018 领域路由/公报/密度分档、RULE-019 覆盖对账、RULE-021 ③ 代码段内链接与占位符不算、空账本 none/0 同义、RULE-022 分包后行为不变、RULE-023 字段分档 | `python tests/test_audit_logic_map.py`；`python scripts/audit_logic_map.py . --current-state` / `--formal-review` / `--json --current-state` | 全部 OK；静态门 PASS；无 parallel/nonroot 报告；夹具不在 Non-root 列表；JSON 可解析 | unittest 输出 + 审计报告 |
+| unit | 审计器行为：INV-001/002 平行真源与已登记领域豁免、RULE-007 嵌套根、RULE-009 记录 schema、RULE-018 领域路由/公报/密度分档、RULE-019 覆盖对账、RULE-021 ③ 代码段内链接与占位符不算、空账本 none/0 同义、RULE-022 ③ 硬上限/无领域进门与 `--advisory-only`、RULE-022 分包后行为不变、RULE-023 字段分档 | `python tests/test_audit_logic_map.py`；`python scripts/audit_logic_map.py . --current-state` / `--formal-review` / `--json --current-state` | 全部 OK；静态门 PASS；无 parallel/nonroot 报告；夹具不在 Non-root 列表；JSON 可解析 | unittest 输出 + 审计报告 |
 | integration | RULE-009/RULE-015 validate 一致性对账 | `python scripts/validate.py` | 决策记录被发现且无假缺失字段（快速模板与扩展 schema 均通过）；三处登记（首列裸 ID / 链接 / 反引号）、撞号、意图层引用与 `path#symbol` 锚点、slug 型 CHG 三字段、占位符、领域公报检查出现且无假错误 | 验证报告 |
 | runtime | RULE-005 批处理入口不错行 | `recall status` / `recall help` | 无 `is not recognized` 输出 | 终端输出 |
 | runtime | RULE-008 非交互可用与重定向不崩 | `recall init < /dev/null`；`echo "" \| recall init`；`recall init --non-interactive`；`recall help > out.txt`；`recall status > out.txt`；`python scripts/audit_logic_map.py . --json --current-state > out.json` | 均退出 0，无 UnicodeEncodeError，落盘为 UTF-8 | 终端输出 / 输出文件 |
@@ -97,7 +97,7 @@
 
 ## 当前限制
 
-- 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为；Density 与 logic_temp 检查只是 advisory，不使静态门失败（消费项目 logic_change 越过硬上限 21 倍仍 PASS，2026-09-03 eduai 实测）；是否让硬上限越线与无领域进门见根账本 CHG-20260904-004
+- 静态门只检查文档结构与工具链约定，不能证明代码语义、消费者或运行行为；logic_temp 检查、越过目标值、单条 CHG 越过 80 行与 blocked 累积只是提示；硬上限越线与无领域自 VER-20260904-005 起使静态门失败，`--advisory-only` 只改退出码（RULE-022 ③）
 - 收尾归零依赖代理自律：`recall status` / `recall validate` 只能看见未跟踪且未被忽略的文件；已被 `git add` 或已提交的垃圾机器识别不到（RULE-020）
 - 审计器函数长度：RULE-022 的 150 行上限只约束新写函数；changes.py（334/152）、semantic.py（398/248）、formal.py（296/178）、report.py（459/350/165）共 9 个存量超限函数是已接受的存量，按同一方法（先冻结 JSON 基线、拆分后逐字节对比）在触及时顺带拆分，不另立案
 - 代码锚点的符号核查只是子串查找（`path#symbol` 的 symbol 在文件文本中出现即算存在），不解析语法；`after_commit` 写成 `pr:` / `release:` 等非 SHA 形式时不校验、只提示"未关联 Git commit"；规则正文里裸写的 `<meta>` 仍按模板占位符、裸写的 `[文本](路径)` 仍按真实链接处理，示意写法须加反引号或放进围栏代码块（VER-20260904-003/004）

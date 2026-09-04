@@ -95,6 +95,15 @@ def parse_args() -> argparse.Namespace:
         ),
     )
     parser.add_argument(
+        "--advisory-only",
+        action="store_true",
+        help=(
+            "Keep Density hard-limit violations and constitution-without-domains as "
+            "advisory output instead of failing the current-state/formal-review gate; "
+            "migration window for legacy projects (VER-20260904-005)"
+        ),
+    )
+    parser.add_argument(
         "--require-agent-entry",
         choices=("codex", "claude", "both"),
         help=(
@@ -137,6 +146,7 @@ def main() -> int:
             current_state=args.current_state,
             formal_review=args.formal_review,
             require_test_matrix=args.require_test_matrix,
+            advisory_only=getattr(args, "advisory_only", False),
         )
         else 0
     )
