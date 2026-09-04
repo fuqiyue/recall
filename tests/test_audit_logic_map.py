@@ -3184,5 +3184,60 @@ class CrossLedgerRuleConflictTests(unittest.TestCase):
         )
 
 
+
+class PlaceholderDetectionTests(unittest.TestCase):
+    """占位符识别只用 textutil `contains_angle_placeholder`（RULE-021 ③）。
+
+    2026-09-03 eduai：规则正文里的 `>128` 与 `<meta>` 被 current-state 门当作模板
+    占位符，规则行搬进部门法后静态门才爆；用户被迫写 HTML 实体绕过。
+    """
+
+    def test_comparisons_arrows_and_inline_code_are_not_placeholders(self) -> None:
+        for text in (
+            "Reject payloads >128 KB",
+            "a < b means retry",
+            "INT-001 -> RULE-001 -> test",
+            "Strip `<meta>` tags before storing",
+        ):
+            self.assertFalse(AUDIT.contains_angle_placeholder(text), text)
+
+    def test_template_placeholder_is_still_detected(self) -> None:
+        for text in ("<规则正文>", "Use <path> here", "<one-line why>"):
+            self.assertTrue(AUDIT.contains_angle_placeholder(text), text)
+
+
+class DomainRuleTextPlaceholderTests(RootOnlyAuditTests):
+    """规则/why 单元格里的比较符与行内代码不算占位符，模板尖括号仍然拒绝。"""
+
+    def _report_with_rule_text(self, rule_text: str) -> dict:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            readme_path = root / "src" / "logic_readme.md"
+            text = readme_path.read_text(encoding="utf-8").replace(
+                "Keep the module output stable.", rule_text
+            )
+            readme_path.write_text(text, encoding="utf-8")
+            return self.collect(root)
+
+    def test_comparison_and_inline_code_in_rule_text_pass(self) -> None:
+        report = self._report_with_rule_text(
+            "Reject payloads >128 KB and strip `<meta>` tags."
+        )
+        self.assertNotIn(
+            "src/logic_readme:current-policy-row-1-needs-rule-and-why",
+            report["current_integrity"]["document_issues"],
+        )
+        self.assertFalse(self.fails(report))
+
+    def test_angle_placeholder_in_rule_text_still_fails(self) -> None:
+        report = self._report_with_rule_text("<fill in the rule>")
+        self.assertIn(
+            "src/logic_readme:current-policy-row-1-needs-rule-and-why",
+            report["current_integrity"]["document_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+
 if __name__ == "__main__":
     unittest.main()

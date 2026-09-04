@@ -470,5 +470,183 @@ class UnpushedCommitTests(unittest.TestCase):
         self.assertIn("RULE-010", result.warnings[0])
 
 
+
+QUICK_RECORD = (
+    "# VER-20260904-101: 快速模板\n\n## 记录控制\n\n- version_id: VER-20260904-101\n"
+    "- status: effective\n- date: 2026-09-04\n- after_commit: abc1234\n\n"
+    "## 为什么做这个决策？\n\nx\n\n## 影响范围\n\nx\n\n## 验证方式\n\nx\n\n## 回滚方式\n\nx\n"
+)
+EXTENDED_RECORD = (
+    "# VER-20260904-102: 扩展 schema\n\n## 记录控制\n\n- version_id: VER-20260904-102\n"
+    "- status: effective\n- governance_mode: collaborative\n- date: 2026-09-04\n"
+    "- after_commit: commit:abc1234\n\n"
+    "## 来源与意图提炼\n\nx\n\n## 决策确认与最终议案\n\nx\n\n## 变更摘要\n\nx\n\n"
+    "## 影响与消费者\n\nx\n\n## 兼容、迁移与回滚\n\nx\n\n## 测试与审核\n\nx\n\n"
+    "## 决策结论与经验\n\nx\n"
+)
+
+
+class RecordSchemaTests(unittest.TestCase):
+    """RULE-009/015 ③：VER 必填段接受模板的两套 schema（CHG-20260904-003 ②）。
+
+    2026-09-03 eduai：46 份按扩展 schema 写的记录全部被报"缺少必填字段"，
+    validate 因此常年 FAIL。
+    """
+
+    def _missing(self, content: str):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "logic_version-20260904-101-demo.md"
+            path.write_text(content, encoding="utf-8")
+            return VALIDATE.check_required_fields(path)
+
+    def test_quick_template_record_passes(self) -> None:
+        self.assertEqual(self._missing(QUICK_RECORD), [])
+
+    def test_extended_schema_record_passes(self) -> None:
+        self.assertEqual(self._missing(EXTENDED_RECORD), [])
+
+    def test_content_argument_avoids_second_read(self) -> None:
+        missing = VALIDATE.check_required_fields(Path("does-not-exist.md"), EXTENDED_RECORD)
+        self.assertEqual(missing, [])
+
+    def test_record_matching_neither_schema_reports_closest_schema(self) -> None:
+        broken = EXTENDED_RECORD.replace("## 测试与审核", "## 测试")
+        missing = self._missing(broken)
+        self.assertEqual(missing, ["## 测试与审核（扩展 schema）"])
+
+    def test_control_fields_are_required_for_both_schemas(self) -> None:
+        missing = self._missing(EXTENDED_RECORD.replace("- date: 2026-09-04\n", ""))
+        self.assertEqual(missing, ["date"])
+
+    def test_bare_body_reports_quick_template_by_default(self) -> None:
+        missing = self._missing("# VER\n\n- version_id: VER-20260904-101\n- status: effective\n- date: 2026-09-04\n")
+        self.assertEqual(len(missing), 4, missing)
+        self.assertTrue(all(field.endswith("（快速模板）") for field in missing), missing)
+
+
+class CommitHashTests(unittest.TestCase):
+    """CHG-20260904-003 ③：after_commit 接受反引号与 `commit:` 前缀；cat-file 在项目根执行。"""
+
+    def test_commit_prefix_is_accepted(self) -> None:
+        self.assertEqual(
+            VALIDATE.extract_commit_hash(Path("x.md"), EXTENDED_RECORD), "abc1234"
+        )
+
+    def test_backticked_hash_is_accepted(self) -> None:
+        text = QUICK_RECORD.replace("- after_commit: abc1234", "- after_commit: `abc1234def`")
+        self.assertEqual(VALIDATE.extract_commit_hash(Path("x.md"), text), "abc1234def")
+
+    def test_non_repository_cwd_is_false_not_exception(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            self.assertFalse(VALIDATE.is_valid_git_commit("abc1234", cwd=Path(temporary)))
+
+
+class VerRowFormatTests(unittest.TestCase):
+    """RULE-015 ①：index.md 首列接受裸 ID、链接与反引号；其余形态报格式而非"未登记"。"""
+
+    def test_first_column_variants_are_recognized(self) -> None:
+        text = (
+            "| VER-20260816-101 | a |\n"
+            "| [VER-20260816-102](records/logic_version-20260816-102-b.md) | b |\n"
+            "| `VER-20260816-103` | c |\n"
+            "| [`VER-20260816-104`](records/x.md) | d |\n"
+        )
+        self.assertEqual(
+            set(VALIDATE.VER_ROW_RE.findall(text)),
+            {"VER-20260816-101", "VER-20260816-102", "VER-20260816-103", "VER-20260816-104"},
+        )
+
+    def test_rule_row_linking_a_ver_is_not_an_index_row(self) -> None:
+        text = "| RULE-002 | key | x | y | [VER-20260816-101](records/a.md) |\n"
+        self.assertEqual(VALIDATE.VER_ROW_RE.findall(text), [])
+        self.assertEqual(VALIDATE.VER_FIRST_CELL_RE.findall(text), [])
+
+    def test_unrecognized_first_cell_reports_format_not_missing_registration(self) -> None:
+        result = VALIDATE.ValidationResult()
+        with tempfile.TemporaryDirectory() as temporary:
+            records_dir = Path(temporary)
+            records = [
+                write_record(records_dir, "logic_version-20260816-101-win.md", "effective")
+            ]
+            index_path = records_dir / "index.md"
+            index_path.write_text("| VER-20260816-101 (草案) | win |\n", encoding="utf-8")
+            VALIDATE.check_ver_registrations(
+                records, index_path, "| VER-20260816-101 | x | y | z |\n", result
+            )
+        self.assertTrue(any("首列格式不识别" in msg for msg in result.warnings), result.warnings)
+
+
+class CodeAnchorTests(unittest.TestCase):
+    """RULE-015 ②：`path#symbol` / `path:line` 锚点剥离后查路径，符号缺失单独告警。"""
+
+    def test_split_code_anchor(self) -> None:
+        self.assertEqual(
+            VALIDATE.split_code_anchor("scripts/validate.py#check_intent_layer"),
+            ("scripts/validate.py", "check_intent_layer"),
+        )
+        self.assertEqual(VALIDATE.split_code_anchor("src/app.py:12"), ("src/app.py", ""))
+        self.assertEqual(VALIDATE.split_code_anchor("src/app.py:12-20#main"), ("src/app.py", "main"))
+        self.assertEqual(VALIDATE.split_code_anchor("src/app.py"), ("src/app.py", ""))
+
+    def _check(self, root: Path, anchor: str):
+        content = intent_layer_readme(
+            source_header="来源", source_value="user:2026-09-04"
+        ).replace("| src/app.py |", f"| {anchor} |")
+        result = VALIDATE.ValidationResult()
+        VALIDATE.check_intent_layer(content, {"RULE-001"}, result, root)
+        return result.warnings
+
+    def test_symbol_anchor_to_existing_symbol_is_silent(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            self.assertEqual(self._check(root, "src/app.py#main"), [])
+            self.assertEqual(self._check(root, "src/app.py:1"), [])
+
+    def test_symbol_anchor_to_missing_symbol_warns_about_symbol(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "src").mkdir()
+            (root / "src" / "app.py").write_text("def main():\n    pass\n", encoding="utf-8")
+            warnings = self._check(root, "src/app.py#renamed")
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("找不到符号 renamed", warnings[0])
+
+    def test_missing_path_still_reports_path_only(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            warnings = self._check(Path(temporary), "src/gone.py#main")
+        self.assertEqual(len(warnings), 1, warnings)
+        self.assertIn("src/gone.py 不存在", warnings[0])
+        self.assertNotIn("#main", warnings[0])
+
+
+class SlugChangeIdTests(unittest.TestCase):
+    """RULE-021 ③：CHG-ID 共用 recall_common 正则，slug 型议案不再静默跳过。"""
+
+    SLUG_LEDGER = (
+        "## CHG-20260904-UNIFIED-CLIENT-DATA: 统一客户端数据\n\n"
+        "- status: draft\n- recall_route: medium\n- raw_request: x\n"
+    )
+
+    def test_slug_id_is_extracted(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "logic_change.md"
+            path.write_text(self.SLUG_LEDGER, encoding="utf-8")
+            found = VALIDATE.extract_chg_ids(path)
+        self.assertEqual([c["id"] for c in found], ["CHG-20260904-UNIFIED-CLIENT-DATA"])
+        self.assertEqual(found[0]["status"], "draft")
+
+    def test_slug_medium_change_missing_fields_is_reported(self) -> None:
+        result = VALIDATE.ValidationResult()
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "logic_change.md"
+            path.write_text(self.SLUG_LEDGER, encoding="utf-8")
+            VALIDATE.check_chg_analysis_fields(path, result)
+        self.assertEqual(len(result.warnings), 1, result.warnings)
+        self.assertIn("CHG-20260904-UNIFIED-CLIENT-DATA", result.warnings[0])
+        self.assertIn("decomposition, fit_analysis", result.warnings[0])
+
+
 if __name__ == "__main__":
     unittest.main()

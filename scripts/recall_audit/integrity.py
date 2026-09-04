@@ -22,6 +22,7 @@ from .constants import (
     MODULE_DOC_POLICIES,
 )
 from .textutil import (
+    contains_angle_placeholder,
     actual_case_relative,
     cell_link_parts,
     cell_link_target,
@@ -1112,8 +1113,7 @@ def _check_current_policy_table(ctx: _CurrentStateContext) -> None:
         if any(
             not value
             or value.casefold() in _PLACEHOLDER_VALUES
-            or "<" in value
-            or ">" in value
+            or contains_angle_placeholder(value)
             for value in (rule_id, rule, why)
         ):
             ctx.document_issues.append(
@@ -1159,7 +1159,7 @@ def _code_map_row_issues(row: dict, label: str, index: int) -> list[str]:
     issues: list[str] = []
     for column in ("路径/稳定锚点", "artifact_class/layer", "职责", "权威来源"):
         value = row.get(column, "").strip()
-        if not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value:
+        if not value or value.casefold() in _PLACEHOLDER_VALUES or contains_angle_placeholder(value):
             issues.append(f"{label}:code-map-row-{index}-missing-{column}")
     if "contract_class" in row:
         contract = row.get("contract_class", "").strip().casefold()
@@ -1858,7 +1858,7 @@ def _check_domain_readme(ctx: _CurrentStateContext, scope: str) -> None:
         rule = row.get("当前有效规则/行为", "").strip()
         why = row.get("why（仅一句可审计摘要）", "").strip()
         if any(
-            not value or value.casefold() in _PLACEHOLDER_VALUES or "<" in value or ">" in value
+            not value or value.casefold() in _PLACEHOLDER_VALUES or contains_angle_placeholder(value)
             for value in (rule_id, rule, why)
         ):
             ctx.document_issues.append(f"{label}:current-policy-row-{index}-needs-rule-and-why")

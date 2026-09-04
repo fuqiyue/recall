@@ -34,7 +34,6 @@
 | change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
 |---|---|---|---|---|---|---|---|
 | CHG-20260904-004 | draft | . | self | Density 硬上限越线与无领域是否让静态门失败 | none | [CHG-20260904-004](logic_change.md#chg-20260904-004) | 2026-09-04 |
-| CHG-20260904-003 | draft | logic_domains/toolchain | self | validate 兼容消费项目的 slug 型 CHG-ID 与扩展 VER 模板 | none | [CHG-20260904-003](logic_domains/toolchain/logic_change.md#chg-20260904-003) | 2026-09-04 |
 
 <a id="chg-20260904-004"></a>
 ## CHG-20260904-004: Density 硬上限越线与无领域是否让静态门失败

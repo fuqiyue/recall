@@ -755,5 +755,32 @@ class CliGlueSmokeTests(unittest.TestCase):
         self.assertNotIn("Traceback", out)
 
 
+
+class ChangeIdSingleSourceTests(unittest.TestCase):
+    """RULE-021 ③：议案编号正则只此一份，validate / conflicts / 审计器同一份。"""
+
+    def test_all_consumers_share_recall_common_pattern(self):
+        import recall_common
+        from recall_audit import constants as audit_constants
+
+        self.assertIs(validate.CHANGE_ID_PATTERN, recall_common.CHANGE_ID_PATTERN)
+        self.assertIs(detect_conflicts.CHANGE_ID_PATTERN, recall_common.CHANGE_ID_PATTERN)
+        self.assertIn(recall_common.CHANGE_ID_PATTERN, audit_constants.CHANGE_HEADING_RE.pattern)
+        self.assertIn(recall_common.CHANGE_ID_PATTERN, audit_constants.DEPENDENCY_REFERENCE_RE.pattern)
+
+    def test_pattern_accepts_numbered_and_slug_ids(self):
+        import recall_common
+
+        for value in ("CHG-20260904-003", "CHG-20260904-UNIFIED-CLIENT-DATA", "chg-20260904-003"):
+            self.assertTrue(recall_common.CHANGE_ID_RE.fullmatch(value), value)
+        for value in ("CHG-", "VER-20260904-003", "CHG-20260904-003:"):
+            self.assertFalse(recall_common.CHANGE_ID_RE.fullmatch(value), value)
+
+    def test_detect_conflicts_extracts_slug_ids(self):
+        content = "## CHG-20260904-UNIFIED-CLIENT-DATA: 统一客户端数据\n- 修改 RULE-001\n"
+        changes = detect_conflicts.extract_changes(content)
+        self.assertEqual([c["id"] for c in changes], ["CHG-20260904-UNIFIED-CLIENT-DATA"])
+
+
 if __name__ == "__main__":
     unittest.main()

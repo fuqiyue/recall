@@ -6,6 +6,8 @@ from __future__ import annotations
 
 import re
 
+from recall_common import CHANGE_ID_PATTERN, CHANGE_ID_RE  # noqa: E402,F401  RULE-021
+
 DEFAULT_EXCLUDES = {
     ".git",
     ".hg",
@@ -732,11 +734,12 @@ ADR_NAME_RE = re.compile(r"^ADR-\d{8}-\d{3}.*\.md$", re.IGNORECASE)
 PARALLEL_CURRENT_RE = re.compile(
     r"^(logic_readme|logic_change)(?:[-_].+)\.md$", re.IGNORECASE
 )
-CHANGE_HEADING_RE = re.compile(r"^\s*##\s+(CHG-[A-Z0-9][A-Z0-9-]*)\b", re.IGNORECASE)
+# 议案编号正则来自 recall_common（RULE-021 ③：validate / conflicts / 审计器同一份）
+CHANGE_HEADING_RE = re.compile(rf"^\s*##\s+({CHANGE_ID_PATTERN})\b", re.IGNORECASE)
 DECISION_AUTHORITY_ID_RE = re.compile(r"^AUTH-[A-Z0-9][A-Z0-9-]*$", re.IGNORECASE)
 POSITIVE_INTEGER_RE = re.compile(r"^[1-9]\d*$")
 DEPENDENCY_REFERENCE_RE = re.compile(
-    r"^(CHG-[A-Z0-9][A-Z0-9-]*)@revision-([1-9]\d*)$", re.IGNORECASE
+    rf"^({CHANGE_ID_PATTERN})@revision-([1-9]\d*)$", re.IGNORECASE
 )
 
 
@@ -744,3 +747,5 @@ NONE_LIKE_CONTROL_VALUES = {"", "none", "unknown", "n/a", "not-applicable", "...
 
 
 ANGLE_PLACEHOLDER_RE = re.compile(r"<[^<>\r\n]+>")
+# 行内代码段：占位符识别前剔除，`<meta>` 之类的代码不算模板占位符
+CODE_SPAN_RE = re.compile(r"`[^`\r\n]*`")

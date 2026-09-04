@@ -15,6 +15,7 @@ from typing import List, Dict, Tuple, Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (  # noqa: E402
+    CHANGE_ID_PATTERN,  # RULE-021 ③：议案编号只此一份
     change_ledgers,
     find_project_root,
     force_utf8_output,
@@ -105,12 +106,12 @@ def extract_changes(content: str) -> List[Dict[str, str]]:
     current_chg = None
 
     for line in lines:
-        chg_match = re.match(r'(?:#{1,6}\s+)?CHG-(\d{8}-\d+):\s*(.+)', line)
+        chg_match = re.match(rf'(?:#{{1,6}}\s+)?({CHANGE_ID_PATTERN}):\s*(.+)', line)
         if chg_match:
             if current_chg:
                 changes.append(current_chg)
             current_chg = {
-                'id': f'CHG-{chg_match.group(1)}',
+                'id': chg_match.group(1),
                 'title': chg_match.group(2).strip(),
                 'content': []
             }

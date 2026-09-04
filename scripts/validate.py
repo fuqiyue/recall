@@ -12,7 +12,8 @@ from typing import List, Dict, Optional, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (
-    change_ledgers,  # noqa: E402  RULE-021
+    CHANGE_ID_PATTERN,  # noqa: E402  RULE-021 ③：议案编号只此一份
+    change_ledgers,
     classify_porcelain,
     find_project_root,
     force_utf8_output,
@@ -28,8 +29,14 @@ RECORD_NAME_RE = re.compile(
 
 # 规则定义行（当前制度表格里以 RULE-ID 开头的行）；正文引用不算定义
 RULE_DEF_RE = re.compile(r'^\|\s*(RULE-\d{3})\s*\|')
-# 三处登记对账用：索引表行首的 VER-ID
-VER_ROW_RE = re.compile(r'^\|\s*(VER-\d{8}-\d{3})\s*\|', re.MULTILINE)
+# 三处登记对账用：索引表首列的 VER-ID。模板写裸 ID，消费项目常写成
+# `[VER-…](records/…)` 或反引号，三种形态都算登记；其余形态单独提示格式
+VER_ROW_RE = re.compile(
+    r'^\|\s*(?:\[\s*)?`?(VER-\d{8}-\d{3})`?(?:\s*\]\([^)\n]*\))?\s*\|',
+    re.MULTILINE,
+)
+# 首列含 VER-ID 但不是上面三种形态（如 `VER-… (草案)`）：报格式而不是报未登记
+VER_FIRST_CELL_RE = re.compile(r'^\|[^|\n]*?(VER-\d{8}-\d{3})[^|\n]*\|', re.MULTILINE)
 # 功能意图层（RULE-014）：完整格式的 intent_id 与流程位置
 INT_ID_RE = re.compile(r'^INT-\d{8}-\d{3}$')
 INT_TOKEN_RE = re.compile(r'\bINT-\d{8}-\d{3}\b')
@@ -53,7 +60,7 @@ DRIFT_WARNING_THRESHOLD = 10
 # commit 关联的几种写法，按 references/ 下两个模板的实际格式
 COMMIT_PATTERNS = (
     # 统一 schema 的实施提交字段: - after_commit: abc123（hook 回填）
-    r'^\s*-\s*after_commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
+    r'^\s*-\s*after_commit\s*[：:]\s*`?(?:commit:)?([0-9a-f]{7,40})`?\s*$',
     # 旧记录格式兼容: - **关联 Commit**: `abc123`
     r'关联\s*Commit\*{0,2}\s*[：:]\s*`?([0-9a-f]{7,40})`?',
     # logic-version-template.md 扩展 schema 的 based_on: ... code: commit:abc123
@@ -171,6 +178,28 @@ def find_registered_child_readmes(
     return paths, missing
 
 
+def split_code_anchor(anchor: str) -> Tuple[str, str]:
+    """把 `path#symbol` / `path:line` 形态的代码锚点拆成 (路径, 符号)。
+
+    旧代码拿整串去 `exists()`，`scripts/validate.py#check_intent_layer`
+    这类正确锚点被报"不存在"（2026-09-03 eduai 6 处误报）。行号形态只保留路径。
+    """
+    path_part, _, symbol = anchor.partition('#')
+    line_match = re.match(r'^(.+?):(\d+)(?:-\d+)?$', path_part)
+    if line_match:
+        path_part = line_match.group(1)
+    return path_part.strip(), symbol.strip()
+
+
+def anchor_symbol_present(target: Path, symbol: str) -> bool:
+    """符号锚点的最低限度核查：符号名在目标文件文本中出现（不做语法解析）。"""
+    try:
+        text = target.read_text(encoding='utf-8', errors='ignore')
+    except OSError:
+        return True
+    return symbol in text
+
+
 def check_intent_layer(
     content: str, rule_ids: set, result: 'ValidationResult', root: Path = None,
     doc_label: str = 'logic_readme.md', seen_int_ids: set = None
@@ -281,13 +310,20 @@ def check_intent_layer(
                     anchor = anchor.strip().strip('`')
                     if not anchor:
                         continue
-                    # 只检查路径形态的锚点；符号/路由锚点无法静态验证
+                    # 只检查路径形态的锚点；纯符号/路由锚点无法静态验证
                     if '/' not in anchor and '.' not in anchor:
                         continue
-                    if not (root / anchor).exists():
+                    path_part, symbol = split_code_anchor(anchor)
+                    target = root / path_part
+                    if not target.exists():
                         result.add_warning(
-                            f"{intent_id}: 代码锚点 {anchor} 不存在"
+                            f"{intent_id}: 代码锚点 {path_part} 不存在"
                             "（文件改名/移动后请更新功能意图登记表）"
+                        )
+                    elif symbol and target.is_file() and not anchor_symbol_present(target, symbol):
+                        result.add_warning(
+                            f"{intent_id}: 代码锚点 {path_part} 中找不到符号 {symbol}"
+                            "（函数/类改名后请更新功能意图登记表）"
                         )
 
     # 操作直觉约束中引用的 INT 必须已登记
@@ -365,7 +401,13 @@ def check_ver_registrations(
 
     index_vers = set()
     if index_path.exists():
-        index_vers = set(VER_ROW_RE.findall(index_path.read_text(encoding='utf-8')))
+        index_text = index_path.read_text(encoding='utf-8')
+        index_vers = set(VER_ROW_RE.findall(index_text))
+        for ver_id in sorted(set(VER_FIRST_CELL_RE.findall(index_text)) - index_vers):
+            result.add_warning(
+                f"logic_version/index.md 有 {ver_id} 行但首列格式不识别"
+                "（应为裸 ID、[ID](path) 或 `ID`，否则会被当作未登记）"
+            )
     readme_vers = set(VER_ROW_RE.findall(readme_content))
     linked_vers = rule_linked_versions(readme_content, *(domain_readme_contents or []))
 
@@ -396,7 +438,7 @@ def check_chg_analysis_fields(change_path: Path, result: 'ValidationResult') -> 
     content = change_path.read_text(encoding='utf-8')
     blocks = re.split(r'^(?=##\s+CHG-)', content, flags=re.MULTILINE)
     for block in blocks:
-        header = re.match(r'##\s+(CHG-\d{8}-\d{3})', block)
+        header = re.match(rf'##\s+({CHANGE_ID_PATTERN})', block)
         if not header:
             continue
         chg_id = header.group(1)
@@ -456,7 +498,7 @@ def extract_chg_ids(change_path: Path) -> List[Dict]:
     with open(change_path, 'r', encoding='utf-8') as f:
         content = f.read()
         # 匹配 CHG-ID 标题
-        pattern = r'##\s+(CHG-\d{8}-\d{3}):\s*(.+?)$'
+        pattern = rf'^\s*##\s+({CHANGE_ID_PATTERN}):\s*(.+?)$'
         for match in re.finditer(pattern, content, re.MULTILINE):
             chg_id = match.group(1)
             title = match.group(2).strip()
@@ -497,13 +539,12 @@ def find_version_records(version_dir: Path) -> List[Path]:
         if RECORD_NAME_RE.match(path.name)
     )
 
-def extract_commit_hash(record_path: Path) -> str:
-    """从决策记录中提取 Git commit hash"""
-    if not record_path.exists():
-        return ""
-
-    with open(record_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+def extract_commit_hash(record_path: Path, content: Optional[str] = None) -> str:
+    """从决策记录中提取 Git commit hash（裸 SHA、反引号或 `commit:` 前缀）"""
+    if content is None:
+        if not record_path.exists():
+            return ""
+        content = record_path.read_text(encoding='utf-8')
 
     for pattern in COMMIT_PATTERNS:
         match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
@@ -512,41 +553,71 @@ def extract_commit_hash(record_path: Path) -> str:
 
     return ""
 
-def check_required_fields(record_path: Path) -> List[str]:
-    """检查决策记录的必填字段。
-
-    字段名以 references/logic-version-template.md 为准。旧代码检查的
-    `版本号` / `关联 Commit` / `创建日期` / `## 修改原因` / `## 决策过程`
-    从来不是这个 schema 的字段，一旦 glob 修好就会让每条记录都报假缺失。
-    """
-    required_fields = [
-        (r'^\s*-\s*version_id\s*:', 'version_id'),
-        (r'^\s*-\s*date\s*:', 'date'),
-        (r'^\s*-\s*status\s*:', 'status'),
+# 记录控制字段：两套模板共有
+RECORD_CONTROL_FIELDS = [
+    (r'^\s*-\s*version_id\s*:', 'version_id'),
+    (r'^\s*-\s*date\s*:', 'date'),
+    (r'^\s*-\s*status\s*:', 'status'),
+]
+# 正文必备章节：references/logic-version-template.md 有两套 schema，
+# 记录满足任一套即可（RULE-009 字段名以模板为准，模板有几套就认几套）
+RECORD_SCHEMAS = {
+    '快速模板': [
         (r'^\s*##\s*为什么', '## 为什么做这个决策？'),
         (r'^\s*##\s*影响范围', '## 影响范围'),
         (r'^\s*##\s*验证方式', '## 验证方式'),
         (r'^\s*##\s*回滚方式', '## 回滚方式'),
+    ],
+    '扩展 schema': [
+        (r'^\s*##\s*变更摘要', '## 变更摘要'),
+        (r'^\s*##\s*影响与消费者', '## 影响与消费者'),
+        (r'^\s*##\s*兼容、迁移与回滚', '## 兼容、迁移与回滚'),
+        (r'^\s*##\s*测试与审核', '## 测试与审核'),
+    ],
+}
+
+
+def _missing_by_patterns(content: str, fields) -> List[str]:
+    return [
+        name for pattern, name in fields
+        if not re.search(pattern, content, re.MULTILINE)
     ]
 
-    missing_fields = []
 
-    with open(record_path, 'r', encoding='utf-8') as f:
-        content = f.read()
+def check_required_fields(record_path: Path, content: Optional[str] = None) -> List[str]:
+    """检查决策记录的必填字段；返回缺失字段名列表（空表示通过）。
 
-    for field_pattern, field_name in required_fields:
-        if not re.search(field_pattern, content, re.MULTILINE):
-            missing_fields.append(field_name)
+    字段名以 references/logic-version-template.md 为准。模板有快速模板与
+    扩展 schema 两套正文章节，旧代码只认快速模板，按扩展 schema 写的记录
+    每条都报 4 个假缺失（2026-09-03 eduai 46 份记录全部 FAIL）。这里控制
+    字段两套共有必查；正文章节满足任一套即通过，都不满足时按更接近的一套
+    报缺失并注明 schema 名。
+    """
+    if content is None:
+        content = record_path.read_text(encoding='utf-8')
 
-    return missing_fields
+    missing = _missing_by_patterns(content, RECORD_CONTROL_FIELDS)
+    by_schema = {
+        name: _missing_by_patterns(content, fields)
+        for name, fields in RECORD_SCHEMAS.items()
+    }
+    if all(by_schema.values()):
+        # 都不满足：取缺失最少的一套（并列时保持声明顺序，即快速模板优先）
+        schema_name = min(by_schema, key=lambda name: len(by_schema[name]))
+        missing.extend(f'{field}（{schema_name}）' for field in by_schema[schema_name])
+    return missing
 
-def is_valid_git_commit(commit_hash: str) -> bool:
-    """检查 Git commit hash 是否有效"""
+def is_valid_git_commit(commit_hash: str, cwd: Optional[Path] = None) -> bool:
+    """检查 Git commit hash 在 ``cwd`` 所在仓库是否有效。
+
+    其余 Git 调用都传项目根；这里此前漏传，skill 集中安装后从项目外目录
+    运行会查到错误的仓库。
+    """
     if not commit_hash:
         return False
 
     # git 未安装、不在 PATH 或超时时 run_git 返回 ok=False，不抛异常（RULE-021）
-    ok, out, _ = run_git(['cat-file', '-t', commit_hash], timeout=5)
+    ok, out, _ = run_git(['cat-file', '-t', commit_hash], cwd=cwd, timeout=5)
     return ok and 'commit' in out
 
 def check_doc_drift(root: Path, result: 'ValidationResult') -> None:
@@ -732,12 +803,12 @@ def validate_recall() -> ValidationResult:
     result.add_info(f"在 logic_version/records/ 中找到 {len(version_records)} 个决策记录")
 
     for record_path in version_records:
-        # 检查必填字段
-        missing = check_required_fields(record_path)
+        record_text = record_path.read_text(encoding='utf-8')
+
+        # 检查必填字段（快速模板 / 扩展 schema 任一套）
+        missing = check_required_fields(record_path, record_text)
         if missing:
             result.add_error(f"{record_path.name} 缺少必填字段: {', '.join(missing)}")
-
-        record_text = record_path.read_text(encoding='utf-8')
 
         # 需求保全（RULE-014）：来自 CHG 的记录必须带需求拆解三字段
         check_record_requirement_fields(record_text, record_path.name, result)
@@ -749,9 +820,9 @@ def validate_recall() -> ValidationResult:
             )
 
         # 检查 Git commit hash
-        commit_hash = extract_commit_hash(record_path)
+        commit_hash = extract_commit_hash(record_path, record_text)
         if commit_hash:
-            if not is_valid_git_commit(commit_hash):
+            if not is_valid_git_commit(commit_hash, cwd=root):
                 result.add_error(f"{record_path.name} 中的 commit hash '{commit_hash}' 无效")
         else:
             result.add_warning(f"{record_path.name} 未关联 Git commit")

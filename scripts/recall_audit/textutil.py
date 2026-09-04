@@ -8,6 +8,8 @@ import re
 from datetime import date
 from pathlib import Path
 from .constants import (
+    CHANGE_ID_RE,
+    CODE_SPAN_RE,
     ADR_NAME_RE,
     ANGLE_PLACEHOLDER_RE,
     CANONICAL_VERSION_RE,
@@ -306,11 +308,7 @@ def is_immutable_decision_record_link(cell: str) -> bool:
 
 def normalize_change_id(value: str) -> str:
     candidate = value.strip("` ,:;")
-    return (
-        candidate.upper()
-        if re.fullmatch(r"CHG-[A-Z0-9][A-Z0-9-]*", candidate, re.IGNORECASE)
-        else ""
-    )
+    return candidate.upper() if CHANGE_ID_RE.fullmatch(candidate) else ""
 
 
 def normalize_topic_id(value: str) -> str:
@@ -366,8 +364,13 @@ def is_none_like(value: str) -> bool:
 
 
 def contains_angle_placeholder(value: str) -> bool:
-    """Detect template placeholders without mistaking traceability arrows for them."""
-    return bool(ANGLE_PLACEHOLDER_RE.search(value))
+    """Detect template placeholders (``<...>``) outside inline code spans.
+
+    Traceability arrows (``->``), bare comparisons (``>128``) and inline code
+    such as ``<meta>`` are not placeholders; the old ``"<" in value`` checks in
+    the current-state gate rejected legitimate rule text for them.
+    """
+    return bool(ANGLE_PLACEHOLDER_RE.search(CODE_SPAN_RE.sub("", value)))
 
 
 def is_iso_date(value: str) -> bool:

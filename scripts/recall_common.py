@@ -15,6 +15,7 @@ conflicts 根查找都属此类）：
 
 from __future__ import annotations
 
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -25,6 +26,13 @@ from typing import Iterable, List, Optional, Tuple
 SELF_ROOT = Path(__file__).resolve().parent.parent
 
 ROOT_MARKER = "logic_readme.md"
+
+# 议案编号只此一份正则（RULE-021 ③）：validate / conflicts / 审计器共用。
+# 日期段之后既接受本仓库的 ``NNN``，也接受消费项目的 slug
+# （``CHG-20260904-UNIFIED-CLIENT-DATA``）；此前 validate 只认 ``\d{3}``，
+# slug 型议案的三字段检查静默跳过（2026-09-03 eduai 实测）。
+CHANGE_ID_PATTERN = r"CHG-[A-Za-z0-9][A-Za-z0-9-]*"
+CHANGE_ID_RE = re.compile(rf"^{CHANGE_ID_PATTERN}$", re.IGNORECASE)
 
 
 def force_utf8_output() -> None:
