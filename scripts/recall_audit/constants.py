@@ -749,3 +749,9 @@ NONE_LIKE_CONTROL_VALUES = {"", "none", "unknown", "n/a", "not-applicable", "...
 ANGLE_PLACEHOLDER_RE = re.compile(r"<[^<>\r\n]+>")
 # 行内代码段：占位符识别前剔除，`<meta>` 之类的代码不算模板占位符
 CODE_SPAN_RE = re.compile(r"`[^`\r\n]*`")
+# 围栏代码块（``` 或 ~~~）：链接可达性检查前剔除，示例里的 `[ID](path)` 不算真实链接
+FENCED_CODE_RE = re.compile(
+    r"^(`{3,}|~{3,})[^\r\n]*\r?\n.*?^\1[ \t]*$", re.MULTILINE | re.DOTALL
+)
+# 空账本的 active_changes：模板写 none，消费项目也常写 0，两者同义
+EMPTY_LEDGER_COUNT_VALUES = {"none", "0"}

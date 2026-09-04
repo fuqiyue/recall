@@ -119,7 +119,7 @@ RULE 编号与宪法及其他领域共用同一编号空间，不得重复；只
 - governance_verification: verified | recorded | unavailable | not-applicable
 - governance_verified_at: YYYY-MM-DD | none
 - last_updated: YYYY-MM-DD
-- active_changes: <本文件 CHG 正文数量或 none>
+- active_changes: <本文件 CHG 正文数量；无正文填 none（0 同义）>
 
 ## 议案规则
 

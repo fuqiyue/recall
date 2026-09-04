@@ -32,6 +32,7 @@ from .textutil import (
     control_values_raw,
     has_meaningful_value,
     inspect_markdown,
+    is_empty_ledger_count,
     is_immutable_decision_record_link,
     is_iso_date,
     is_none_like,
@@ -1483,6 +1484,13 @@ def _collect_registry_lookups(ctx: _CurrentStateContext) -> None:
     ctx.module_anchor_scopes = module_anchor_scopes
 
 
+def _ledger_count_matches(declared: str, body_count: int) -> bool:
+    """``active_changes`` 与正文数一致：无正文时 ``none``/``0`` 同义（模板写 none）。"""
+    if body_count == 0:
+        return is_empty_ledger_count(declared)
+    return declared.strip().casefold() == str(body_count)
+
+
 def _check_change_body_index(ctx: _CurrentStateContext) -> None:
     """核查议案正文 ID 无重复、active_changes 计数正确、正文与活跃索引双向一致。"""
     body_id_list = change_heading_ids(ctx.change_text)
@@ -1496,7 +1504,7 @@ def _check_change_body_index(ctx: _CurrentStateContext) -> None:
 
     declared_active_changes = (ctx.change_raw.get("active_changes") or [""])[0]
     expected_active_changes = str(len(body_id_list)) if body_id_list else "none"
-    if declared_active_changes.casefold() != expected_active_changes:
+    if not _ledger_count_matches(declared_active_changes, len(body_id_list)):
         ctx.proposal_issues.append(
             "active_changes-count-mismatch:"
             f"{declared_active_changes or 'missing'}!={expected_active_changes}"
@@ -1957,7 +1965,7 @@ def _check_domain_change(ctx: _CurrentStateContext, scope: str) -> None:
         ctx.domain_change_ids[change_id] = scope
     declared = (control.get("active_changes") or [""])[0]
     expected = str(len(body_ids)) if body_ids else "none"
-    if declared.casefold() != expected:
+    if not _ledger_count_matches(declared, len(body_ids)):
         ctx.proposal_issues.append(
             f"{label}:active_changes-count-mismatch:{declared or 'missing'}!={expected}"
         )

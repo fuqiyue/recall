@@ -44,8 +44,8 @@ jobs:
       run: |
         # CHANGELOG.md 已于 2026-08-16 归档；变更历史由 logic_version/ 与 logic_readme.md 承载
         if git diff --name-only origin/main...HEAD | grep -qE "^(scripts/|recall\.(bat|sh))"; then
-          if ! git diff --name-only origin/main...HEAD | grep -qE "^(logic_readme\.md|logic_version/)"; then
-            echo "⚠️ 提示: 脚本/入口变更未触及 logic_readme.md 或 logic_version/，请确认 docs_impact 为 none 有理由"
+          if ! git diff --name-only origin/main...HEAD | grep -qE "^(logic_readme\.md|logic_domains/|logic_version/)"; then
+            echo "⚠️ 提示: 脚本/入口变更未触及 logic_readme.md、logic_domains/ 或 logic_version/，请确认 docs_impact 为 none 有理由"
           fi
         fi
 

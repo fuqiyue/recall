@@ -709,7 +709,9 @@ Rollback the code change.
 """
 
 
-class RootOnlyAuditTests(unittest.TestCase):
+class ProjectFixtureMixin:
+    """根宪法 / 领域夹具与审计调用助手；子类只带自己的用例，避免重复跑整套 RootOnlyAuditTests。"""
+
     def write_project(
         self,
         root: Path,
@@ -796,6 +798,8 @@ class RootOnlyAuditTests(unittest.TestCase):
             )
         change_path.write_text(proposal, encoding="utf-8")
 
+
+class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
     def test_current_state_accepts_lightweight_root_only_map(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
@@ -3206,7 +3210,7 @@ class PlaceholderDetectionTests(unittest.TestCase):
             self.assertTrue(AUDIT.contains_angle_placeholder(text), text)
 
 
-class DomainRuleTextPlaceholderTests(RootOnlyAuditTests):
+class DomainRuleTextPlaceholderTests(ProjectFixtureMixin, unittest.TestCase):
     """规则/why 单元格里的比较符与行内代码不算占位符，模板尖括号仍然拒绝。"""
 
     def _report_with_rule_text(self, rule_text: str) -> dict:
@@ -3235,6 +3239,134 @@ class DomainRuleTextPlaceholderTests(RootOnlyAuditTests):
         self.assertIn(
             "src/logic_readme:current-policy-row-1-needs-rule-and-why",
             report["current_integrity"]["document_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+
+class CodeSegmentLinkTests(unittest.TestCase):
+    """链接可达性只查代码段之外的链接（RULE-021 ③，VER-20260904-004）。
+
+    2026-09-04 消费项目：规则正文里示意性的 `[ID](path)` 被 `audit_links` 当作
+    真实链接、报坏链，用户被迫把措辞改成"指向记录的 Markdown 链接"。
+    """
+
+    def test_strip_code_segments_removes_fences_and_spans(self) -> None:
+        text = (
+            "keep `[ID](path)` here\n"
+            "```markdown\n[t](missing.md)\n```\n"
+            "~~~\n[q](also-missing.md)\n~~~\n"
+            "tail [k](v.md)"
+        )
+        stripped = AUDIT.strip_code_segments(text)
+        self.assertNotIn("[ID](path)", stripped)
+        self.assertNotIn("missing.md", stripped)
+        self.assertIn("[k](v.md)", stripped)
+
+    def test_audit_links_ignores_code_and_link_titles(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "real.md").write_text("x", encoding="utf-8")
+            document = root / "logic_readme.md"
+            text = (
+                "| RULE-001 | key | index accepts `[ID](path)` links | why |\n"
+                "```\n[example](nowhere/example.md)\n```\n"
+                "see [real](real.md \"Title\") and [bad](missing.md)\n"
+            )
+            document.write_text(text, encoding="utf-8")
+            self.assertEqual(
+                AUDIT.audit_links(document, text, root), ["missing.md"]
+            )
+
+    def test_empty_ledger_count_accepts_none_and_zero(self) -> None:
+        for value in ("none", "None", "0", " 0 "):
+            self.assertTrue(AUDIT.is_empty_ledger_count(value), value)
+        for value in ("1", "", "n/a"):
+            self.assertFalse(AUDIT.is_empty_ledger_count(value), value)
+
+
+class DomainRuleTextLinkTests(ProjectFixtureMixin, unittest.TestCase):
+    """规则单元格里反引号包裹的链接示例不算坏链；裸坏链仍使静态门失败并带 broken-link 前缀。"""
+
+    def _report_with_rule_text(self, rule_text: str) -> dict:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root)
+            readme_path = root / "src" / "logic_readme.md"
+            text = readme_path.read_text(encoding="utf-8").replace(
+                "Keep the module output stable.", rule_text
+            )
+            readme_path.write_text(text, encoding="utf-8")
+            return self.collect(root)
+
+    def test_inline_code_link_example_passes(self) -> None:
+        report = self._report_with_rule_text(
+            "Index first column accepts bare IDs or `[ID](path)` links."
+        )
+        self.assertFalse(
+            [
+                issue
+                for issue in report["current_integrity"]["document_issues"]
+                if "broken-link" in issue
+            ]
+        )
+        self.assertFalse(self.fails(report))
+
+    def test_bare_broken_link_still_fails_with_prefix(self) -> None:
+        report = self._report_with_rule_text("See [spec](nowhere/spec.md).")
+        self.assertIn(
+            "src:logic_readme:broken-link:nowhere/spec.md",
+            report["current_integrity"]["document_issues"],
+        )
+        self.assertTrue(self.fails(report))
+
+
+class EmptyLedgerCountTests(ProjectFixtureMixin, unittest.TestCase):
+    """空账本 `active_changes` 写 `0` 与模板的 `none` 同义；有正文时 `0` 仍报不匹配。"""
+
+    def test_domain_ledger_zero_without_bodies_passes(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_domain_project(root, gazette_row=None)
+            change_path = root / "src" / "logic_change.md"
+            text = change_path.read_text(encoding="utf-8")
+            row_start = text.index(f"| {DOMAIN_CHANGE_ID} | implementing")
+            text = text[:row_start].replace("- active_changes: 1", "- active_changes: 0")
+            change_path.write_text(text, encoding="utf-8")
+            readme_path = root / "src" / "logic_readme.md"
+            readme_path.write_text(
+                readme_path.read_text(encoding="utf-8").replace(
+                    f"- 相关 CHG-ID：{DOMAIN_CHANGE_ID}", "- 相关 CHG-ID：none"
+                ),
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        issues = (
+            report["current_integrity"]["proposal_issues"]
+            + report["current_integrity"]["document_issues"]
+        )
+        self.assertFalse([issue for issue in issues if "active_changes" in issue], issues)
+        self.assertFalse(
+            [issue for issue in issues if "missing-effective-marker" in issue], issues
+        )
+        self.assertFalse(self.fails(report))
+
+    def test_zero_with_bodies_still_mismatches(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            change_path = root / "logic_change.md"
+            change_path.write_text(
+                change_path.read_text(encoding="utf-8").replace(
+                    "- active_changes: 1", "- active_changes: 0"
+                ),
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        self.assertIn(
+            "active_changes-count-mismatch:0!=1",
+            report["current_integrity"]["proposal_issues"],
         )
         self.assertTrue(self.fails(report))
 

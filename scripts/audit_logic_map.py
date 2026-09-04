@@ -108,6 +108,9 @@ from recall_audit.constants import (  # noqa: F401
     VERSION_ID_TOKEN_RE,
     VERSION_SLUG_RE,
     VERSION_STATUSES,
+    CODE_SPAN_RE,
+    FENCED_CODE_RE,
+    EMPTY_LEDGER_COUNT_VALUES,
 )
 from recall_audit.textutil import (  # noqa: F401
     actual_case_relative,
@@ -140,6 +143,8 @@ from recall_audit.textutil import (  # noqa: F401
     relative_depth,
     scope_parts,
     split_control_list,
+    strip_code_segments,
+    is_empty_ledger_count,
 )
 from recall_audit.fsclassify import (  # noqa: F401
     is_dependency_tree_root,

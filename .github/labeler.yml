@@ -10,11 +10,11 @@ scripts:
 
 cli:
   - changed-files:
-    - any-glob-to-any-file: ['recall.bat', 'recall.sh', 'scripts/cli.py']
+    - any-glob-to-any-file: ['recall.bat', 'recall.sh', 'scripts/recall.py']
 
 core-logic:
   - changed-files:
-    - any-glob-to-any-file: ['logic_readme.md', 'logic_change.md', 'logic_version/**/*']
+    - any-glob-to-any-file: ['logic_readme.md', 'logic_change.md', 'logic_domains/**/*', 'logic_version/**/*']
 
 ci-cd:
   - changed-files:

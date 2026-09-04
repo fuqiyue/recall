@@ -57,6 +57,7 @@ from .textutil import (
     markdown_table_rows,
     normalize_scope_path,
     read_text,
+    is_empty_ledger_count,
 )
 from .fsclassify import (
     is_generated_file,
@@ -202,7 +203,7 @@ def semantic_issues(path: Path, kind: str, *, root: Path | None = None) -> list[
         # each module body is checked independently below.
         if (
             active_count
-            and active_count[0] != "none"
+            and not is_empty_ledger_count(active_count[0])
             and not effective_values
             and not is_root_index
         ):
@@ -566,7 +567,7 @@ def audit_module(path: Path, files: list[Path], root: Path) -> ModuleAudit:
             f"logic_readme:{item}"
             for item in path_reference_issues(readme, root, ("parent",))
         )
-        broken_links.extend(f"logic_readme:{item}" for item in links)
+        broken_links.extend(f"logic_readme:broken-link:{item}" for item in links)
         required_readme_v2_fields = set(REQUIRED_README_FIELDS_V2)
         if relative == ".":
             required_readme_v2_fields |= REQUIRED_README_FIELDS_V2_ROOT
@@ -720,7 +721,7 @@ def audit_module(path: Path, files: list[Path], root: Path) -> ModuleAudit:
             f"logic_change:{item}"
             for item in path_reference_issues(change, root, ("current_policy",))
         )
-        broken_links.extend(f"logic_change:{item}" for item in links)
+        broken_links.extend(f"logic_change:broken-link:{item}" for item in links)
         required_change_v2_fields = set(REQUIRED_CHANGE_FIELDS_V2)
         if relative == ".":
             required_change_v2_fields |= REQUIRED_CHANGE_FIELDS_V2_ROOT

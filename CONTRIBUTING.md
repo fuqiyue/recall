@@ -55,8 +55,10 @@
 
 5. **测试**
    ```bash
-   # 运行验证
+   # 运行验证、审计静态门与全部测试
    ./recall.sh validate
+   ./recall.sh audit
+   python -m unittest discover -s tests
    
    # 手动测试相关功能
    ./recall.sh status
@@ -70,7 +72,7 @@
 
    详细说明修改内容和原因
    
-   Ref: logic_version/records/VER-YYYYMMDD-HHMM-description.md"
+   Ref: logic_version/records/logic_version-YYYYMMDD-NNN-<scope>.md"
    ```
 
 7. **推送并创建 PR**

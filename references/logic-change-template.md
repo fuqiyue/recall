@@ -20,12 +20,12 @@
 - governance_verification: verified | recorded | unavailable | not-applicable
 - governance_verified_at: YYYY-MM-DD | none
 - last_updated: YYYY-MM-DD
-- active_changes: <本文件 CHG 正文数量或 none>
+- active_changes: <本文件 CHG 正文数量；无正文填 none（0 同义）>
 
 ## 议案规则
 
 - 本文件所有条目默认 `effective: false`；确认、实施和代码语义审查都不等于生效。
-- 允许状态：draft | awaiting-decision | implementing | verifying | blocked。
+- 允许状态：draft | awaiting-decision | implementing | verifying | promoting | blocked（`promoting` 是晋升过渡态，见 change-lifecycle.md）。
 - `CHG-ID` 的边界是可独立决策、验收、发布和回滚的最小工作项。两个改动若必须一起实施才能保持同一不变量，就合并为一个 CHG；只有可以独立关闭时才拆分为多个 CHG。
 - `TOPIC-ID` 是同类讨论的容器，可集中多个 CHG 的来源、共享约束和开放问题；它不改变任何 CHG 的决策、发布或回滚边界。一个主题可暂时没有 CHG，多个 CHG 也可属于同一主题；每个活跃 CHG 最多填写一个 `topic_id`。主题最后一个相关 CHG 关闭时，必须把共享背景、约束、讨论来源和最终结论复制到该 CHG 的 `VER-*` 快照，避免主题从活跃文件移除后丢失理由。
 - `recall_route` 标明本条目的分析深度：`simple` 通常不需要创建 CHG，只有用户要求追踪时使用；`medium` 先给出计划、影响范围和验证方式；`high` 必须显式检索消费者与相关历史、比较替代方案，并使用决策门槛。无法确定时升级通道。
@@ -75,7 +75,7 @@
 
 ### 元数据
 
-- status: draft | awaiting-decision | implementing | verifying | blocked
+- status: draft | awaiting-decision | implementing | verifying | promoting | blocked
 - effective: false
 - topic_id: TOPIC-YYYYMMDD-NNN | none
 - recall_route: simple | medium | high
@@ -239,5 +239,5 @@
 - `effective`：先重新核对 `based_on`、版本绑定依赖、冲突处理和实际运行暴露，再完成代码语义审查和验收；对 `history_retention: compact` 或 `full` 的 CHG，先创建相应 `VER-*`，把 `intent_source_refs` 与可审计意图提炼原样固化；对高风险/`decision_record: required` 再保留完整决策快照、必要时 ADR 并更新索引，再更新根 `logic_readme.md` 的受影响章节和关键规则链接。目标环境启用时，现行制度和关闭记录必须同一受控发布变更完成；`deployed-active` 不得留在活跃 CHG；最后清理 `logic_temp` 并移除条目。
 - `rejected` / `cancelled`：不得进入当前制度；如果已进行决策检查点，也创建不可变记录保留最终方案与拒绝/取消原因，然后清理临时记录并移除。
 - `rolled-back`：把当前制度恢复为实际状态，生成回滚记录，验证恢复路径，清理临时记录并移除。
-- 无活跃议案时保留 `active_changes: none`。
+- 无活跃议案时保留 `active_changes: none`（审计器把 `0` 视为同义）。
 - 本文件随 Git 分支/worktree 版本化，不是跨分支实时锁；并行任务使用不同 CHG-ID，合并时按议案条目处理冲突，禁止整文件覆盖。它以低并发为前提：出现频繁并行写入、跨团队审核或强制权限时，先在外部 Issue/Spec/PR/变更系统协调，再回写主题与 CHG 的稳定引用。机器检查只能验证已声明的依赖、冲突、版本、治理引用和影响面，不能替代对真实消费者、运行数据、代码语义或外部权限控制的核对，也不能证明用户咨询确实发生或确认来源有权裁决。

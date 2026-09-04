@@ -25,7 +25,7 @@
 - last_verified: 2026-09-04
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: SKILL.md, logic_readme.md
-- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002, VER-20260903-001, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-002, VER-20260904-003
+- source_decisions: VER-20260808-001, VER-20260808-002, VER-20260811-001, VER-20260811-002, VER-20260811-003, VER-20260816-001, VER-20260816-002, VER-20260816-003, VER-20260816-004, VER-20260816-005, VER-20260831-001, VER-20260831-002, VER-20260903-001, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-002, VER-20260904-003, VER-20260904-004
 - intent_summary: 为 AI 提供项目设计逻辑的回忆机制，记录"为什么这么设计"而非代码快照，避免上下文膨胀；宪法必读、部门法按需导入
 - intent_sources: 用户访谈 2026-08-07；用户确认 2026-09-03（一二级拆分法）
 - decision_validity: valid
@@ -210,9 +210,9 @@
 
 | version_id | 决策摘要 | 关联规则 | 记录 |
 |---|---|---|---|
-| VER-20260904-001 | 一法多议案：跨账本目标规则冲突与旧议案基线失效检查（不分档）、意图层来源列（用户表述即宪法）、按意图路由、conflicts 新节 | RULE-014, RULE-015, RULE-018, RULE-023 | [记录](logic_version/records/logic_version-20260904-001-intent-provenance-conflicts.md) |
 | VER-20260904-002 | 文档优化：宪法索引收缩为指针 + 最近 3 条、代码地图 `contract_class` 列、规则行子条款化、status 计数同源、route 跳过边界行与表头、`recall audit`、待立案事项入账 | RULE-002, RULE-015, RULE-018, RULE-021, RULE-022 | [记录](logic_version/records/logic_version-20260904-002-docs-consolidation.md) |
 | VER-20260904-003 | validate/审计器兼容消费项目格式：VER 必填段双 schema、index 首列链接形态、锚点 `#symbol` 剥离、CHG-ID 单一正则、占位符判定剔除行内代码 | RULE-015, RULE-021 | [记录](logic_version/records/logic_version-20260904-003-validate-compat.md) |
+| VER-20260904-004 | 审计器兼容消费项目写法：链接可达性剔除代码段、空账本 `active_changes` 接受 `0`、坏链前缀、模板状态枚举补 `promoting`、CI/labeler 两级文档路径 | RULE-021 | [记录](logic_version/records/logic_version-20260904-004-audit-link-ledger-compat.md) |
 
 ## 活跃议案入口
 

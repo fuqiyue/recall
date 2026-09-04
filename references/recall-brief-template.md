@@ -59,7 +59,7 @@
 
 | CHG-ID | proposal_revision | status | authority_surfaces | based_on | 冲突/依赖 | 运行暴露 | 历史保留 | 未决门槛 |
 |---|---|---|---|---|---|---|---|---|
-| ... | ... | draft/awaiting-decision/implementing/verifying/blocked | RULE/API/DB/FLAG/... | policy + code/snapshot | ... | runtime_state/env/flag | none/compact/full | ... |
+| ... | ... | draft/awaiting-decision/implementing/verifying/promoting/blocked | RULE/API/DB/FLAG/... | policy + code/snapshot | ... | runtime_state/env/flag | none/compact/full | ... |
 
 没有相关议案时明确写 none。不得把用户确认、代码语义审查或测试通过误写成已经生效。
 

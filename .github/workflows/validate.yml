@@ -27,11 +27,8 @@ jobs:
         chmod +x recall.sh
         ./recall.sh validate
 
-    - name: 运行逻辑地图测试
-      run: python tests/test_audit_logic_map.py
-
-    - name: 运行 CLI / 校验 / 公共模块 / Git 自动同步测试
-      run: python -m unittest tests.test_git_sync tests.test_recall_cli tests.test_validate tests.test_recall_common
+    - name: 运行全部测试（新增测试文件自动纳入）
+      run: python -m unittest discover -s tests
 
     - name: 审计静态门（current-state）
       run: python scripts/audit_logic_map.py . --current-state

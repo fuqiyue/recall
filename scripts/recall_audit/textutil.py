@@ -10,6 +10,8 @@ from pathlib import Path
 from .constants import (
     CHANGE_ID_RE,
     CODE_SPAN_RE,
+    EMPTY_LEDGER_COUNT_VALUES,
+    FENCED_CODE_RE,
     ADR_NAME_RE,
     ANGLE_PLACEHOLDER_RE,
     CANONICAL_VERSION_RE,
@@ -26,17 +28,35 @@ def relative_depth(path: Path, root: Path) -> int:
     return len(path.relative_to(root).parts)
 
 
+def strip_code_segments(text: str) -> str:
+    """Remove fenced code blocks and inline code spans.
+
+    Markdown inside code is illustrative, not a reference: ``[ID](path)`` in a
+    rule cell or a template excerpt must not be resolved as a file link, just
+    as ``<meta>`` inside backticks is not a template placeholder.
+    """
+    return CODE_SPAN_RE.sub("", FENCED_CODE_RE.sub("", text))
+
+
+def is_empty_ledger_count(value: str) -> bool:
+    """``active_changes`` of a ledger without CHG bodies: ``none`` (template) or ``0``."""
+    return value.strip().casefold() in EMPTY_LEDGER_COUNT_VALUES
+
+
 def normalize_link_target(raw: str) -> str | None:
     target = raw.strip().strip("<>")
     if not target or target.startswith(("http://", "https://", "mailto:", "#")):
         return None
+    # `[text](path "title")`: the optional title is not part of the path
+    if " " in target and target.rstrip().endswith(('"', "'")):
+        target = target.split(" ", 1)[0]
     target = target.split("#", 1)[0].split("?", 1)[0]
     return target or None
 
 
 def audit_links(document: Path, text: str, root: Path) -> list[str]:
     broken: list[str] = []
-    for raw in MARKDOWN_LINK_RE.findall(text):
+    for raw in MARKDOWN_LINK_RE.findall(strip_code_segments(text)):
         target = normalize_link_target(raw)
         if target is None:
             continue
