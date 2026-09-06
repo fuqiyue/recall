@@ -1724,6 +1724,26 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
         self.assertFalse(report["static_gate"]["passed"])
         self.assertTrue(self.fails(report))
 
+    def test_source_files_under_declared_unmapped_dir_are_not_candidates(self) -> None:
+        """宪法 unmapped_paths 已登记的目录（如 .github/ 的 CI 配置）不再进"待审阅候选"；未登记时仍列出。"""
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root)
+            workflows = root / ".github" / "workflows"
+            workflows.mkdir(parents=True)
+            (workflows / "ci.yml").write_text("name: ci\n", encoding="utf-8")
+            before = self.collect(root)
+            readme = root / "logic_readme.md"
+            readme.write_text(
+                readme.read_text(encoding="utf-8")
+                + "\n- unmapped_paths: .github/ (仓库社区配置)\n",
+                encoding="utf-8",
+            )
+            after = self.collect(root)
+
+        self.assertIn(".github/workflows/ci.yml", before["private_agent_knowledge_candidates"])
+        self.assertNotIn(".github/workflows/ci.yml", after["private_agent_knowledge_candidates"])
+
     def test_other_tool_and_backup_current_documents_are_rejected(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)

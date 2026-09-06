@@ -253,6 +253,41 @@ def registered_domains(root: Path) -> List[LogicDomain]:
     return domains
 
 
+class InheritedModule:
+    """范围登记表中 ``doc_policy: inherited`` 的非根行：没有自己的 readme，规则在宪法对应小节。"""
+
+    def __init__(self, module_id: str, scope_path: str, anchor: str):
+        self.module_id = module_id
+        self.scope_path = scope_path
+        # 宪法内小节的链接目标，如 ``logic_readme.md#scope-mod-templates``
+        self.anchor = anchor
+
+
+def inherited_modules(root: Path) -> List[InheritedModule]:
+    """宪法范围登记表里 ``inherited`` 登记的路径（本仓库：references/、logic_version/）。
+
+    这些路径已登记但没有部门法：规则直接写在宪法（``logic_readme`` 列指向宪法内锚点）。
+    ``recall route`` 用它区分"目标落在宪法直辖模块"与"目标不属于任何登记范围"——
+    此前两者都被报成"未命中任何领域，先新增领域行（修宪案）"，对已登记的
+    references/ 是错误建议（RULE-018）。
+    """
+    readme = root / ROOT_MARKER
+    if not readme.exists():
+        return []
+    text = readme.read_text(encoding="utf-8", errors="replace")
+    modules: List[InheritedModule] = []
+    for row in _table_rows_under_heading(text, REGISTRY_HEADING):
+        policy = (row.get("doc_policy") or "").strip().strip("`").lower()
+        membership = (row.get("membership") or "").strip().strip("`").lower()
+        scope = (row.get("scope_path") or "").strip().strip("`").replace("\\", "/").strip("/")
+        if membership != "in-system" or policy != "inherited" or not scope or scope == ".":
+            continue
+        link = re.search(r"\(([^)]+)\)", row.get("logic_readme") or "")
+        anchor = link.group(1).strip() if link else ROOT_MARKER
+        modules.append(InheritedModule((row.get("module_id") or "").strip(), scope, anchor))
+    return modules
+
+
 def change_ledgers(root: Path) -> List[Tuple[str, Path]]:
     """全部议案账本：``[("logic_change.md", 根), ("logic_domains/x/logic_change.md", 领域), ...]``。
 

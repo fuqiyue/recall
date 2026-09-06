@@ -52,7 +52,7 @@ class TempProject:
 class CreateVerTests(unittest.TestCase):
     def test_generated_record_uses_canonical_name_and_schema(self):
         """recall new 生成的记录必须能被 validate/status/list 发现并通过字段校验。"""
-        with TempProject() as root:
+        with TempProject() as root, contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(create_ver.create_ver_record("测试标题", "smoke-test"), 0)
 
             records = list((root / "logic_version" / "records").glob("*.md"))
@@ -83,9 +83,9 @@ class CreateVerTests(unittest.TestCase):
 
     def test_cmd_new_signature_matches(self):
         """recall.py cmd_new 与 create_ver 的接口保持一致（曾经断裂）。"""
-        with TempProject():
+        with TempProject(), contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(recall.cmd_new(["标题", "cmd-new-smoke"]), 0)
-        self.assertEqual(recall.cmd_new(["只有一个参数"]), 1)
+            self.assertEqual(recall.cmd_new(["只有一个参数"]), 1)
 
 
 class StatusRuleCountTests(unittest.TestCase):
@@ -426,6 +426,7 @@ CONSTITUTION_WITH_DOMAINS = """# Constitution
 | MOD-ROOT | . | in-system | root/runtime-code | paired | [root](logic_readme.md) | [changes](logic_change.md) | self | active |
 | MOD-BILLING | logic_domains/billing | in-system | domain/runtime-code | paired | [billing](logic_domains/billing/logic_readme.md) | [changes](logic_domains/billing/logic_change.md) | self | active |
 | MOD-SYNC | logic_domains/sync | in-system | domain/runtime-code | paired | [sync](logic_domains/sync/logic_readme.md) | [changes](logic_domains/sync/logic_change.md) | self | active |
+| MOD-TEMPLATES | references | in-system | module/runtime-code | inherited | [root policy](logic_readme.md#scope-mod-templates) | [active changes](logic_change.md) | self | active |
 """
 
 
@@ -641,6 +642,37 @@ class RouteDocsTests(unittest.TestCase):
         self.assertEqual(route_docs.estimate_tokens("abcd" * 10), 10)
         self.assertEqual(route_docs.estimate_tokens("中文"), 2)
 
+    def test_inherited_module_path_points_back_to_constitution(self):
+        """RULE-018：references/ 这类 inherited 登记路径没有部门法，route 指回宪法小节而不是建议新建领域。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            (root / "references").mkdir()
+            (root / "references" / "tpl.md").write_text("# tpl\n", encoding="utf-8")
+            plan = route_docs.build_plan(root, ["references/tpl.md"])
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                route_docs._print_plan(plan)
+        self.assertEqual(plan["matched_domains"], [])
+        self.assertEqual(
+            [(m["module_id"], m["anchor"]) for m in plan["matched_inherited"]],
+            [("MOD-TEMPLATES", "logic_readme.md#scope-mod-templates")],
+        )
+        out = buffer.getvalue()
+        self.assertIn("宪法直辖模块", out)
+        self.assertNotIn("新增领域行", out)
+
+    def test_unregistered_path_still_gets_new_domain_advice(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._write_project(root)
+            plan = route_docs.build_plan(root, ["docs/unknown.md"])
+            buffer = io.StringIO()
+            with contextlib.redirect_stdout(buffer):
+                route_docs._print_plan(plan)
+        self.assertEqual(plan["matched_inherited"], [])
+        self.assertIn("新增领域行", buffer.getvalue())
+
 
 class UnpushedHintTests(unittest.TestCase):
     """RULE-010：status 把本地领先上游的提交数变成一行提示；无上游时沉默。"""
@@ -753,6 +785,57 @@ class CliGlueSmokeTests(unittest.TestCase):
         self.assertIn(code, (0, 1), out)
         self.assertIn("验证报告", out)
         self.assertNotIn("Traceback", out)
+
+    def test_new_creates_record_in_temp_project(self):
+        """`recall new` 真跑：记录落在临时项目（cwd 向上找到的 logic_readme.md），不碰本仓库。"""
+        with TempProject() as root:
+            code, out = self._run("new", "冒烟标题", "glue-smoke", cwd=root)
+            records = list((root / "logic_version" / "records").glob("*.md"))
+        self.assertEqual(code, 0, out)
+        self.assertIn("已创建决策记录", out)
+        self.assertEqual(len(records), 1)
+        self.assertRegex(records[0].name, r"^logic_version-\d{8}-\d{3}-glue-smoke\.md$")
+
+    def test_new_without_scope_exits_one(self):
+        code, out = self._run("new", "只有标题")
+        self.assertEqual(code, 1)
+        self.assertIn("用法: recall new", out)
+
+    def test_list_exits_zero_and_shows_records(self):
+        code, out = self._run("list", "2")
+        self.assertEqual(code, 0, out)
+        self.assertIn("最近的决策记录", out)
+        self.assertRegex(out, r"VER-\d{8}-\d{3}")
+        self.assertNotIn("Traceback", out)
+
+    def test_list_rejects_non_numeric_limit(self):
+        code, out = self._run("list", "abc")
+        self.assertEqual(code, 1)
+        self.assertIn("无效的数量", out)
+
+    def test_query_intent_and_file_exit_zero(self):
+        code, out = self._run("query", "intent", "INT-20260816-005", cwd=ROOT / "scripts")
+        self.assertEqual(code, 0, out)
+        self.assertIn("INT-20260816-005", out)
+        self.assertNotIn("Traceback", out)
+        code, out = self._run("query", "file", "scripts/git_sync.py")
+        self.assertEqual(code, 0, out)
+        self.assertNotIn("Traceback", out)
+
+    def test_query_without_type_exits_one(self):
+        code, out = self._run("query")
+        self.assertEqual(code, 1)
+        self.assertIn("用法: recall query", out)
+
+    def test_sync_and_init_reach_their_argument_parsers(self):
+        """init/sync 真跑会改仓库配置并触网，胶水冒烟只到 argparse 层（--help 退出 0）；
+        业务行为由 tests/test_git_sync.py 在临时仓库覆盖。"""
+        code, out = self._run("sync", "--help")
+        self.assertEqual(code, 0, out)
+        self.assertIn("--manual", out)
+        code, out = self._run("init", "--help")
+        self.assertEqual(code, 0, out)
+        self.assertIn("--non-interactive", out)
 
 
 

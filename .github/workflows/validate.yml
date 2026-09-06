@@ -33,6 +33,13 @@ jobs:
     - name: 审计静态门（current-state）
       run: python scripts/audit_logic_map.py . --current-state
 
+    - name: 冲突检测（退出码 2 = 有待裁决的潜在冲突，只提示不阻断）
+      run: |
+        code=0
+        python scripts/recall.py conflicts || code=$?
+        if [ "$code" -eq 2 ]; then echo "⚠️ 检出潜在冲突，请在会话中按 FLOW-004 裁决"; exit 0; fi
+        exit "$code"
+
     - name: 检查文档一致性
       run: |
         # 验证必要文件存在

@@ -1126,6 +1126,25 @@ def registered_child_document_paths(root: Path) -> set[str]:
 registered_child_readme_paths = registered_child_document_paths
 
 
+def _parse_registry_entries(value: str) -> set[str]:
+    """``owned_paths`` / ``unmapped_paths`` 的逗号分号分隔值 → 去掉括号说明与尾部斜杠的小写集合。"""
+    entries: set[str] = set()
+    for raw in re.split(r'[,;，；]', value):
+        item = re.sub(r'[（(][^）)]*[）)]', '', raw).strip().strip('/').strip()
+        if item and item.lower() != 'none':
+            entries.add(item.casefold())
+    return entries
+
+
+def _constitution_unmapped_paths(root: Path) -> set[str]:
+    """宪法 ``unmapped_paths`` 登记的顶层路径：已声明为非真源、不属于任何领域。"""
+    text, error = read_text(root / "logic_readme.md")
+    if error:
+        return set()
+    match = re.search(r'^\s*-\s*unmapped_paths\s*[：:]\s*(.+)$', text, re.MULTILINE)
+    return _parse_registry_entries(match.group(1)) if match else set()
+
+
 def audit_root_doc_coverage(root: Path) -> dict:
     """对账：git 跟踪的 Markdown 顶层入口必须被 owned_paths ∪ unmapped_paths 覆盖。
 
@@ -1145,17 +1164,9 @@ def audit_root_doc_coverage(root: Path) -> dict:
         r'^\s*-\s*unmapped_paths\s*[：:]\s*(.+)$', text, re.MULTILINE
     )
 
-    def parse_entries(value: str) -> set[str]:
-        entries: set[str] = set()
-        for raw in re.split(r'[,;，；]', value):
-            item = re.sub(r'[（(][^）)]*[）)]', '', raw).strip().strip('/').strip()
-            if item and item.lower() != 'none':
-                entries.add(item.casefold())
-        return entries
-
-    registered = parse_entries(owned_match.group(1))
+    registered = _parse_registry_entries(owned_match.group(1))
     if unmapped_match:
-        registered |= parse_entries(unmapped_match.group(1))
+        registered |= _parse_registry_entries(unmapped_match.group(1))
 
     ok, stdout, _ = run_git(
         ["-c", "core.quotepath=false", "ls-files", "--", "*.md"], cwd=root, timeout=15
@@ -1322,15 +1333,20 @@ def audit_agent_entrypoints(root: Path) -> tuple[list[dict], list[str], list[str
                     )
         reports.append(report)
 
+    # 宪法 unmapped_paths 已登记（并写明理由）的代理/仓库配置目录，其源码类文件
+    # 不再列为"待审阅候选"：登记本身就是审阅结论（如 .github/ 的 CI 与 labeler）。
+    # .md 形态的平行真源检测不受此豁免影响（INV-001 / RULE-019）。
+    declared_unmapped = _constitution_unmapped_paths(root)
     for private_name in sorted(AGENT_PRIVATE_DIR_NAMES):
         private_root = root / private_name
         if not private_root.is_dir():
             continue
+        candidates_declared = private_name.casefold() in declared_unmapped
         for path in private_root.rglob("*"):
             if not path.is_file():
                 continue
             if path.suffix.lower() != ".md":
-                if is_source_file(path):
+                if is_source_file(path) and not candidates_declared:
                     private_candidates.append(path.relative_to(root).as_posix())
                 continue
             if (

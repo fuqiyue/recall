@@ -23,6 +23,7 @@ from recall_common import (  # noqa: E402
     LogicDomain,
     find_project_root,
     force_utf8_output,
+    inherited_modules,
     registered_domains,
 )
 
@@ -198,6 +199,28 @@ def match_domains(root: Path, targets: List[str], intents: Optional[List[Dict[st
     return hits
 
 
+def match_inherited(root: Path, targets: List[str]) -> List[Dict[str, object]]:
+    """目标路径落在宪法直辖模块（登记表 inherited 行，如 references/）。
+
+    这类路径没有也不该有部门法：规则在宪法对应小节，读宪法即可。不把它们
+    报成"未命中任何领域、先新增领域行"，那是给未登记路径的建议。
+    """
+    hits: List[Dict[str, object]] = []
+    for module in inherited_modules(root):
+        matched = [
+            target for target in targets
+            if _looks_like_path(root, target) and _path_matches(target, module.scope_path)
+        ]
+        if matched:
+            hits.append({
+                "module_id": module.module_id,
+                "scope_path": module.scope_path,
+                "anchor": module.anchor,
+                "targets": matched,
+            })
+    return hits
+
+
 def _gazette_hits(root: Path, scopes: List[str]) -> List[str]:
     """根账本公报中指向命中领域的活跃 CHG 行（提示有在办议案）。"""
     change = root / "logic_change.md"
@@ -218,6 +241,7 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
     domains = registered_domains(root)
     intents = match_intents(root, targets) if targets else []
     hits = match_domains(root, targets, intents) if targets else {}
+    inherited = match_inherited(root, targets) if targets else []
     reading: List[Dict[str, object]] = []
 
     def add(path: Path, role: str, reason: str) -> None:
@@ -250,6 +274,7 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
         "targets": targets,
         "reading_order": reading,
         "matched_domains": sorted(hits),
+        "matched_inherited": inherited,
         "matched_intents": [
             {k: v for k, v in intent.items()} for intent in intents
         ],
@@ -279,12 +304,18 @@ def _print_plan(plan: Dict[str, object]) -> None:
         print("\n🔄 命中领域有在办议案：")
         for line in plan["in_flight_changes"]:
             print(f"   • {line}")
+    inherited = plan.get("matched_inherited") or []
+    if inherited:
+        print("\n🏛️  命中宪法直辖模块（inherited：无部门法，规则在宪法对应小节）：")
+        for item in inherited:
+            print(f"   • {item['module_id']} ({item['scope_path']}) ← {', '.join(item['targets'])}；读 {item['anchor']}")
     domains = plan["domains"]
+    unmatched = bool(targets) and not plan["matched_domains"] and not inherited
     if not domains:
         print("\n⚠️  宪法未登记任何领域（RULE-018 一二级拆分法要求至少一个 logic_domains/<domain>/ paired 行）")
-    elif targets and not plan["matched_domains"]:
-        print("\nℹ️  目标未命中任何领域职权；可选领域：")
-    if domains and (not targets or not plan["matched_domains"]):
+    elif unmatched:
+        print("\nℹ️  目标未命中任何领域职权，也不在宪法直辖模块内；可选领域：")
+    if domains and (not targets or unmatched):
         for d in domains:
             change = d["change"]
             change_part = f"，change {change['lines']} 行" if change and change["exists"] else ""
@@ -293,7 +324,7 @@ def _print_plan(plan: Dict[str, object]) -> None:
                 f"readme {d['readme']['lines']} 行{change_part}"
             )
         if targets:
-            print("   新功能不属于任何领域时，先在宪法范围登记表新增领域行（修宪案），再动手")
+            print("   宪法 owned_paths 直辖的根文件只读宪法；新功能不属于任何领域时，先在宪法范围登记表新增领域行（修宪案），再动手")
     print("")
 
 

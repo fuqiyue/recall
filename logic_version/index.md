@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-09-04
+- last_updated: 2026-09-06
 - owner: self
 
 ## 关于逻辑回档
@@ -57,6 +57,7 @@
 | VER-20260904-003 | logic_version-20260904-003-validate-compat | 2026-09-04 | effective | logic_domains/toolchain, scripts/, tests/ | RULE-015, RULE-021 | 2 | validate/审计器兼容消费项目格式：VER 必填段接受快速模板与扩展 schema、index.md 首列接受链接与反引号、代码锚点剥离 #symbol/:line 并核查符号、CHG-ID 正则统一到 recall_common（NNN 或 slug）、占位符判定剔除行内代码段、cat-file 在项目根执行 | [logic_version-20260904-003-validate-compat.md](records/logic_version-20260904-003-validate-compat.md) |
 | VER-20260904-004 | logic_version-20260904-004-audit-link-ledger-compat | 2026-09-04 | effective | logic_domains/toolchain, references/, scripts/, tests/ | RULE-021 | 1 | 审计器兼容消费项目写法：链接可达性剔除围栏与行内代码、空账本 active_changes 接受 0（与 none 同义）、领域坏链条目带 broken-link 前缀、logic-change/brief 模板状态枚举补 promoting、CI docs_impact 提示与 labeler 纳入 logic_domains/ | [logic_version-20260904-004-audit-link-ledger-compat.md](records/logic_version-20260904-004-audit-link-ledger-compat.md) |
 | VER-20260904-005 | logic_version-20260904-005-density-gate | 2026-09-04 | effective | ., logic_domains/toolchain, references/, scripts/, tests/ | RULE-018, RULE-022 | 1 | Density 硬上限越线与宪法无领域进 current-state / formal-review 静态门（CHG-20260904-004 用户裁决 A），--advisory-only 迁移窗口；单条 CHG 80 行与 blocked 累积降为提示；审计测试夹具默认带 core 领域 | [logic_version-20260904-005-density-gate.md](records/logic_version-20260904-005-density-gate.md) |
+| VER-20260906-001 | logic_version-20260906-001-constitution-slim-alignment | 2026-09-06 | effective | ., logic_domains/toolchain, logic_domains/git-pipeline, scripts/, tests/, references/ | RULE-010, RULE-013, RULE-018, RULE-021, RULE-022, RULE-024 | 1 | 宪法瘦身与规则-实现对齐：RULE-022 ② 下放为工具链 RULE-024（函数长度机器门，冻结 11 个存量）、route 识别 inherited 模块、RULE-021 ④ 冒烟补全、RULE-010/013 事故叙事与 INV-003 早期修订归档、审计候选豁免 unmapped_paths | [logic_version-20260906-001-constitution-slim-alignment.md](records/logic_version-20260906-001-constitution-slim-alignment.md) |
 
 **说明**：高风险变更完成后，在此创建 VER-* 记录行，并在 `records/` 目录中创建对应的 Markdown 文件。
 
