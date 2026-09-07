@@ -42,14 +42,14 @@ description: 在修改、规划、诊断或审查项目逻辑时使用。先读�
 ## 核心原则（12 条）
 
 1. 遵守用户的当前授权。未经授权不修改代码、制度或议案
-2. 严格分离状态：`logic_readme.md` 是当前已生效制度；`logic_change.md` 是尚未生效的活跃议案；`logic_version/records/` 是关闭后的不可变决策记录。目标环境一旦实际启用新行为，必须在同一发布变更中更新 `logic_readme.md`、固化所需 `VER-*` 并关闭对应 CHG
+2. 严格分离状态：`logic_readme.md` 是当前已生效制度；`logic_change.md` 是尚未生效的活跃议案；`logic_version/records/` 是关闭后的不可变决策记录。AI 审查与必要验证通过后，按 RULE-025 主动完成文档晋升、所需 `VER-*` 和 CHG 关闭；默认不等待交付后的人工体验。交付与生产部署分别据实记录
 3. 两级文档（RULE-018）：根 `logic_readme.md` 是宪法、根 `logic_change.md` 是修宪账本 + 全项目公报；每个领域在 `logic_domains/<domain>/` 有一对已登记的 readme + change，领域事务的 CHG 立在领域账本、触及宪法的立在根账本，同一 CHG 正文只在一处；无论项目大小至少一个领域，领域过大拆小部门；`logic_version/` 全项目唯一。禁止创建 `logic_readme-v2.md` 或任何未登记的平行正文
 4. `logic_version/` 只在当前文档直接引用、需要解释冲突或追溯兼容性时按 ID 读取。历史记录保存设计逻辑，而非代码快照
 5. 新请求与现行规则、活跃议案或已确认意图存在实质矛盾，或模糊点会改变范围/语义/兼容/数据安全/方案选择时，先列明新旧来源、具体矛盾、可行选项、主要影响和建议，再向当前用户或授权决策方请求明确选择；确认前不得实施受影响部分。新增或调整用户可见功能时，还须对照 `logic_readme.md` 的功能意图与用户流程说明其流程位置和与相邻功能的关系；说不清位置视为此类模糊点。**用户的表述就是宪法的来源**：用户提出的目标、约束或操作习惯先对照意图层（INT/UXI），已有则复用，没有则先立修宪案登记（`来源: user:日期`）再做领域工作；AI 推断的意图标 `inferred`/`code-derived`，不得冒充用户确认（RULE-014/016）。同一规则有多个议案时，各议案写 `authority_surfaces: RULE-xxx` 并互指 `conflicts_with`，由用户裁定 supersede/merge/排序；规则在议案之后被修订则重核 `based_on`（`recall conflicts`、审计 `shared-rule-target` / `rule-changed-after-proposal`）
 6. 每次代码改动都判断 `docs_impact`：当前规则、契约、稳定代码锚点、代码地图、验证入口或活跃议案实际变化时，在同一获授权变更中更新所属文档（领域规则改领域 readme，全局规则/意图层/登记表改宪法）；确无影响时说明 `none + 原因`
 7. 风险决定分析和验证深度，不自动决定要填表。不要为了"符合流程"制造议案、ADR、版本记录或空测试矩阵
 8. 引入适配层、全局开关、双读写或新抽象前，确认真实消费者或旧状态证据、说明最小修复为何不足，并给出唯一权威源、负责人、可验证退出条件和最晚复查日期。证据不足时默认不引入临时复杂度
-9. 实施后的代码语义审查独立记录。它核对当前代码、调用方、Schema、测试结果和运行证据是否支持已确认方案；不能用用户确认、测试文件存在或静态审计通过替代
+9. 实施后的代码语义审查由 AI 执行并独立记录（personal 可自审，见 RULE-025；协作项目遵守已明确的分工）。它核对当前代码、调用方、Schema、测试结果和运行证据是否支持已确认方案；不能用用户确认、测试文件存在或静态审计通过替代
 10. 先按简单、中等、高风险三条通道确定分析深度；不确定项若会改变方案、兼容性、数据安全或长期复杂度，则升级通道
 11. 会话默认延续：新会话或上下文压缩后，以现行 logic 文档与活跃议案为准继续工作（新会话视作新人接手既有项目，文档即交接），不要求用户重述背景；仅当用户明确指出现行规则或代码有问题时才修改现行制度。模糊点按原则 5 先分析、给出建议，再咨询（RULE-017）
 12. 收尾归零：任务的完成态是"交付物就位 + 本次新建的非交付物（探针脚本、临时测试、草稿、调试输出）已删除或经用户同意保留 + 最终汇报列出处置清单"。`medium`/`high` 通道必建 `logic_version/working/<version_slug>/logic_temp.md` 并在"工作区产物台账"登记去留，台账清零才能关闭 CHG 并删除 working 目录；`simple` 通道只在汇报中列清单。工具绝不静默删除文件（RULE-020）
@@ -80,7 +80,8 @@ recall status     # 领域数、各账本议案计数、记录计数，分列未
 | 初始化 Git 管道、排查同步、判断"谁负责推送"、after_commit 回填 | [Git 自动同步与推送责任](references/git-sync.md)（RULE-010/011/013） |
 | 决定 personal / collaborative / compliance 用哪些字段；行数上限 | [治理模式](references/governance-modes.md)、[字段词汇分层](references/field-vocabulary.md) |
 | 新项目或存量项目接入、模块补全、领域划分与拆分步骤 | [项目接入流程](references/project-onboarding.md)（RULE-016/018） |
-| CHG 状态机、晋升清单、关闭与归档步骤 | [变更与决策生命周期](references/change-lifecycle.md) |
+| CHG 状态机、AI 审查后自主交付、人工反馈另开案、晋升与归档步骤（RULE-025） | [变更与决策生命周期](references/change-lifecycle.md) |
+| 需要流程、架构、方案或状态解释文档：在当前项目 explainers/ 生成 HTML（RULE-026） | [解释性 HTML 交付](references/explainers.md) |
 | 对接 plan 模式、Spec、Steering 等外部工件 | [外部工作流适配](references/workflow-integration.md) |
 | 需要填写文档 | [logic_readme 模板](references/logic-readme-template.md)、[logic_change 模板](references/logic-change-template.md)、[logic_version 模板](references/logic-version-template.md)、[ADR 模板](references/decision-record-template.md)、[logic_temp 模板](references/logic-temp-template.md) |
 

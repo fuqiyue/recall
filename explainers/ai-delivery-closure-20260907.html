@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Recall · AI 审查后，完成交付</title>
+  <style>
+    :root{--paper:#f4f0e6;--ink:#233b38;--muted:#63716a;--green:#266755;--red:#a7442e;--line:#c9cfc1;--white:#fffdf6}
+    *{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:16px/1.85 "Microsoft YaHei UI","PingFang SC",sans-serif}a{color:var(--green);text-underline-offset:4px}a:focus-visible,summary:focus-visible{outline:3px solid var(--red);outline-offset:5px}header,main,footer{width:min(1100px,calc(100% - 48px));margin:auto}header{display:flex;justify-content:space-between;gap:20px;padding:24px 0;border-bottom:1px solid var(--line);font-size:13px;letter-spacing:.07em}header b{letter-spacing:.16em}nav{display:flex;gap:22px}nav a{white-space:nowrap}.hero{padding:68px 0 40px;display:grid;grid-template-columns:1.65fr 1fr;gap:60px;align-items:end}.eyebrow{font-size:12px;letter-spacing:.16em;color:var(--red);font-weight:700}h1,h2,h3{font-family:"Noto Serif SC","Songti SC",SimSun,serif}h1{font-size:clamp(38px,5.5vw,68px);line-height:1.22;letter-spacing:-.04em;margin:18px 0 25px}h1 em{font-style:normal;color:var(--green)}.lead{font-size:18px;max-width:640px;color:var(--muted)}.note{border-left:3px solid var(--red);padding:0 0 0 22px;margin-bottom:22px}.note strong{font-size:21px}.note p{color:var(--muted);font-size:14px;margin-bottom:0}.ribbon{background:var(--ink);color:var(--white);padding:25px 30px;display:flex;justify-content:space-between;gap:28px;align-items:center}.ribbon span{font-size:13px;color:#d2ddd3}.ribbon b{font-size:19px}section{padding:52px 0;border-bottom:1px solid var(--line);scroll-margin-top:20px}.section-head{display:flex;gap:22px;align-items:baseline}.section-head span{font-size:12px;color:var(--red);font-weight:bold}h2{font-size:29px;margin:0 0 23px;line-height:1.4}h3{font-size:22px;line-height:1.4;margin:8px 0 14px}.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--line);border:1px solid var(--line)}.step{background:var(--white);padding:25px 22px}.step:last-child{background:#e0e9dc}.step .num{color:var(--red);font:italic 30px Georgia,serif}.step p{font-size:14px;color:var(--muted);margin-bottom:0}.step small{display:block;margin-top:18px;font:12px/1.6 Consolas,monospace;overflow-wrap:anywhere}.feedback{margin:18px 0 0;padding:15px 22px;border:1px dashed #93a58b;color:var(--green)}.columns{display:grid;grid-template-columns:1fr 1fr;gap:45px}.columns p{color:var(--muted)}.label{font-size:12px;color:var(--red);letter-spacing:.06em}.table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;text-align:left;font-size:14px}th{font-weight:700;color:var(--green);font-size:12px;letter-spacing:.06em}td,th{padding:16px 14px;border-bottom:1px solid var(--line);vertical-align:top}th:first-child,td:first-child{padding-left:0;width:25%}code{font: .9em/1.6 Consolas,"Microsoft YaHei UI",monospace;overflow-wrap:anywhere}details{padding:17px 0;border-top:1px solid var(--line)}summary{cursor:pointer;font-weight:700}details p{color:var(--muted);max-width:860px}.path{font:16px/1.8 Consolas,monospace;background:var(--white);border:1px solid var(--line);padding:20px;overflow-wrap:anywhere}.sources{display:flex;flex-wrap:wrap;gap:12px 26px;font-size:14px}footer{padding:26px 0 45px;font-size:12px;color:var(--muted);display:flex;justify-content:space-between;gap:20px}
+    @media(max-width:720px){header,main,footer{width:calc(100% - 32px)}header{flex-direction:column;gap:12px}.hero{grid-template-columns:1fr;gap:15px;padding:42px 0 28px}.note{margin-bottom:0}.ribbon{align-items:start;flex-direction:column;gap:8px;padding:21px}.flow{grid-template-columns:1fr 1fr}.columns{grid-template-columns:1fr;gap:20px}h2{font-size:25px}.section-head{gap:12px}section{padding:35px 0}footer{flex-direction:column;gap:6px}td,th{padding:12px 8px}.step{padding:20px 16px}}
+    @media(max-width:390px){.flow{grid-template-columns:1fr}nav{gap:16px}}
+    @media print{body{background:white;font-size:11pt}.hero{padding:25px 0}.ribbon{background:white;color:var(--ink);border:1px solid var(--line)}.ribbon span{color:var(--muted)}section{padding:22px 0}.flow,.columns,details{break-inside:avoid}nav{display:none}header,main,footer{width:100%}a{color:inherit}}
+  </style>
+</head>
+<body>
+  <header><b>RECALL / 交付方式</b><nav aria-label="页面导航"><a href="#flow">交付流程</a><a href="#status">状态含义</a><a href="#html">解释文档</a></nav></header>
+  <main>
+    <div class="hero">
+      <div><div class="eyebrow">WORKFLOW NOTE · 2026.09.07</div><h1>AI 审查之后，<br><em>把交付做完。</em></h1><p class="lead">实现、审查、必要验证、文档晋升与归档由 AI 连续完成。交付后的人工体验发现问题，再开启一项新的修改。</p></div>
+      <aside class="note"><strong>verifying 是工作阶段。</strong><p>它表示 AI 还有明确的验证工作要做。验证通过后继续关案，不能默认停下来等待“用户看一下”。</p></aside>
+    </div>
+    <div class="ribbon"><b>AI 自主交付 → 人工后测 → 新问题、新议案</b><span>默认 personal 模式 · RULE-025</span></div>
+    <section id="flow">
+      <div class="section-head"><span>01 / FLOW</span><h2>从实现到交付，一次走完</h2></div>
+      <div class="flow">
+        <article class="step"><div class="num">01</div><h3>完成实现</h3><p>按照已授权的需求和现行规则修改，核对真正受影响的调用方与边界。</p><small>implementing</small></article>
+        <article class="step"><div class="num">02</div><h3>AI 审查与验证</h3><p>审查代码语义，执行与风险相称的必要验证；发现缺陷继续修复并复验，记录证据。</p><small>verifying</small></article>
+        <article class="step"><div class="num">03</div><h3>写入现行文档</h3><p>将实际规则写入所属 readme，标明适用环境；按通道固化 VER 与索引。</p><small>promoting</small></article>
+        <article class="step"><div class="num">04</div><h3>归档并交付</h3><p>清理临时产物，移除 CHG 正文和根公报行。说明交付内容与真实验证边界。</p><small>关闭动作 · 不保留 closed 活跃项</small></article>
+      </div>
+      <p class="feedback">↳ 人工后测发现问题：在原所属账本新增 CHG-ID，引用原 VER 和复现证据；简单修复按简单通道。</p>
+    </section>
+    <section>
+      <div class="section-head"><span>02 / BOUNDARY</span><h2>开发交付和生产上线，分别说清楚</h2></div>
+      <div class="columns"><article><span class="label">可以完成交付</span><h3>AI 审查与必要验证已通过</h3><p>源码或本地行为已经交付，即可更新现行文档并关开发案。生产未部署、真机未测试，应写成真实环境限制；默认不再成为人工等待门。</p></article><article><span class="label">仍需继续处理</span><h3>还有真实的工程缺口</h3><p>实现未完成、必要测试失败、审查未通过、关键证据不足或明确的外部前置仍然有效。AI 应继续处理，无法继续时说明具体缺口和解除动作。</p></article></div>
+      <details><summary>“AI 自审通过”是否意味着可以跳过测试或生产发布？</summary><p>不意味着。审查与验证必须有实际证据，深度取决于改动风险；本地测试不证明生产已经运行。如果任务本身要求上线，还要完成获授权的上线工作。明确约定的人工验收或团队审查分工仍按该项目授权执行。</p></details>
+    </section>
+    <section id="status">
+      <div class="section-head"><span>03 / READING STATUS</span><h2>怎样理解那组 22 / 23 / 6 / 1</h2></div>
+      <p>这是用户提供的 EduAI HTML 快照中的活跃议案分布：22 verifying、23 implementing、6 blocked、1 draft。下面解释状态含义；本次没有逐项重审或关闭这些旧案，也没有重算它们此刻的数量。</p>
+      <div class="table-wrap"><table><thead><tr><th>快照状态</th><th>下一步</th><th>不能据此推断</th></tr></thead><tbody>
+        <tr><td><code>22 verifying</code></td><td>逐项检查是否还有必要验证；已通过则主动晋升关案。</td><td>不等于 22 个故障，也不等于必须等人工。</td></tr>
+        <tr><td><code>23 implementing</code></td><td>核对实现进度；完成后进入 AI 审查与验证。</td><td>不能把“已有代码”当作已完成。</td></tr>
+        <tr><td><code>6 blocked</code></td><td>核对真实前置；上游关案后重核并改绑 VER/现行规则。</td><td>不能因上游只缺真人体验就继续机械阻塞。</td></tr>
+        <tr><td><code>1 draft</code></td><td>形成方案，处理会影响实现的未决问题。</td><td>不能自动认定已经授权所有设计选择。</td></tr>
+      </tbody></table></div>
+      <details><summary>为什么原先会停在 verifying？</summary><p>原说明把 AI 复审、本地受控验证、发布取证和真人体验混在“未关闭”之中；旧 Recall 晋升清单也写着“目标环境已启用”。EduAI 根文档已有 2026-09-03 的本地验证后关案裁定，但旧条目和说明仍可能沿用更早的等待口径。应回到每项当前证据判断，不能仅按旧状态批量关案。</p></details>
+    </section>
+    <section id="html">
+      <div class="section-head"><span>04 / EXPLAINERS</span><h2>以后，需要解释文档就打开 HTML</h2></div>
+      <div class="columns"><div><p>在当前项目生成，而非固定写到 EduAI。持续维护的主题优先更新已有页面；需要保留日期快照时另建带日期的文件。</p><div class="path">&lt;项目根&gt;/explainers/&lt;topic&gt;.html<br>&lt;项目根&gt;/explainers/&lt;topic&gt;-YYYYMMDD.html</div></div><div><h3>可直接看，也可追到来源</h3><p>页面包含结论、适当图示、来源链接、快照日期和未验证边界。默认单文件、本地打开；简单问答无需额外建页。</p><p>规则保存在 readme，活跃修改保存在 change，历史决定保存在 VER。HTML 是帮助理解它们的展示快照。</p></div></div>
+    </section>
+    <section id="sources">
+      <div class="section-head"><span>05 / SOURCES</span><h2>依据与核验范围</h2></div>
+      <p>本次依据用户 2026-09-07 请求更新 Recall 的交付与解释文档约定，并核对技能入口、生命周期和模板的一致性。EduAI 状态仅作为原因分析样例；没有访问生产或执行其业务验收。</p>
+      <div class="sources"><a href="../logic_readme.md">现行规则 · RULE-025 / 026</a><a href="../references/change-lifecycle.md">生命周期步骤</a><a href="../references/explainers.md">HTML 输出约定</a><a href="../logic_version/records/logic_version-20260907-001-ai-delivery-closure.md">交付规则决策记录</a><a href="../logic_version/records/logic_version-20260907-002-html-explainers.md">解释文档决策记录</a></div>
+    </section>
+  </main>
+  <footer><span>RECALL · 解释快照，非现行制度</span><span>2026-09-07 · 以来源文档及当前证据为准</span></footer>
+</body>
+</html>

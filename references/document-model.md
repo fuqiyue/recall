@@ -11,6 +11,7 @@
 |-- logic_domains/<domain>/
 |   |-- logic_readme.md              # 二级·部门法：该领域的规则、代码地图、测试；职权由 owned_paths 声明
 |   `-- logic_change.md              # 二级账本：该领域一事一议的 CHG 正文
+|-- explainers/                     # 可直接查看的 HTML 解释快照（RULE-026），非制度真源
 |-- AGENTS.md / CLAUDE.md            # 代理自动读取的短入口
 |-- .agents/ / .claude/              # 专属配置/仓库技能；不存业务真源
 `-- logic_version/                   # 全项目只有根一份，不按领域拆
@@ -40,7 +41,7 @@
 - 有效决策索引只留指针 + 最近 3 条，全量在 `logic_version/index.md`；生效 VER 由规则行的"决策记录"列直接链接（RULE-002）
 - 功能意图与用户流程层只在宪法维护，按条目模块化：`INT-*`（功能级用户目标）、`FLOW-*`（用户操作流程）、`UXI-*`（操作直觉约束），供需求拆解与融入分析对照；系统视角看各领域代码地图，用户视角看本层。维护深度按治理模式分档：`personal` 用轻量档（INT 必维护、FLOW 可合并、UXI 按需），`collaborative` 及以上全量维护，档位定义见[治理模式](governance-modes.md)
 - RULE/INT 编号空间全项目唯一（宪法与全部领域共用），`recall validate` 跨文档检查撞号
-- 未生效方案、讨论、开放问题不写入本文件
+- 已完成的开发交付按 RULE-025 写入实际规则并标注适用环境；未部署或未测真机不冒充生产事实。未实施方案、讨论、开放问题不写成现行规则
 
 模板：[logic_readme 模板](logic-readme-template.md)（宪法）、[领域文档模板](logic-domain-template.md)（部门法）。
 
@@ -50,7 +51,7 @@
 - 每个 CHG 只有一个正文，所属账本即其唯一位置；`recall validate` 会提示缺少公报行的领域 CHG，`recall status` 显示领域数与各账本 CHG 数
 - 只在以下情况创建或更新条目：用户要求追踪议案；存在尚未确认且会改变制度/方案的选择；多个工作项需要协调；或正式审查要求留下可审计结论
 - 每项保持 `effective: false`。状态：`draft` | `awaiting-decision` | `implementing` | `verifying` | `promoting` | `blocked`
-- `promoting` 状态记录晋升过渡期，带晋升检查清单，支持中断恢复。详见[变更生命周期](change-lifecycle.md)
+- AI 审查与必要验证通过即按 RULE-025 主动晋升、归档并关闭；`promoting` 带清单以支持中断恢复，不默认等待人工。详见[变更生命周期](change-lifecycle.md)
 
 模板：[logic_change 模板](logic-change-template.md)（根账本；领域账本的精简形态见[领域文档模板](logic-domain-template.md)）。
 
@@ -67,3 +68,7 @@
 初始化 Codex 项目时，创建根 `AGENTS.md` 和 `.agents/`；初始化 Claude 项目时，创建根 `CLAUDE.md` 和 `.claude/`。根入口只写短路由：修改、规划、诊断、审查，或解释"为什么这样设计"前，先读 `<project-root>/logic_readme.md` 和 `<project-root>/logic_change.md`，再用 `recall route` 定位并只读命中的领域文档，然后读相关代码、测试和必要的运行证据。专属目录只放工具配置、命令或仓库技能；不得把业务制度、议案、ADR 或历史复制进去。若入口与逻辑文档冲突，入口只决定去哪里读；业务真源仍是根现行文档与已登记领域文档。系统、开发者和用户当前指令始终更高。
 
 模板：[代理入口模板](agent-entry-template.md)。
+
+## explainers/（解释展示）
+
+按 RULE-026 在需要解释文档时生成 HTML，来源仍是现行 readme/change 与核验结论；操作见 [解释性 HTML 交付](explainers.md)。

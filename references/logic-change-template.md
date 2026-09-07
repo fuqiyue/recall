@@ -24,7 +24,7 @@
 
 ## 议案规则
 
-- 本文件所有条目默认 `effective: false`；确认、实施和代码语义审查都不等于生效。
+- 本文件所有条目默认 `effective: false`；交付关案按技能宪法 RULE-025 与 change-lifecycle.md 执行，AI 审查/必要验证通过后主动完成晋升；不能只记 passed 就停手。
 - 允许状态：draft | awaiting-decision | implementing | verifying | promoting | blocked（`promoting` 是晋升过渡态，见 change-lifecycle.md）。
 - `CHG-ID` 的边界是可独立决策、验收、发布和回滚的最小工作项。两个改动若必须一起实施才能保持同一不变量，就合并为一个 CHG；只有可以独立关闭时才拆分为多个 CHG。
 - `TOPIC-ID` 是同类讨论的容器，可集中多个 CHG 的来源、共享约束和开放问题；它不改变任何 CHG 的决策、发布或回滚边界。一个主题可暂时没有 CHG，多个 CHG 也可属于同一主题；每个活跃 CHG 最多填写一个 `topic_id`。主题最后一个相关 CHG 关闭时，必须把共享背景、约束、讨论来源和最终结论复制到该 CHG 的 `VER-*` 快照，避免主题从活跃文件移除后丢失理由。
@@ -37,11 +37,11 @@
 - 新请求与仍有效的旧需求、现行规则、活跃议案或已确认意图存在实质矛盾，或者模糊点会改变范围、语义、兼容、数据安全或方案选择时，必须在 `user_intent_gap`、`questions_for_user` 和适用的决策检查点中列明新旧来源、具体矛盾、可行选项、主要影响和建议，并向用户或授权决策方确认。确认前方案只能是 `candidate`，代理的建议不能标成 `selected`，也不得实施受影响部分。只有更高优先级当前指令或已声明的精确唯一权威已经直接裁定时才跳过询问，并记录裁定依据；可客观核实的事实问题先调查。这项咨询义务适用于所有通道，不自动要求把简单/中等事项升级为完整高风险表单。
 - 活跃依赖必须写成 `CHG-...@revision-N`，不能只写 CHG-ID。被依赖 CHG 改版、阻塞或关闭后，依赖方不得继续实施；先阻塞/重新决策，关闭后将事实改写为对应 `VER-*`/ADR/现行规则基线，不保留悬空 CHG 依赖。循环依赖不是等待条件，必须合并、拆分或重排。
 - `conflict_resolution` 只使用 `none`、`unresolved`、`merge`、`supersede` 或 `sequence-and-revalidate`。等待用户或授权决策方选择时使用 `unresolved`，并让受影响 CHG 保持 `blocked`，或在使用正式决策门槛时保持 `awaiting-decision`；`merge`、`supersede` 和 `sequence-and-revalidate` 只能记录已经确认的处理结果，不能由代理自行选定。顺序执行必须由后项用版本绑定依赖指向前项，并在前项关闭后重新核对基线。
-- `effective: false` 表示尚未写入当前制度，不描述代码是否已合并或部署。用 `runtime_state`、`runtime_environments` 和 `feature_flag` 记录实际运行暴露；活跃 CHG 只允许未实现、未部署或已部署但未启用的状态。目标环境要启用新行为前或在同一受控发布中，先把最终规则晋升到 `logic_readme.md` 并创建所需 `VER-*`，随后关闭 CHG；`deployed-active` 只写入关闭后的版本记录。
+- `effective: false` 表示尚未完成文档晋升，不描述生产是否已部署。用 `runtime_state`、`runtime_environments` 和 `feature_flag` 如实记录运行暴露；开发交付与生产上线分别表述，按 RULE-025 在 AI 审查和必要验证通过后写入所属 readme、创建所需 VER 并关闭 CHG。禁止以未部署为由扣留已完成的开发交付，也禁止把未部署写成 `deployed-active`。
 - `history_retention` 由变更性质决定：`none` 仅用于内部且无制度影响的追踪；中等风险的规则或用户可见行为改动使用 `compact`；高风险/决策门槛改动使用 `full`。`compact` 也要在关闭前保留简短 `VER-*`，至少能恢复变更原因、影响面、基线、结果和回滚信息。
 - `decision_gate: required` 只用于 `recall_route: high`：跨模块、公共契约、数据迁移、兼容性、安全边界，或 adapter、全局开关、双读写/双真源、新抽象等会改变长期复杂度的选择。先在“决策检查点”给出当前事实和 A/B/C 取舍，再由用户或授权决策方确认当前版本。简单/中等事项中的需求矛盾仍必须咨询，只是不因咨询本身自动获得完整高风险表单和历史记录。
 - `decision_confirmed_by`、`decision_ref` 和 `decision_confirmed_at` 记录决策来源；它们不是 Git、文件、分支或部署权限。`decision_confirmed_by: self` 只能表示具备项目决策权的人明确作出选择，当前执行代理不能用它确认自己的建议。`owner` 记录协调责任，`changed_by` 记录实际修改人或代理。`governance_mode: personal` 允许 self 审查但必须保留外部治理引用；`collaborative` 的高风险通过性审查必须由非实施者完成，并由 `governance_ref` 指向真实 PR/CI/保护或审批控制，同时在本次 CHG 的 `governance_execution_ref` 填写实际 PR/CI/审批引用。`governance_evidence` 是责任人核验外部控制的证据，不是 Recall 自己证明权限生效。
-- `semantic_review_*` 只记录实施后的代码语义审查。它必须独立核对当前代码、调用方、Schema、测试结果和运行证据，不能由用户确认、测试文件存在或静态审计代替。
+- `semantic_review_*` 只记录实施后的代码语义审查；personal 可由执行 AI 自审并用一行结论与证据代替完整字段组（RULE-025）。它必须独立核对当前代码、调用方、Schema、测试结果和运行证据，不能由用户确认、测试文件存在或静态审计代替。
 - `decision_gate: required` 的 CHG 必须在生效后创建不可变版本记录，保存最终议案快照、确认、实现、审查、验证和回滚信息；不能因关闭条目而丢失决策逻辑。
 - `logic_change.md` 只承担活跃变更的决策正文。高风险 CHG 在关闭前先创建 `VER-*`，必要时创建 ADR；随后由 `logic_readme.md` 的生效关键规则链接该记录，不能把活跃 CHG 当作长期引用目标。
 - 旧的 `approved`、`reviewed_by`/`review_ref` 和 `AUTH-*` 字段直接迁移到当前真实阶段的 `decision_*` 与 `semantic_review_*` 字段；不保留兼容字段、双状态或平行版本文件。
@@ -225,7 +225,7 @@
 
 - target_logic_sections: <生效后更新所属 logic_readme.md（宪法或领域）的哪些章节>
 - version_record: <logic_version/records/logic_version-...md；decision_record=required 时不得为 none>
-- close_condition: <代码语义审查通过、当前制度已更新、不可变记录和索引已创建后移除本 CHG 正文；不得把单个 CHG 置为 none>
+- close_condition: <按 RULE-025，AI 语义审查和必要验证通过后主动晋升；当前制度与所需记录/索引就位即移除 CHG，不默认等待人工体验>
 - temp_cleanup: <删除 working/<version_slug> 临时目录的负责人和条件；前提是 logic_temp 工作区产物台账已清零（RULE-020）>
 ~~~
 
@@ -234,9 +234,10 @@
 - `draft`：正在形成议案版本；需要决策时 `decision_state: pending`。
 - `awaiting-decision`：决策检查点已给出，等待用户或授权决策方确认当前 `proposal_revision`。
 - `implementing`：只有 `decision_gate: not-required`，或确认版本与当前版本一致时才允许进入。
-- `verifying`：实施后正在核对测试、运行证据和代码语义审查；语义审查未通过不得生效。
+- `verifying`：AI 正在完成必要验证与语义审查，通过即执行晋升；缺陷继续修复，真实前置写明证据和解除动作。默认不等待真人体验（RULE-025）。
+- `promoting`：按 change-lifecycle.md 清单连续完成文档晋升、历史归档与关闭，不是新的人工审批门。
 - `blocked`：保留当前确认或待确认事实，并写清解除条件；不是无限期停车场。
-- `effective`：先重新核对 `based_on`、版本绑定依赖、冲突处理和实际运行暴露，再完成代码语义审查和验收；对 `history_retention: compact` 或 `full` 的 CHG，先创建相应 `VER-*`，把 `intent_source_refs` 与可审计意图提炼原样固化；对高风险/`decision_record: required` 再保留完整决策快照、必要时 ADR 并更新索引，再更新根 `logic_readme.md` 的受影响章节和关键规则链接。目标环境启用时，现行制度和关闭记录必须同一受控发布变更完成；`deployed-active` 不得留在活跃 CHG；最后清理 `logic_temp` 并移除条目。
+- `effective`：先重新核对 `based_on`、版本绑定依赖、冲突处理和实际运行暴露，再完成 AI 代码语义审查与必要验证（RULE-025）；对 `history_retention: compact` 或 `full` 的 CHG，先创建相应 `VER-*`，把 `intent_source_refs` 与可审计意图提炼原样固化；对高风险/`decision_record: required` 再保留完整决策快照、必要时 ADR 并更新索引，再更新所属 `logic_readme.md` 的受影响章节和关键规则链接。开发交付时即更新文档，明确实际适用环境与未验证限制；`deployed-active` 不得留在活跃 CHG；最后清理 `logic_temp` 并移除条目。
 - `rejected` / `cancelled`：不得进入当前制度；如果已进行决策检查点，也创建不可变记录保留最终方案与拒绝/取消原因，然后清理临时记录并移除。
 - `rolled-back`：把当前制度恢复为实际状态，生成回滚记录，验证恢复路径，清理临时记录并移除。
 - 无活跃议案时保留 `active_changes: none`（审计器把 `0` 视为同义）。

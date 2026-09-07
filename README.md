@@ -36,6 +36,7 @@ recall help          # 完整帮助
 | `logic_readme.md` | 宪法：全局规则、功能意图与领域目录，每个任务必读 |
 | `logic_change.md` | 修宪议案 + 全项目活跃议案索引 |
 | `logic_domains/<domain>/` | 部门法：领域规则、代码地图与其议案账本，按需导入（`recall route`） |
+| `explainers/` | 可直接打开的 HTML 解释快照（非制度真源） |
 | `logic_version/` | 不可变决策记录：为什么改、方案取舍、如何回滚 |
 
 代码变化由 Git 管理，决策记录通过 commit hash 与代码双向关联。
@@ -46,6 +47,7 @@ recall help          # 完整帮助
 
 - **[SKILL.md](SKILL.md)** — 核心原则、变更通道与使用方式
 - **[logic_readme.md](logic_readme.md)** — 当前生效规则与代码地图
+- **[AI 交付流程说明](explainers/ai-delivery-closure-20260907.html)** — AI 审查、关案与人工反馈的关系
 - **[references/](references/)** — 模板、生命周期与项目接入流程
 
 ## 兼容性
