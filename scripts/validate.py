@@ -867,6 +867,8 @@ def main() -> int:
     print("\n🔍 开始验证 Recall 系统一致性...\n")
 
     result = validate_recall()
+    from task_context import check_consistency
+    check_consistency(find_project_root(), result)
     result.print_report()
 
     return 0 if result.is_valid() else 1

@@ -112,6 +112,12 @@ def print_help():
     包括规则数量、活跃变更、最近决策、未提交/未跟踪/未推送提示
     示例: recall status
 
+  next [--json]
+    汇总想法、可做候选、待决策、阻塞、进行中与收尾的下一步上下文
+
+  index [--write] [--json]
+    生成并核对根公报；仅 --write 写入派生表与根正文计数
+
   conflicts
     检测规则间的潜在冲突
     分析 RULE-* 和 CHG-* 是否存在逻辑矛盾（宪法 + 全部领域）
@@ -320,12 +326,17 @@ def cmd_status():
             parts = []
             for label, ledger_path in ledgers:
                 content = ledger_path.read_text(encoding='utf-8', errors='replace')
-                ids = set(re.findall(r'^##\s+(CHG-[A-Za-z0-9][A-Za-z0-9-]*)', content, re.MULTILINE))
+                from task_context import read_changes
+                ids = {item['id'] for item in read_changes(content, label)}
                 total += len(ids)
                 parts.append(f"{label} {len(ids)}")
             print(f"🔄 活跃变更: {total} 个 CHG 正文（" + "；".join(parts) + "）")
         else:
             print("🔄 活跃变更: ⚠️  logic_change.md 不存在")
+
+        # 检查决策记录
+        from task_context import snapshot, render
+        render(snapshot(root))
 
         # 检查决策记录
         records_dir = root / "logic_version" / "records"
@@ -444,7 +455,10 @@ def main():
     command = sys.argv[1].lower()
     args = sys.argv[2:]
 
+    import task_context
     commands = {
+        'next': lambda: task_context.main(args),
+        'index': lambda: task_context.main(args, command='index'),
         'init': lambda: cmd_init(args),
         'sync': lambda: cmd_sync(args),
         'new': lambda: cmd_new(args),

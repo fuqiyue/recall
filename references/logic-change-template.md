@@ -2,6 +2,8 @@
 
 每份 `logic_readme.md` 配一份 `logic_change.md`（RULE-018）：根账本承载修宪议案（改全局规则、INT 层、登记表行、INV 的 CHG）正文与全项目活跃议案索引；领域账本 `logic_domains/<domain>/logic_change.md` 承载本领域一事一议的 CHG 正文，精简形态见[领域文档模板](logic-domain-template.md)。本模板以根账本为例；用 `CHG-ID`、范围和状态区分事项，不创建 `v2`、`final` 或未登记的副本。本文不是当前制度的执行依据。
 
+按需待办、下一步与根公报自动生成见 [任务上下文](task-context.md)（RULE-027/028）；普通个人任务保留需求与剩余动作，完整字段仅按实际需要使用。
+
 目录：文档控制与索引；议案正文；决策确认、影响、兼容、测试与晋升。
 
 ~~~markdown
@@ -113,7 +115,8 @@
 - runtime_environments: none | <实际 local/staging/prod/region；多个用 ; 分隔>
 - feature_flag: none | <FLAG:<稳定ID>=state；仅实际部署受开关控制时填写>
 - blocked_by: <具体 CHG-ID、外部事件或用户决定；非 blocked 填 none>
-- next_action: <下一步和负责人；非 blocked 填 none>
+- blocked_reason: <阻塞原因及证据；无阻塞可省略>
+- next_action: <具体剩余动作；任何阶段均可填写，阻塞时说明解除动作>
 - unblock_condition: <解除阻塞的可验证条件；非 blocked 填 none>
 - reserved_version_id: <VER-YYYYMMDD-NNN 或 none>
 - version_slug: <logic_version-YYYYMMDD-NNN-<scope> 或 none>
@@ -149,7 +152,7 @@
 
 - raw_request: <用户原始请求的稳定引用或一句忠实转述；不粘贴长对话>
 - decomposition: <拆解出的功能点/工作项；每项一行>
-- fit_analysis: <对照根 logic_readme.md 的功能意图与用户流程：复用/替代/新增哪个 INT-*，插入哪条 FLOW-* 的哪一步，是否触碰 UXI-*；说不清位置时列入 user_intent_gap 并按核心原则 5 澄清>
+- fit_analysis: <对照根 logic_readme.md 的功能意图与用户流程：复用/替代/新增哪个 INT-*，插入哪条 FLOW-* 的哪一步，是否触碰 UXI-*；说不清位置时列入 user_intent_gap 并按RULE-014 澄清>
 
 ### 必要理由与来源
 

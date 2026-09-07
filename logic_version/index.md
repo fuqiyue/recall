@@ -35,6 +35,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20260907-003 | logic_version-20260907-003-task-context | 2026-09-07 | effective | ., logic_domains/toolchain | RULE-014, RULE-018, RULE-022, RULE-027, RULE-028 | 1 | 任务上下文优先、下一步视图与派生公报 | [记录](records/logic_version-20260907-003-task-context.md) |
 | VER-20260907-001 | logic_version-20260907-001-ai-delivery-closure | 2026-09-07 | effective | . | RULE-025 | 1 | AI 自主审查后完成开发交付 | [记录](records/logic_version-20260907-001-ai-delivery-closure.md) |
 | VER-20260907-002 | logic_version-20260907-002-html-explainers | 2026-09-07 | effective | . | RULE-026 | 1 | 解释文档统一交付 explainers HTML | [记录](records/logic_version-20260907-002-html-explainers.md) |
 | VER-20260808-001 | logic_version-20260808-001-recall-restructure | 2026-08-08 | closed | . | RULE-001, RULE-002, RULE-003, RULE-004 | 1 | Recall 系统结构重组：修复账本完整性、平行真源、反膨胀无强制点、状态机空洞 | [logic_version-20260808-001-recall-restructure.md](records/logic_version-20260808-001-recall-restructure.md) |

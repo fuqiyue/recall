@@ -18,6 +18,8 @@ recall init          # Windows；Linux/macOS 用 ./recall.sh init
 
 # 日常命令
 recall status        # 查看系统状态
+recall next          # 当前任务、下一步与阻塞上下文
+recall index         # 生成并核对根公报；加 --write 显式更新
 recall new "描述" tag  # 创建决策记录
 recall sync          # 自动保存并同步（未跟踪新文件默认排除，--include-new 纳入）
 recall validate      # 验证一致性
