@@ -8,7 +8,7 @@
 - date: 2026-09-07
 - change_id: CHG-20260907-002
 - before_commit: d681d75b6853031c12a3e0a97cd52083164b945b
-- after_commit: _待填写_
+- after_commit: 714e147
 - decision_ref: user:2026-09-07 本任务
 - confirmed_proposal_revision: 1
 
