@@ -8,7 +8,7 @@
 - date: 2026-09-07
 - change_id: CHG-20260907-003
 - before_commit: 27f6212cba5af45d6733412b3c17d8448a314eef
-- after_commit: pending
+- after_commit: 1c9d5f797938617a693594cfbb5228f17c3d21b6
 - decision_ref: user:2026-09-07 本轮明确要求按已认可的五项优化
 - confirmed_proposal_revision: 1
 
