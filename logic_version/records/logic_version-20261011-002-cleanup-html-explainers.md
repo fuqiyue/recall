@@ -32,7 +32,7 @@
 - semantic_review_ref: recall next; recall validate; filesystem post-delete check
 - semantic_reviewed_at: 2026-10-11
 - before_commit: 20d81401675482c50a9de1268a92faa2e4812ff2
-- after_commit: _待填写_
+- after_commit: 9389954
 - corrects: VER-20260907-002
 
 ## 来源与意图提炼
