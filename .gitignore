@@ -68,3 +68,6 @@ logs/
 
 # 用户私人笔记（不属于 Recall 项目，勿随自动保存上传）
 自我前端分类.txt
+
+# Recall runtime ACL reports (local evidence, not project truth)
+acl-reports/

@@ -34,6 +34,7 @@
 ## 不可变决策记录
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
+| VER-20261011-003 | logic_version-20261011-003-maintenance-boundaries | 2026-10-11 | effective | ., logic_domains/toolchain | RULE-019, RULE-022 | none | 入口路径、审计边界、运行数据分类与宪法密度优化 | [记录](records/logic_version-20261011-003-maintenance-boundaries.md) |
 |---|---|---|---|---|---|---|---|---|
 | VER-20260907-003 | logic_version-20260907-003-task-context | 2026-09-07 | effective | ., logic_domains/toolchain | RULE-014, RULE-018, RULE-022, RULE-027, RULE-028 | 1 | 任务上下文优先、下一步视图与派生公报 | [记录](records/logic_version-20260907-003-task-context.md) |
 | VER-20261011-001 | logic_version-20261011-001-cleanup-ai-delivery-closure | 2026-10-11 | correction | . | none | 1 | 勘误：清理 AI 自主交付案临时目录并关闭 CHG | [记录](records/logic_version-20261011-001-cleanup-ai-delivery-closure.md) |

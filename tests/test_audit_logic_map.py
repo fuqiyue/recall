@@ -1724,6 +1724,28 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
         self.assertFalse(report["static_gate"]["passed"])
         self.assertTrue(self.fails(report))
 
+    def test_declared_root_boundaries_are_not_missing_map_candidates(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.write_project(root, full=True)
+            docs = root / "docs"
+            docs.mkdir()
+            (docs / "tool.py").write_text("print('ok')" + chr(10), encoding="utf-8")
+            agents = root / "agents"
+            agents.mkdir()
+            (agents / "openai.yaml").write_text("interface: {}" + chr(10), encoding="utf-8")
+            readme = root / "logic_readme.md"
+            readme.write_text(
+                readme.read_text(encoding="utf-8")
+                + chr(10) + "- owned_paths: src, docs/" + chr(10)
+                + "- unmapped_paths: agents/ (agent configuration)" + chr(10),
+                encoding="utf-8",
+            )
+            report = self.collect(root)
+
+        self.assertNotIn("docs", report["missing_map_candidates"])
+        self.assertNotIn("agents", report["missing_map_candidates"])
+
     def test_source_files_under_declared_unmapped_dir_are_not_candidates(self) -> None:
         """宪法 unmapped_paths 已登记的目录（如 .github/ 的 CI 配置）不再进"待审阅候选"；未登记时仍列出。"""
         with tempfile.TemporaryDirectory() as temporary:

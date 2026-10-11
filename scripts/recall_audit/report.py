@@ -41,6 +41,31 @@ from .formal import (
     audit_formal_review,
     audit_test_inventory,
 )
+
+def _declared_path_patterns(text: str, key: str) -> list[str]:
+    """Return normalized path patterns from a control field."""
+    patterns: list[str] = []
+    for value in control_values_raw(text).get(key, []):
+        for item in re.split(r"[,;，；]", value):
+            item = re.sub(r"\s*\([^)]*\)\s*$", "", item).strip(" []" + chr(96))
+            if item:
+                patterns.append(normalize_scope_path(item))
+    return patterns
+
+
+def _path_pattern_covers(scope: str, pattern: str) -> bool:
+    """Match exact paths, ancestors, descendants, and explicit globs."""
+    scope = normalize_scope_path(scope)
+    pattern = normalize_scope_path(pattern)
+    return (
+        scope == pattern
+        or is_scope_ancestor(pattern, scope)
+        or is_scope_ancestor(scope, pattern)
+        or fnmatchcase(scope, pattern)
+        or fnmatchcase(pattern, scope)
+    )
+
+
 from .archive import (
     audit_agent_entrypoints,
     audit_archive,
@@ -190,6 +215,8 @@ def collect_audit(args: argparse.Namespace) -> dict:
 
     root_policy_text, _ = read_text(root / "logic_readme.md")
     root_policy_values = control_values(root_policy_text)
+    root_owned_paths = _declared_path_patterns(root_policy_text, "owned_paths")
+    root_unmapped_paths = _declared_path_patterns(root_policy_text, "unmapped_paths")
     registry_every_folder = "registry-every-folder" in root_policy_values.get(
         "coverage_policy", []
     )
@@ -219,36 +246,27 @@ def collect_audit(args: argparse.Namespace) -> dict:
             for inherited in registered_inherited_scopes
         ):
             return True
-        candidates = [
-            audit
-            for audit in audits
-            if audit.logic_readme
-            and audit.path != "."
-            and is_scope_ancestor(audit.path, scope)
-        ]
-        if not candidates:
-            return False
-        owner = max(candidates, key=lambda audit: len(scope_parts(audit.path)))
-        owner_text, owner_error = read_text(root / owner.path / "logic_readme.md")
-        if owner_error:
-            return False
-        raw_values = control_values_raw(owner_text)
-        policy_values = control_values(owner_text)
-        child_policy = (policy_values.get("child_policy") or [""])[0]
-        if child_policy not in {"inherit", "review-before-split"}:
-            return False
-        patterns = {
-            item.strip()
-            for value in raw_values.get("owned_paths", [])
-            for item in re.split(r"[,;，；]", value)
-            if item.strip()
-        }
-        return any(
-            scope == normalize_scope_path(pattern)
-            or is_scope_ancestor(normalize_scope_path(pattern), scope)
-            or fnmatchcase(scope, normalize_scope_path(pattern))
-            for pattern in patterns
-        )
+        if any(_path_pattern_covers(scope, pattern) for pattern in root_owned_paths):
+            return True
+        if any(_path_pattern_covers(scope, pattern) for pattern in root_unmapped_paths):
+            return True
+        for audit in audits:
+            if not audit.logic_readme:
+                continue
+            owner_text, owner_error = read_text(root / audit.path / "logic_readme.md")
+            if owner_error:
+                continue
+            if any(
+                _path_pattern_covers(scope, pattern)
+                for pattern in _declared_path_patterns(owner_text, "owned_paths")
+            ):
+                return True
+            if any(
+                _path_pattern_covers(scope, pattern)
+                for pattern in _declared_path_patterns(owner_text, "unmapped_paths")
+            ):
+                return True
+        return False
 
     missing_map_candidates = [
         scope
