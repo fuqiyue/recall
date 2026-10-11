@@ -13,7 +13,7 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - last_updated: 2026-10-11
-- active_changes: none
+- active_changes: 0
 
 ## 议案规则
 
