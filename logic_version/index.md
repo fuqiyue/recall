@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-09-07
+- last_updated: 2026-10-11
 - owner: self
 
 ## 关于逻辑回档
@@ -36,6 +36,8 @@
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
 | VER-20260907-003 | logic_version-20260907-003-task-context | 2026-09-07 | effective | ., logic_domains/toolchain | RULE-014, RULE-018, RULE-022, RULE-027, RULE-028 | 1 | 任务上下文优先、下一步视图与派生公报 | [记录](records/logic_version-20260907-003-task-context.md) |
+| VER-20261011-001 | logic_version-20261011-001-cleanup-ai-delivery-closure | 2026-10-11 | correction | . | none | 1 | 勘误：清理 AI 自主交付案临时目录并关闭 CHG | [记录](records/logic_version-20261011-001-cleanup-ai-delivery-closure.md) |
+| VER-20261011-002 | logic_version-20261011-002-cleanup-html-explainers | 2026-10-11 | correction | . | none | 1 | 勘误：清理解释性 HTML 案临时目录并关闭 CHG | [记录](records/logic_version-20261011-002-cleanup-html-explainers.md) |
 | VER-20260907-001 | logic_version-20260907-001-ai-delivery-closure | 2026-09-07 | effective | . | RULE-025 | 1 | AI 自主审查后完成开发交付 | [记录](records/logic_version-20260907-001-ai-delivery-closure.md) |
 | VER-20260907-002 | logic_version-20260907-002-html-explainers | 2026-09-07 | effective | . | RULE-026 | 1 | 解释文档统一交付 explainers HTML | [记录](records/logic_version-20260907-002-html-explainers.md) |
 | VER-20260808-001 | logic_version-20260808-001-recall-restructure | 2026-08-08 | closed | . | RULE-001, RULE-002, RULE-003, RULE-004 | 1 | Recall 系统结构重组：修复账本完整性、平行真源、反膨胀无强制点、状态机空洞 | [logic_version-20260808-001-recall-restructure.md](records/logic_version-20260808-001-recall-restructure.md) |
@@ -84,3 +86,4 @@
 2. 在上方"不可变决策记录"表中添加索引行（`rejected`/`cancelled`/`rolled-back` 记录只登记到这里，不进宪法有效决策索引）
 3. 让相关规则行的"决策记录"列链接该记录；宪法"有效决策索引"只滚动保留最近 3 条（RULE-002），`recall validate` 对既未被规则行链接、也不在宪法索引的生效记录告警
 4. 把 CHG 的需求拆解三字段搬入记录后再删除 CHG 条目（语义见 RULE-014，步骤见 references/change-lifecycle.md §7）
+
