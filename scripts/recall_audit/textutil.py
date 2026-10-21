@@ -55,6 +55,7 @@ def normalize_link_target(raw: str) -> str | None:
 
 
 def audit_links(document: Path, text: str, root: Path) -> list[str]:
+    root = root.resolve()
     broken: list[str] = []
     for raw in MARKDOWN_LINK_RE.findall(strip_code_segments(text)):
         target = normalize_link_target(raw)

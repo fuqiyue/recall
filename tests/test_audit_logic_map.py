@@ -3461,7 +3461,7 @@ class CodeSegmentLinkTests(unittest.TestCase):
             )
             document.write_text(text, encoding="utf-8")
             self.assertEqual(
-                AUDIT.audit_links(document, text, root), ["missing.md"]
+                AUDIT.audit_links(document, text, root / ".." / root.name), ["missing.md"]
             )
 
     def test_empty_ledger_count_accepts_none_and_zero(self) -> None:

@@ -356,6 +356,7 @@ def backfill_after_commit(project_root: Path, quiet: bool = False) -> bool:
     回填后以内部提交落盘（只 add 被回填的文件，绝不 ``add -A``，避免把
     无关脏文件卷进来）。失败只告警，不阻断同步。
     """
+    project_root = project_root.resolve()
     ok, output, _ = run_git(["log", "-1", "--format=%h%n%B"], cwd=project_root)
     if not ok or not output:
         return True

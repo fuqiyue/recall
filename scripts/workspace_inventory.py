@@ -119,6 +119,7 @@ def markdown(data, domain=None):
 
 def write_maps(root, data):
     """Preflight all outputs; never overwrite hand-authored prose or create a domain."""
+    root = Path(root).resolve()
     outputs = [("logic_domains/file_map.md", markdown(data))]
     outputs += [(scope + "/file_map.md", markdown(data, scope)) for scope in data["domains"]]
     prepared = [(project_path(root, name), text) for name, text in outputs]

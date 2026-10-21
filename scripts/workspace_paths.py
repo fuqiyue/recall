@@ -70,6 +70,7 @@ def contract(root):
 
 def task_ledgers(root):
     """One fixed level; never follow links into another project."""
+    root = Path(root).resolve()
     base = Path(root) / "logic_changes"
     if not base.is_dir():
         return []

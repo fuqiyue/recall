@@ -28,6 +28,7 @@ class WorkspaceTests(unittest.TestCase):
         self.addCleanup(self.temp.cleanup)
         self.root = Path(self.temp.name) / "vscode3" / "教材"
         shutil.copytree(ROOT / "references/examples/mini-project", self.root)
+        self.root = self.root.resolve()
 
     def write(self, rel, text=""):
         path = self.root / rel
@@ -120,6 +121,13 @@ class WorkspaceTests(unittest.TestCase):
             with self.subTest(args=args):
                 result = self.cli(*args)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_task_discovery_and_maps_accept_equivalent_root_spelling(self):
+        task = self.task()
+        alias = self.root / ".." / self.root.name
+        self.assertIn(("logic_changes/feature/logic_change.md", task), change_ledgers(alias))
+        written = write_maps(alias, inventory(alias, ["src"]))
+        self.assertIn("logic_domains/core/file_map.md", written)
 
     def test_invalid_task_not_hidden_from_audit(self):
         path = self.task()

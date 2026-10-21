@@ -195,7 +195,8 @@ class GitSyncTests(unittest.TestCase):
                 return True, "", ""
 
             with patch.object(git_sync, "run_git", side_effect=fake_run_git):
-                self.assertTrue(git_sync.backfill_after_commit(root, quiet=True))
+                alias = root / ".." / root.name
+                self.assertTrue(git_sync.backfill_after_commit(alias, quiet=True))
 
             content = record.read_text(encoding="utf-8")
             self.assertIn("- after_commit: abc1234", content)
