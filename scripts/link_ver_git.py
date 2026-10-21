@@ -15,14 +15,9 @@ from recall_common import find_project_root, force_utf8_output, git_output  # no
 # 决策记录文件名：logic_version-YYYYMMDD-NNN-<scope>.md
 RECORD_NAME_RE = re.compile(r'^logic_version-\d{8}-\d{3}-.+\.md$', re.IGNORECASE)
 
-# commit 关联的几种写法，与 validate.py 的 COMMIT_PATTERNS 保持一致。
-# after_commit 必须排最前：新 schema 记录同时有 before_commit（基线）和
-# after_commit（实施提交），列表展示应优先取实施提交。
-COMMIT_PATTERNS = (
-    r'^\s*-\s*after_commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
-    r'关联\s*Commit\*{0,2}\s*[：:]\s*`?([0-9a-f]{7,40})`?',
-    r'\bcode\s*:\s*commit\s*:\s*`?([0-9a-f]{7,40})`?',
-    r'^\s*-\s*commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
+from record_context import (
+    COMMIT_PATTERNS, active_change_controls, commit_corrections,
+    record_commit_hash, version_record_state,
 )
 
 # 功能意图登记（logic_readme.md）：反向查询 intent → 规则 → 记录 → 代码锚点
@@ -39,7 +34,7 @@ def run_git(args):
     return git_output(args)
 
 
-def _parse_record(record_file):
+def _parse_record(record_file, active_controls=None):
     """解析一条决策记录的元数据，读不出来返回 None。
 
     字段名以 references/logic-version-template.md 为准（`- version_id:`、
@@ -68,12 +63,8 @@ def _parse_record(record_file):
     )
     record_date = date_match.group(1) if date_match else "Unknown"
 
-    commit_hash = "_待填写_"
-    for pattern in COMMIT_PATTERNS:
-        commit_match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-        if commit_match:
-            commit_hash = commit_match.group(1)
-            break
+    commit_hash = record_commit_hash(content) or "_待填写_"
+    state = version_record_state(content, record_file, active_controls or {})
 
     return {
         'file': record_file.name,
@@ -83,6 +74,7 @@ def _parse_record(record_file):
         'commit': commit_hash,
         'path': record_file,
         'content': content,
+        'record_state': state,
     }
 
 
@@ -91,12 +83,21 @@ def _iter_records():
     records_dir = _records_dir()
     if not records_dir.exists():
         return
+    controls = active_change_controls(records_dir.parent.parent)
     for record_file in sorted(records_dir.glob("*.md")):
         if not RECORD_NAME_RE.match(record_file.name):
             continue
-        record = _parse_record(record_file)
+        record = _parse_record(record_file, controls)
         if record is not None:
             yield record
+
+
+def _print_record_context(record):
+    state = record.get('record_state', 'archived')
+    if state != 'archived':
+        print("    状态: " + ("活跃草稿（未归档）" if state == 'draft' else "草稿关联待修复"))
+    if record.get('commit_source'):
+        print(f"    提交关联来源: {record['commit_source']}")
 
 
 def find_decision_records_for_file(file_path):
@@ -113,9 +114,19 @@ def find_decision_records_for_commit(commit_hash):
     """查找与某个提交相关的决策记录"""
     if not commit_hash:
         return []
-    return [
-        record for record in _iter_records() if commit_hash in record['content']
-    ]
+    records = list(_iter_records())
+    matched = [record for record in records if commit_hash in record['content']]
+    corrections = commit_corrections(
+        {record['path']: record['content'] for record in records},
+        {record['path']: record['record_state'] for record in records},
+    )
+    for record in records:
+        sources = [item for item in corrections.get(record['ver_id'].casefold(), [])
+                   if item['commit'].startswith(commit_hash) or commit_hash.startswith(item['commit'])]
+        if sources and record not in matched:
+            matched.append(dict(record, commit_source=', '.join(item['version_id'] for item in sources)))
+    return matched
+
 
 
 def query_file_history(file_path):
@@ -172,6 +183,7 @@ def query_file_history(file_path):
         for rec in records:
             print(f"  • {rec['ver_id']}: {rec['title']}")
             print(f"    文件: {rec['file']}")
+            _print_record_context(rec)
     else:
         print("  (未找到相关决策记录)")
 
@@ -233,6 +245,7 @@ def query_commit_details(commit_hash):
         for rec in records:
             print(f"  • {rec['ver_id']}: {rec['title']}")
             print(f"    文件: {rec['file']}")
+            _print_record_context(rec)
             print(f"    路径: {rec['path']}")
     else:
         print("  (未找到相关决策记录)")
@@ -337,6 +350,7 @@ def query_intent(intent_id):
         for rec in related:
             print(f"  • {rec['ver_id']} ({rec['date']}): {rec['title']}")
             print(f"    文件: {rec['file']}")
+            _print_record_context(rec)
     else:
         print("  (未找到相关决策记录)")
 
@@ -376,6 +390,7 @@ def list_recent_decisions(limit=10):
     for record in records[:limit]:
         print(f"  • {record['ver_id']} ({record['date']})")
         print(f"    {record['title']}")
+        _print_record_context(record)
         print(f"    Commit: {record['commit']}")
         print(f"    文件: {record['file']}")
         print()

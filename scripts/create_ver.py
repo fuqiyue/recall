@@ -10,6 +10,7 @@ recall status 都按这个名字发现记录，任何一方改名都会让记录
 （RULE-009）。
 """
 
+import argparse
 import re
 import sys
 from datetime import date
@@ -24,14 +25,12 @@ RECORD_NAME_RE = re.compile(r'^logic_version-(\d{8})-(\d{3})-.+\.md$', re.IGNORE
 LEGACY_NAME_RE = re.compile(r'^ver-(\d{8})-(\d{3})-.+\.md$', re.IGNORECASE)
 
 
-def find_project_root(start=None):
-    """向上查找 logic_readme.md；找不到时退回 Recall 自身（RULE-021 公共实现）。
-
-    skill 被集中安装、而用户在无 logic_readme.md 的目录运行时，记录应
-    落回 Recall 自身而不是 cwd。
-    """
-    return _find_root(start, fallback=SELF_ROOT)
-
+def find_project_root(start=None, *, project=None):
+    """显式路径必须是项目根；否则沿 cwd 向上查找，缺根时失败。"""
+    root = Path(project).resolve() if project is not None else _find_root(start)
+    if not (root / "logic_readme.md").is_file():
+        raise ValueError(f"未找到项目根 logic_readme.md: {root}；在目标项目运行，或使用 --project <项目根>")
+    return root
 
 def head_short_hash(cwd):
     """返回当前 HEAD 短哈希；无 Git/无提交时返回 None。"""
@@ -81,13 +80,21 @@ def extract_quick_template(template_text):
     return '\n'.join(collected).strip('\n')
 
 
-def create_ver_record(title, scope, template_path=None, output_dir=None):
+def create_ver_record(title, scope, template_path=None, output_dir=None, *, project=None):
     """创建版本决策记录。返回退出码：0 成功，1 失败。"""
     # recall.py cmd_new 直接调用本函数、绕过 main()，防护必须在这里
     force_utf8_output()
-    root = find_project_root()
+    if not scope or not scope.replace('-', '').replace('_', '').isalnum():
+        print("❌ 范围标识符只能包含字母、数字、连字符和下划线")
+        return 1
+    try:
+        root = find_project_root(project=project)
+    except ValueError as error:
+        print(f"❌ {error}")
+        return 1
     if template_path is None:
-        template_path = root / "references" / "logic-version-template.md"
+        local_template = root / "references" / "logic-version-template.md"
+        template_path = local_template if local_template.is_file() else SELF_ROOT / "references" / "logic-version-template.md"
     if output_dir is None:
         output_dir = root / "logic_version" / "records"
 
@@ -134,7 +141,7 @@ def create_ver_record(title, scope, template_path=None, output_dir=None):
     except ValueError:
         display_path = filepath
 
-    print(f"✅ 已创建决策记录")
+    print("✅ 已创建决策记录草稿；关联CHG完成验证与清理后定稿")
     print(f"   📄 文件: {display_path}")
     print(f"   🆔 版本号: {ver_id}")
     print(f"   📅 日期: {today_iso}")
@@ -142,54 +149,26 @@ def create_ver_record(title, scope, template_path=None, output_dir=None):
     print("📝 下一步:")
     print(f"   1. 编辑文件填写详细内容: {filepath.name}")
     print("   2. 实施代码修改")
-    print("   3. Git 提交时引用此记录:")
-    print(f"      git commit -m 'feat: {title}'")
-    print(f"      git commit -m '...'")
-    print(f"      git commit -m 'Ref: logic_version/records/{filename}'")
-    print("   4. after_commit 由 post-commit hook 自动回填（RULE-013），无需手动更新")
+    print("   3. 更新现行文档，清理并核结果，补齐本记录后定稿和更新索引")
+    print("   4. 关闭CHG并核公报；Git提交时引用本记录:")
+    print(f'      git commit -m "feat: 描述本次变更" -m "Ref: logic_version/records/{filename}"')
+    print("   5. after_commit 由 post-commit hook 自动回填（RULE-013），无需手动更新")
     return 0
 
 
-def show_usage():
-    """显示使用说明"""
-    print("""
-使用方法:
-  python scripts/create_ver.py <标题> <范围标识>
-
-参数:
-  <标题>      - 变更的简短标题（用引号包围）
-  <范围标识>  - 用于文件名的范围标识符（小写，用连字符分隔）
-
-示例:
-  python scripts/create_ver.py "添加暗色模式支持" "dark-mode"
-  python scripts/create_ver.py "优化数据库查询性能" "db-optimization"
-  python scripts/create_ver.py "修复登录Bug" "login-fix"
-
-生成的文件命名规则:
-  logic_version-YYYYMMDD-NNN-<范围标识>.md
-
-  例如: logic_version-20260808-001-dark-mode.md
-""")
-
-
-def main():
-    """主函数"""
-    _force_utf8_output()
-
-    if len(sys.argv) < 3:
-        show_usage()
-        sys.exit(1)
-
-    title = sys.argv[1]
-    scope = sys.argv[2]
-
-    # 验证范围标识符格式
-    if not scope.replace('-', '').replace('_', '').isalnum():
-        print("❌ 范围标识符只能包含字母、数字、连字符和下划线")
-        sys.exit(1)
-
-    sys.exit(create_ver_record(title, scope))
+def main(argv=None):
+    """创建记录的唯一命令解析入口，recall new 与直调脚本共用。"""
+    force_utf8_output()
+    parser = argparse.ArgumentParser(description="在已定位的项目创建 Recall 决策记录")
+    parser.add_argument("title", help="变更描述")
+    parser.add_argument("scope", help="文件名短标签")
+    parser.add_argument("--project", help="显式目标项目根，必须包含 logic_readme.md")
+    try:
+        args = parser.parse_args(argv)
+    except SystemExit as error:
+        return int(error.code)
+    return create_ver_record(args.title, args.scope, project=args.project)
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

@@ -50,6 +50,7 @@ def read_changes(text, path):
             fields.setdefault(key, value.strip().strip("`"))
         change_id = heading.group(1).upper()
         title = heading.group(0)[heading.group(0).upper().index(change_id) + len(change_id):].lstrip(" :：")
+        title = re.sub(r"\s*<a\s+id=(?:\"[^\"]+\"|'[^']+')\s*>\s*</a>\s*", " ", title, flags=re.I).strip()
         result.append(dict(fields, id=change_id, title=title, path=path, kind="change"))
     return result
 

@@ -18,17 +18,19 @@ INV-001/INV-002 与RULE-018；合法做法见下"领域划分与拆分"——登
 
 ---
 
+可运行骨架和预期输出见[首次接入示例](practical-examples.md#1-首次接入建立可以读路由和验证的最小项目)。
+
 ## 第一步：宪法骨架 + 首个领域（接入时，一次性）
 
 在 `recall init` 之后，按 [logic_readme 模板](logic-readme-template.md) 建立**最小**根文档（宪法），并按
 [领域文档模板](logic-domain-template.md) 建立至少一个领域：
 
 1. **文档控制 + 目标与边界**：项目是什么、负责什么、不负责什么（问用户，一句话级别）
-2. **范围登记表（领域目录）**：先登记至少一个 `paired` 领域行——小项目用一个
+2. **范围登记表（领域目录）**：先登记至少一个 `readme-only` 领域行——小项目用一个
    `logic_domains/core/` 覆盖全部代码即可，`owned_paths` 写顶层代码目录；再列其余顶层
    模块目录，每行只需 `module_id`、`scope_path`、`status`，尚未补全文档的登记为
    `status: pending-docs`，让"哪里还没有文档"本身可见。随后创建
-   `logic_domains/<domain>/logic_readme.md` + `logic_change.md`（模板字段填齐，规则表可空）
+   `logic_domains/<domain>/logic_readme.md`（模板字段填齐，规则表可空）
 3. **代码地图**：写在拥有该路径的领域文档；只填已识别的顶层入口（主入口文件、配置、测试目录），职责一句话；
    AI 从代码扫描得出的描述在"权威来源/决策依据"处标 `code-derived`，与用户确认的条目区分
 4. **功能意图层初稿**（只写在宪法）：访谈式提问从用户口中提取（不从代码反推）：
@@ -70,22 +72,19 @@ INV-001/INV-002 与RULE-018；合法做法见下"领域划分与拆分"——登
 
 1. 用户确认新建或拆分哪个领域，以及它接管的 `owned_paths`
 2. 按[领域文档模板](logic-domain-template.md)创建 `logic_domains/<domain>/logic_readme.md`
-   与 `logic_change.md`（`module_doc_policy: paired`，`parent: ../../logic_readme.md`）
-3. 在根 `logic_change.md` 立修宪案（登记表行属宪法内容），把领域行加入宪法范围登记表：
-   `| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | paired | ... | ... | self | active |`
+   （`module_doc_policy: readme-only`，`parent: ../../logic_readme.md`）
+3. 在 `logic_changes/<任务>/logic_change.md` 立修宪案并登记根公报（登记表行属宪法内容），把领域行加入宪法范围登记表：
+   `| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | readme-only | ... | ... | self | active |`
 4. 把该职权范围的规则行、代码地图行、测试行迁入新领域文档（拆分时从原领域迁出并收窄其
    `owned_paths`）；宪法只保留全局规则、INT 层与该领域的目录行（一句话职责即可）。迁入时给
    代码地图补 `contract_class` 列（`public`/`persisted`/`security`/`internal`）：这是 SKILL
    按影响选择深度的依据，缺列时每次通道判定都要人工判断"有没有外部调用方"
 5. 引用旧锚点（`#scope-...`）的活跃 CHG 改为引用 `MOD-ID`；原领域账本中只涉及迁出路径的
-   CHG 随正文迁到新领域账本，公报行同步改 `proposal_path`
+   CHG 的affected_scopes改为新领域；正文仍留在同一任务文件
 6. 跑 `recall validate` + `python scripts/audit_logic_map.py . --current-state` 确认编号唯一、
    公报一致、路由对账通过；再用 `recall route <迁入路径>` 确认命中新领域
 
-**划分后的阅读与修改顺序**：改某领域 = 读宪法（全局规则 + 领域目录）→ 读根 `logic_change.md`
-（修宪案 + 公报）→ `recall route` 命中的领域 readme + change → 代码/测试；跨领域变更 = 读全部
-相关领域文档，并在同一变更中一起更新。宪法优先于部门法。`logic_change.md` 每级一份（根账本
-放修宪案与公报，领域账本放本领域正文）；`logic_version/` 不拆分，全项目始终只有根一份。
+**读取顺序**：根readme → 根change公报 → route命中的领域与任务正文 → 相关代码/测试。跨领域任务仍一份正文，logic_version全项目一份。接入先声明工作路径并运行有界目录盘点，见[工作路径与任务](workspace-tasks.md)。
 
 ## 存量项目的节奏建议
 

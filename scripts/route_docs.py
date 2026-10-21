@@ -21,17 +21,14 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (  # noqa: E402
     LogicDomain,
+    estimate_tokens,
     find_project_root,
     force_utf8_output,
     inherited_modules,
     registered_domains,
 )
-
-
-def estimate_tokens(text: str) -> int:
-    """粗估 token：CJK 字符约 1 token/字，其余约 4 字符/token。只用于比较大小。"""
-    cjk = sum(1 for ch in text if ord(ch) >= 0x2E80)
-    return cjk + (len(text) - cjk) // 4
+from workspace_paths import task_ledgers, split_paths
+from task_context import read_changes
 
 
 def _doc_stats(path: Path) -> Dict[str, object]:
@@ -100,6 +97,13 @@ def _keyword_matches(keyword: str, domain: LogicDomain) -> bool:
     if needle in domain.module_id.casefold() or needle in domain.scope_path.casefold():
         return True
     return needle in _keyword_searchable_text(domain)
+
+
+def _relative_target(root: Path, target: str) -> str | None:
+    try:
+        return (root / target).resolve().relative_to(root.resolve()).as_posix()
+    except ValueError:
+        return None
 
 
 def _looks_like_path(root: Path, target: str) -> bool:
@@ -178,7 +182,8 @@ def match_domains(root: Path, targets: List[str], intents: Optional[List[Dict[st
         owned = domain.owned_paths()
         for target in targets:
             if _looks_like_path(root, target):
-                matched = [item for item in owned if _path_matches(target, item)]
+                relative = _relative_target(root, target)
+                matched = [item for item in owned if relative is not None and _path_matches(relative, item)]
                 if matched:
                     reasons.append(f"路径 {target} 属于职权 {', '.join(matched)}")
             elif not _INT_ID_RE.match(target) and _keyword_matches(target, domain):
@@ -209,7 +214,8 @@ def match_inherited(root: Path, targets: List[str]) -> List[Dict[str, object]]:
     for module in inherited_modules(root):
         matched = [
             target for target in targets
-            if _looks_like_path(root, target) and _path_matches(target, module.scope_path)
+            if _looks_like_path(root, target) and _relative_target(root, target) is not None
+            and _path_matches(_relative_target(root, target), module.scope_path)
         ]
         if matched:
             hits.append({
@@ -219,6 +225,29 @@ def match_inherited(root: Path, targets: List[str]) -> List[Dict[str, object]]:
                 "targets": matched,
             })
     return hits
+
+
+def classify_unrouted_targets(root: Path, targets: List[str]) -> tuple[list[str], list[str]]:
+    """区分根直接管辖与未登记目标；逐目标判断，混合请求不掩盖遗漏。"""
+    text = (root / "logic_readme.md").read_text(encoding="utf-8", errors="replace")
+    match = re.search(r"^- owned_paths:\s*(.+)$", text, re.MULTILINE)
+    owned = [p.strip().strip("`") for p in match.group(1).split(",")] if match else []
+    direct = {"logic_readme.md", "logic_change.md"}
+    direct.update(_normalize(p) for p in owned if "/" not in p.strip("/") and "\\" not in p)
+    root_hits, unknown = [], []
+    for target in targets:
+        intents = match_intents(root, [target])
+        if match_domains(root, [target], intents) or match_inherited(root, [target]):
+            continue
+        try:
+            relative = (root / target).resolve().relative_to(root.resolve()).as_posix()
+        except ValueError:
+            relative = ""
+        if _looks_like_path(root, target) and relative in direct:
+            root_hits.append(target)
+        else:
+            unknown.append(target)
+    return root_hits, unknown
 
 
 def _gazette_hits(root: Path, scopes: List[str]) -> List[str]:
@@ -242,6 +271,7 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
     intents = match_intents(root, targets) if targets else []
     hits = match_domains(root, targets, intents) if targets else {}
     inherited = match_inherited(root, targets) if targets else []
+    root_targets, unmatched_targets = classify_unrouted_targets(root, targets)
     reading: List[Dict[str, object]] = []
 
     def add(path: Path, role: str, reason: str) -> None:
@@ -256,6 +286,12 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
             add(domain.readme, f"部门法 {domain.module_id}", "; ".join(hits[domain.scope_path]))
             if domain.change is not None:
                 add(domain.change, f"领域议案 {domain.module_id}", "该领域一事一议的活跃 CHG 正文")
+    for label, path in task_ledgers(root):
+        items = read_changes(path.read_text(encoding="utf-8"), label)
+        if any(set(split_paths(item.get("affected_scopes", ""))) & (set(hits) | {"."})
+               or any(t.casefold() in (label + " " + item["id"] + " " + item["title"]).casefold() for t in targets)
+               for item in items):
+            add(path, "任务负责人账本", "命中任务或受影响领域；计划、进度与产物同一正文")
     total_tokens = sum(int(item["tokens"]) for item in reading)
     total_lines = sum(int(item["lines"]) for item in reading)
     all_domains = [
@@ -274,11 +310,14 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
         "targets": targets,
         "reading_order": reading,
         "matched_domains": sorted(hits),
+        "matched_root": root_targets,
+        "unmatched_targets": unmatched_targets,
         "matched_inherited": inherited,
         "matched_intents": [
             {k: v for k, v in intent.items()} for intent in intents
         ],
-        "in_flight_changes": _gazette_hits(root, sorted(hits)),
+        "in_flight_changes": _gazette_hits(root, sorted(hits)) + [
+            r["path"] for r in reading if r["role"] == "任务负责人账本"],
         "domains": all_domains,
         "total_lines": total_lines,
         "total_tokens_estimate": total_tokens,
@@ -310,11 +349,15 @@ def _print_plan(plan: Dict[str, object]) -> None:
         for item in inherited:
             print(f"   • {item['module_id']} ({item['scope_path']}) ← {', '.join(item['targets'])}；读 {item['anchor']}")
     domains = plan["domains"]
-    unmatched = bool(targets) and not plan["matched_domains"] and not inherited
+    root_targets = plan.get("matched_root") or []
+    if root_targets:
+        print(f"\n🏛️  根直接管辖：{', '.join(root_targets)}；读取根宪法与账本，无需新增领域")
+    unknown = plan.get("unmatched_targets") or []
+    unmatched = bool(unknown)
     if not domains:
         print("\n⚠️  宪法未登记任何领域（RULE-018 一二级拆分法要求至少一个 logic_domains/<domain>/ paired 行）")
     elif unmatched:
-        print("\nℹ️  目标未命中任何领域职权，也不在宪法直辖模块内；可选领域：")
+        print(f"\nℹ️  未登记目标：{', '.join(unknown)}；可选领域：")
     if domains and (not targets or unmatched):
         for d in domains:
             change = d["change"]

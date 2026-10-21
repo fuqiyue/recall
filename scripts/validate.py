@@ -6,6 +6,7 @@ Recall 一致性验证工具
 """
 
 import re
+import hashlib
 import sys
 from pathlib import Path
 from typing import List, Dict, Optional, Tuple
@@ -17,6 +18,7 @@ from recall_common import (
     classify_porcelain,
     find_project_root,
     force_utf8_output,
+    describe_git_failure,
     git_output,
     run_git,
     unpushed_commit_count,
@@ -57,19 +59,90 @@ INACTIVE_RECORD_STATUSES = {'rejected', 'cancelled', 'rolled-back'}
 # 漂移度量（RULE-015）：纯代码/自动保存提交累积超过阈值时告警
 DRIFT_WARNING_THRESHOLD = 10
 
-# commit 关联的几种写法，按 references/ 下两个模板的实际格式
-COMMIT_PATTERNS = (
-    # 统一 schema 的实施提交字段: - after_commit: abc123（hook 回填）
-    r'^\s*-\s*after_commit\s*[：:]\s*`?(?:commit:)?([0-9a-f]{7,40})`?\s*$',
-    # 旧记录格式兼容: - **关联 Commit**: `abc123`
-    r'关联\s*Commit\*{0,2}\s*[：:]\s*`?([0-9a-f]{7,40})`?',
-    # logic-version-template.md 扩展 schema 的 based_on: ... code: commit:abc123
-    r'\bcode\s*:\s*commit\s*:\s*`?([0-9a-f]{7,40})`?',
-    # 旧快速模板的独立控制字段: - commit: abc123
-    r'^\s*-\s*commit\s*[：:]\s*`?([0-9a-f]{7,40})`?\s*$',
+from record_context import (
+    COMMIT_PATTERNS, active_change_controls, commit_corrections,
+    record_commit_hash, version_record_state,
 )
+from task_context import unfenced
+from recall_audit.textutil import control_values, markdown_table_rows
 
 
+def archived_index_text(index_path, text, result):
+    """Exclude only verified live worklogs from archived-record registration."""
+    text = unfenced(text)
+    section = markdown_section(text, '活跃临时记录')
+    controls = active_change_controls(index_path.parent.parent)
+    valid_ids = set()
+    for row in markdown_table_rows(text, '活跃临时记录'):
+        identity = row.get('version_id', '').strip('` ')
+        change_id = row.get('change_id', '').strip('` ').casefold()
+        if not re.fullmatch(r'VER-\d{8}-\d{3}', identity):
+            continue
+        link = re.fullmatch(r'\[[^\]]+\]\(([^)]+)\)', row.get('path', ''))
+        relative = link.group(1) if link else row.get('path', '').strip('` ')
+        target = (index_path.parent / relative).resolve()
+        working_root = (index_path.parent / 'working').resolve()
+        block = controls.get(change_id, {})
+        valid = (target.is_relative_to(working_root) and target.is_file()
+                 and target.name == 'logic_temp.md')
+        values = control_values(unfenced(target.read_text(encoding='utf-8'))) if valid else {}
+        declared_slug = block.get('version_slug')
+        declared_path = block.get('temp_path', [])
+        source_bound = (declared_slug == values.get('version_slug') or
+                        (not declared_slug and len(declared_path) == 1 and
+                         (index_path.parent.parent / declared_path[0]).resolve() == target))
+        valid = (valid and row.get('state', '').strip('` ').casefold() == 'working'
+                 and values.get('state') == ['working']
+                 and values.get('version_id') == [identity.casefold()]
+                 and values.get('source_change_id') == [change_id]
+                 and values.get('proposal_revision') == block.get('proposal_revision')
+                 and values.get('version_slug') == [target.parent.name.casefold()]
+                 and source_bound
+                 and block.get('status', [''])[0] in
+                 ('draft', 'awaiting-decision', 'implementing', 'verifying', 'promoting', 'blocked'))
+        if valid:
+            valid_ids.add(identity)
+        else:
+            result.add_error(f'{identity} 活跃临时记录的路径、身份或 CHG 关联无效')
+    kept = [line for line in section.splitlines()
+            if not (VER_ROW_RE.match(line) and VER_ROW_RE.match(line).group(1) in valid_ids)]
+    return text.replace(section, '\n' + '\n'.join(kept) + '\n', 1) if section else text
+
+
+def schema_supplements(texts, states, result):
+    """Bind append-only schema supplements to exact archived source bytes."""
+    by_id = {}
+    for path in texts:
+        match = RECORD_NAME_RE.fullmatch(path.name)
+        if match:
+            by_id.setdefault(f'ver-{match[1]}-{match[2]}', []).append(path)
+    supplements = {}
+    for path, text in texts.items():
+        payloads = re.findall(r'^```recall-schema-supplement\s*\n(.*?)^```\s*$',
+                              text, re.M | re.S)
+        if not payloads:
+            continue
+        values = control_values(unfenced(text))
+        targets = by_id.get((values.get('corrects') or [''])[0], [])
+        match = RECORD_NAME_RE.fullmatch(path.name)
+        valid = (len(payloads) == 1 and states.get(path) == 'archived'
+                 and values.get('immutable') == ['true']
+                 and values.get('status') == ['correction']
+                 and len(values.get('corrects', [])) == 1 and len(targets) == 1
+                 and match is not None
+                 and values.get('version_id') == [f'ver-{match[1]}-{match[2]}']
+                 and not check_required_fields(path, unfenced(text)))
+        target = targets[0] if len(targets) == 1 else None
+        digests = re.findall(r'^- corrected_record_sha256:\s*([0-9a-f]{64})\s*$',
+                             unfenced(text), re.M)
+        valid = (valid and target != path and states.get(target) == 'archived'
+                 and digests ==
+                 [hashlib.sha256(target.read_bytes()).hexdigest()])
+        if not valid:
+            result.add_error(f'{path.name} 历史格式补充记录的定稿、来源或 SHA256 绑定无效')
+            continue
+        supplements.setdefault(target, []).append(payloads[0])
+    return supplements
 
 
 class ValidationResult:
@@ -365,6 +438,7 @@ def check_ver_registrations(
     readme_content: str,
     result: 'ValidationResult',
     domain_readme_contents: Optional[List[str]] = None,
+    record_states: Optional[dict] = None,
 ) -> None:
     """VER 登记对账：records/ 文件 ↔ logic_version/index.md ↔ 现行文档引用。
 
@@ -373,6 +447,10 @@ def check_ver_registrations(
     宪法索引只留指针 + 最近几条，全量索引在 index.md）。任何一处缺失都会让
     追溯链对部分工具静默不可见。同时检测 version_id 撞号。
     """
+    if record_states is None:
+        controls = active_change_controls(index_path.parent.parent)
+        record_states = {path: version_record_state(path.read_text(encoding='utf-8'), path, controls)
+                         for path in version_records}
     file_vers: Dict[str, List[str]] = {}
     for record_path in version_records:
         match = RECORD_NAME_RE.match(record_path.name)
@@ -387,11 +465,13 @@ def check_ver_registrations(
 
     # 记录状态：非生效记录（rejected/cancelled/rolled-back）豁免有效决策索引登记
     record_status: Dict[str, str] = {}
+    lifecycle_by_id = {}
     for record_path in version_records:
         match = RECORD_NAME_RE.match(record_path.name)
         if not match:
             continue
         ver_id = f"VER-{match.group(1)}-{match.group(2)}"
+        lifecycle_by_id[ver_id] = record_states.get(record_path, 'archived')
         status_match = re.search(
             r'^\s*-\s*status\s*[：:]\s*(\S+)', record_path.read_text(encoding='utf-8'),
             re.MULTILINE,
@@ -401,7 +481,7 @@ def check_ver_registrations(
 
     index_vers = set()
     if index_path.exists():
-        index_text = index_path.read_text(encoding='utf-8')
+        index_text = archived_index_text(index_path, index_path.read_text(encoding='utf-8'), result)
         index_vers = set(VER_ROW_RE.findall(index_text))
         for ver_id in sorted(set(VER_FIRST_CELL_RE.findall(index_text)) - index_vers):
             result.add_warning(
@@ -412,6 +492,14 @@ def check_ver_registrations(
     linked_vers = rule_linked_versions(readme_content, *(domain_readme_contents or []))
 
     for ver_id in sorted(file_vers):
+        state = lifecycle_by_id.get(ver_id, 'archived')
+        if state == 'invalid-draft':
+            result.add_error(f"{ver_id} 草稿未匹配唯一活跃 CHG 的 revision/slug，或 immutable 字段无效")
+            continue
+        if state == 'draft':
+            if ver_id in index_vers or ver_id in readme_vers:
+                result.add_warning(f"{ver_id} 是活跃草稿，不应登记为已归档/有效决策")
+            continue
         if index_path.exists() and ver_id not in index_vers:
             result.add_warning(f"{ver_id} 未登记到 logic_version/index.md")
         inactive = record_status.get(ver_id) in INACTIVE_RECORD_STATUSES
@@ -546,12 +634,7 @@ def extract_commit_hash(record_path: Path, content: Optional[str] = None) -> str
             return ""
         content = record_path.read_text(encoding='utf-8')
 
-    for pattern in COMMIT_PATTERNS:
-        match = re.search(pattern, content, re.IGNORECASE | re.MULTILINE)
-        if match:
-            return match.group(1)
-
-    return ""
+    return record_commit_hash(content)
 
 # 记录控制字段：两套模板共有
 RECORD_CONTROL_FIELDS = [
@@ -685,8 +768,52 @@ def report_untracked_leftovers(paths: List[str], result: 'ValidationResult') -> 
         listing += f" 等（另 {len(cleaned) - len(shown)} 个）"
     result.add_warning(
         f"{len(cleaned)} 个未跟踪且未被 .gitignore 覆盖的文件: {listing}"
-        "（RULE-020 收尾归零：交付物请 git add，非交付物请删除或加入 .gitignore；"
-        "medium/high 变更在 logic_temp.md 台账登记去留）"
+        "（RULE-020 收尾归零：交付物核对归属，非交付物请删除；加入 .gitignore 不等于清理完成；"
+        "medium/high 在任务正文产物台账登记，旧任务兼容 logic_temp.md）"
+    )
+
+
+def _validate_version_records(root, version_dir, readme_content, child_readmes, result):
+    records = find_version_records(version_dir)
+    texts = {path: path.read_text(encoding='utf-8') for path in records}
+    controls = active_change_controls(root)
+    states = {path: version_record_state(text, path, controls) for path, text in texts.items()}
+    supplements = schema_supplements(texts, states, result)
+    corrections = commit_corrections(texts, states)
+    valid_corrections = {
+        target: [item for item in items if is_valid_git_commit(item['commit'], cwd=root)]
+        for target, items in corrections.items()
+    }
+    drafts = sum(state == 'draft' for state in states.values())
+    result.add_info(f"在 logic_version/records/ 中找到 {len(records)} 个决策记录；活跃草稿 {drafts} 个")
+    for path, text in texts.items():
+        if states[path] == 'draft':
+            result.add_info(f"{path.name} 是关联活跃 CHG 的未归档草稿")
+            continue
+        schema_text = text + '\n' + '\n'.join(supplements.get(path, []))
+        missing = check_required_fields(path, schema_text)
+        if missing:
+            result.add_error(f"{path.name} 缺少必填字段: {', '.join(missing)}")
+        elif path in supplements:
+            result.add_info(f'{path.name} 的格式由绑定原 SHA256 的追加记录补充；原字节保持不变')
+        check_record_requirement_fields(text, path.name, result)
+        commit = record_commit_hash(text)
+        match = RECORD_NAME_RE.match(path.name)
+        identity = f"ver-{match.group(1)}-{match.group(2)}" if match else ''
+        appended = valid_corrections.get(identity, [])
+        if commit:
+            if not is_valid_git_commit(commit, cwd=root):
+                result.add_error(f"{path.name} 中的 commit hash '{commit}' 无效")
+        elif appended:
+            sources = ', '.join(item['version_id'] for item in appended)
+            result.add_info(f"{path.name} 的提交关联由追加记录 {sources} 提供；原记录保持不变")
+        else:
+            result.add_warning(f"{path.name} 未关联 Git commit")
+        if UNFILLED_PLACEHOLDER_RE.search(text) and not appended:
+            result.add_warning(f"{path.name} 的 after_commit 占位符尚未回填（由受管理 hook 回填；none 须追加关联记录）")
+    check_ver_registrations(
+        records, version_dir / 'index.md', readme_content, result,
+        [child.read_text(encoding='utf-8') for child in child_readmes], states,
     )
 
 
@@ -781,10 +908,11 @@ def validate_recall() -> ValidationResult:
                         f"{chg['id']} 在 {label} 有正文但未登记进根 logic_change.md 活跃议案索引"
                         "（RULE-018：根账本是全项目公报）"
                     )
-    domain_ledgers = len(ledgers) - (1 if change_path.exists() else 0)
+    task_count = sum(label.startswith('logic_changes/') for label, _ in ledgers)
+    domain_ledgers = len(ledgers) - (1 if change_path.exists() else 0) - task_count
     result.add_info(
         f"在 {len(ledgers)} 份议案账本中找到 {len(chg_records)} 个变更议案"
-        + (f"（含 {domain_ledgers} 份领域账本）" if domain_ledgers else "")
+        + (f"（含 {domain_ledgers} 份领域账本；{task_count} 份任务账本）" if domain_ledgers or task_count else "")
     )
 
     # 检查 CHG 状态
@@ -798,43 +926,7 @@ def validate_recall() -> ValidationResult:
     for _label, ledger_path in ledgers:
         check_chg_analysis_fields(ledger_path, result)
 
-    # 3. 检查决策记录
-    version_records = find_version_records(version_dir)
-    result.add_info(f"在 logic_version/records/ 中找到 {len(version_records)} 个决策记录")
-
-    for record_path in version_records:
-        record_text = record_path.read_text(encoding='utf-8')
-
-        # 检查必填字段（快速模板 / 扩展 schema 任一套）
-        missing = check_required_fields(record_path, record_text)
-        if missing:
-            result.add_error(f"{record_path.name} 缺少必填字段: {', '.join(missing)}")
-
-        # 需求保全（RULE-014）：来自 CHG 的记录必须带需求拆解三字段
-        check_record_requirement_fields(record_text, record_path.name, result)
-
-        if UNFILLED_PLACEHOLDER_RE.search(record_text):
-            result.add_warning(
-                f"{record_path.name} 的 after_commit 占位符尚未回填"
-                "（提交时带 Ref 行、或将记录与代码同提交，hook 会自动回填）"
-            )
-
-        # 检查 Git commit hash
-        commit_hash = extract_commit_hash(record_path, record_text)
-        if commit_hash:
-            if not is_valid_git_commit(commit_hash, cwd=root):
-                result.add_error(f"{record_path.name} 中的 commit hash '{commit_hash}' 无效")
-        else:
-            result.add_warning(f"{record_path.name} 未关联 Git commit")
-
-    # 3b. VER 登记对账与撞号检测（规则行反链含全部已登记领域文档）
-    check_ver_registrations(
-        version_records,
-        version_dir / "index.md",
-        readme_content,
-        result,
-        [child.read_text(encoding='utf-8') for child in child_readmes],
-    )
+    _validate_version_records(root, version_dir, readme_content, child_readmes, result)
 
     # 3c. 漂移度量（RULE-015）：文档是代码理解的缓存，量化缓存的"新鲜度"
     check_doc_drift(root, result)
@@ -854,11 +946,18 @@ def validate_recall() -> ValidationResult:
         )
         if untracked is not None:
             report_untracked_leftovers(untracked.splitlines(), result)
-    elif 'not a git repository' in status_err.lower() or 'git' in status_err.lower():
-        result.add_warning("无法检查 Git 状态（可能未初始化 Git）")
     else:
-        result.add_warning("Git 不可用或未安装")
+        result.add_warning(describe_git_failure(status_err, 'Git 状态检查'))
 
+    from workspace_check import check_workspace
+    try:
+        workspace = check_workspace(root)
+        for finding in workspace["findings"]:
+            report = result.add_error if finding["severity"] == "error" else result.add_warning
+            if finding["severity"] != "info":
+                report(f"工作区 {finding['code']}: {finding['path']} — {finding['message']}")
+    except (ValueError, OSError) as error:
+        result.add_error(f"工作路径检查失败：{error}")
     return result
 
 def main() -> int:

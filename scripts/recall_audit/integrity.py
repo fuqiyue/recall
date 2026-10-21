@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
 from typing import Callable
+from workspace_paths import task_ledgers
 from .constants import (
     CURRENT_CHANGE_FIELDS,
     CURRENT_CHANGE_SECTIONS,
@@ -55,6 +56,7 @@ from .changes import (
     change_coordination_issues,
     change_heading_ids,
     change_index_ids,
+    change_block_semantic_issues,
     governance_evidence_issues,
     review_freshness_issues,
 )
@@ -518,6 +520,12 @@ def _collect_proposal_texts(
             continue
         texts_by_scope[audit.path] = text
         ids_by_scope[audit.path] = change_heading_ids(text)
+    for label, path in task_ledgers(root):
+        text, error = read_text(path)
+        if not error:
+            scope = path.parent.relative_to(root).as_posix()
+            texts_by_scope[scope] = text
+            ids_by_scope[scope] = change_heading_ids(text)
     return ids_by_scope, texts_by_scope
 
 
@@ -713,7 +721,7 @@ def _check_proposal_authorities(
 def _check_module_proposal_owners(ctx: _ProposalContext) -> None:
     """核查模块级议案的 affected_scopes 归属方均为该模块自身（否则应根正典）。"""
     for proposal_scope, proposal_text in ctx.texts_by_scope.items():
-        if proposal_scope == ".":
+        if proposal_scope == "." or proposal_scope.startswith("logic_changes/"):
             continue
         for change_id, block in change_blocks(proposal_text).items():
             affected_scopes = change_affected_scopes(control_values_raw(block))
@@ -1002,6 +1010,9 @@ def audit_proposal_integrity(root: Path, audits: list[ModuleAudit]) -> dict:
         },
     )
     _check_root_index_routes(ctx)
+    for scope, text in texts_by_scope.items():
+        if scope.startswith("logic_changes/"):
+            ctx.route_issues.extend(change_block_semantic_issues(text, task_file=True))
 
     authority_rows = markdown_table_rows(registry_text, "决策权限登记")
     active_authority_scopes = _check_authority_registry(ctx, authority_rows)
@@ -1843,7 +1854,7 @@ def _registered_domain_rows(ctx: _CurrentStateContext) -> list[tuple[str, str]]:
         policy = (row.get("doc_policy") or "").strip().strip("`").casefold()
         membership = (row.get("membership") or "").strip().strip("`").casefold()
         scope = normalize_scope_path(row.get("scope_path", ""))
-        if policy != "paired" or membership != "in-system" or scope in {"", "."}:
+        if policy not in {"paired", "readme-only"} or membership != "in-system" or scope in {"", "."}:
             continue
         domains.append((row.get("module_id", "").strip(), scope))
     return domains
@@ -1989,6 +2000,43 @@ def _check_gazette_rows(ctx: _CurrentStateContext) -> None:
             ctx.proposal_issues.append(f"{change_id}:root-index-target-body-not-found:{target}")
 
 
+def _check_task_documents(ctx: _CurrentStateContext) -> None:
+    """Task ledgers share proposal semantics, but have no duplicated local index."""
+    for label, path in task_ledgers(ctx.root):
+        text, error = read_text(path)
+        if error:
+            ctx.document_issues.append(f"{label}:unreadable:{error}")
+            continue
+        blocks = change_blocks(text)
+        if len(change_heading_ids(text)) != 1:
+            ctx.proposal_issues.append(f"{label}:task-needs-one-change")
+        mode = (control_values(text).get("governance_mode") or ["personal"])[0]
+        ctx.ledger_blocks[label], ctx.ledger_modes[label] = blocks, mode
+        ctx.proposal_issues.extend(change_block_semantic_issues(text, task_file=True))
+        for change_id, block in blocks.items():
+            if change_id in ctx.body_ids or change_id in ctx.domain_change_ids:
+                ctx.proposal_issues.append(f"duplicate-change-body:{change_id}")
+            ctx.domain_change_ids[change_id] = path.parent.relative_to(ctx.root).as_posix()
+            values, raw = control_values(block), control_values_raw(block)
+            _check_block_responsibility(ctx, change_id, values, raw)
+            _check_block_topic(ctx, change_id, raw, change_field_tier(values, mode))
+            _check_block_scopes(ctx, change_id, raw)
+            if normalize_scope_path((raw.get("scope") or [""])[0]) not in ctx.registered_scopes:
+                ctx.proposal_issues.append(f"{change_id}:task-primary-scope-not-registered")
+            if text.casefold().count(f'<a id="{change_id.casefold()}"></a>') != 1:
+                ctx.proposal_issues.append(f"{change_id}:task-needs-unique-anchor")
+            rows = [r for r in ctx.gazette_rows if normalize_change_id(r.get("change_id", "")) == change_id]
+            if len(rows) != 1:
+                ctx.proposal_issues.append(f"{change_id}:task-needs-one-root-index-row")
+            for row in rows:
+                target, fragment = cell_link_parts(row.get("proposal_path", ""))
+                if target != label or fragment != change_id.casefold():
+                    ctx.proposal_issues.append(f"{change_id}:task-index-path-mismatch")
+                for key in ("status", "scope", "owner"):
+                    if row.get(key, "").casefold() != (values.get(key) or [""])[0]:
+                        ctx.proposal_issues.append(f"{change_id}:task-index-{key}-mismatch")
+
+
 def _check_ledger_coordination(ctx: _CurrentStateContext) -> None:
     """协调检查（依赖/冲突/影响面重叠）以整本账本为单位，并能看见其余账本的活跃 CHG。
 
@@ -2071,11 +2119,24 @@ def audit_current_state_integrity(
     _check_change_body_index(ctx)
     _check_topic_index(ctx)
     _check_change_blocks(ctx)
+    _check_task_documents(ctx)
     _check_topic_memberships(ctx)
     _check_domain_documents(ctx, audits)
     _check_ledger_coordination(ctx)
+    _check_workspace(ctx)
 
     return ctx.result()
+
+
+def _check_workspace(ctx):
+    from workspace_check import check_workspace
+    try:
+        report = check_workspace(ctx.root)
+        ctx.proposal_issues.extend(
+            f"workspace:{row['code']}:{row['path']}" for row in report["findings"] if row["severity"] == "error"
+        )
+    except (ValueError, OSError) as error:
+        ctx.proposal_issues.append(f"workspace:{error}")
 
 
 def active_change_ids(root: Path, audits: list[ModuleAudit]) -> set[str]:
@@ -2087,4 +2148,6 @@ def active_change_ids(root: Path, audits: list[ModuleAudit]) -> set[str]:
         text, error = read_text(directory / "logic_change.md")
         if not error:
             ids.update(change_heading_ids(text))
+    for _, path in task_ledgers(root):
+        ids.update(change_heading_ids(path.read_text(encoding="utf-8")))
     return ids

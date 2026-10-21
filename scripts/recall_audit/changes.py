@@ -699,7 +699,7 @@ def change_index_ids(text: str) -> set[str]:
     }
 
 
-def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list[str]:
+def change_block_semantic_issues(text: str, *, root_index: bool = False, task_file: bool = False) -> list[str]:
     """Validate proposal blocks and their local index.
 
     A module change file is a self-contained ledger, so every indexed CHG-ID
@@ -793,9 +793,9 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
             for row in proposal_index_rows
             if normalize_change_id(row.get("change_id", "")) == change_id
         ]
-        if not matching_index_rows:
+        if not matching_index_rows and not task_file:
             issues.append(f"{change_id}:missing-from-index")
-        else:
+        elif matching_index_rows:
             if len(matching_index_rows) != 1:
                 issues.append(f"{change_id}:duplicate-index-rows")
             index_row = matching_index_rows[0]
@@ -842,7 +842,7 @@ def change_block_semantic_issues(text: str, *, root_index: bool = False) -> list
         missing = sorted(set(heading_ids) - indexed_ids)
         if missing:
             issues.append("ids-missing-from-index:" + ",".join(missing))
-    elif set(heading_ids) != indexed_ids:
+    elif not task_file and set(heading_ids) != indexed_ids:
         missing = sorted(set(heading_ids) - indexed_ids)
         extra = sorted(indexed_ids - set(heading_ids))
         if missing:

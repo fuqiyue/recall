@@ -1,6 +1,6 @@
 # 字段词汇分层
 
-Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按治理需要逐层启用。
+个人模式保留下表 8 项基本内容；它们包含散文内容，不是“只填8个字段”的机器schema。机器必填与条件字段以下方审计器口径和[个人最小块](logic-change-template.md#personal-最小块)为准，其余按治理需要启用。
 
 分层的原因：把全部字段当成默认必填会让单条 CHG 达到 80-200 行，与"避免上下文膨胀"直接矛盾。字段数量应该跟随真实治理需要，而不是跟随模板长度。
 
@@ -8,7 +8,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 | 层级 | 何时启用 | 字段数 |
 |---|---|---|
-| personal | 默认。单人或单人 + AI | 8 |
+| personal | 默认。单人或单人 + AI | 8项基本内容；机器字段另见下文 |
 | collaborative | 真实存在多人分工，且已配置 PR/CI/CODEOWNERS 等外部控制 | +9 |
 | compliance | 用户明确要求正式审查、审计留存或表单合规 | +13 |
 
@@ -19,7 +19,7 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 | 字段 | 含义 |
 |---|---|
 | `status` | `draft` \| `awaiting-decision` \| `implementing` \| `verifying` \| `promoting` \| `blocked` |
-| `proposal_revision` | 议案版本号；实质修改方案/影响面/基线时递增 |
+| `proposal_revision` | 方案版本号；实质修改方案/影响面/基线时递增，不等于修订表的执行轮次；表格用法见[多轮修订](workspace-tasks.md#多轮修订) |
 | 目标 | 一句话说明要达到什么 |
 | 理由 | 3-5 条，为什么这么做、放弃了什么 |
 | 当前证据 | 读过的代码、测试、运行结果 |
@@ -59,6 +59,18 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 
 `effective: false` 只表示尚未成为当前制度。实际合并、部署、开关暴露用 `runtime_state`、`runtime_environments`、`feature_flag` 表达；已合并未部署、灰度部署和制度生效是三件不同的事。
 
+## 工作路径与任务产物
+
+| 字段 | 位置与含义 |
+|---|---|
+| `workspace_root` | 根readme；固定为`.`，以实际项目文件夹为根 |
+| `scratch_root` | 根readme；默认`.work/`，临时代码放其下`临时-具体功能` |
+| `data_roots` | 根readme；逗号/分号分隔的数据目录，盘点默认仅列上层 |
+| `task_temp_dirs` | CHG；项目相对路径，任务独占，无则none |
+| `path / artifact_kind / disposition / reason / cleaned_at` | 任务正文“工作区产物台账”表；keep仅限deliverable/evidence，非交付物delete，gitignore不是处置 |
+
+新任务正文在logic_changes，原temp_root/temp_path仅供旧logic_temp兼容；操作见[工作路径与任务](workspace-tasks.md)。台账与文件核对不会自动删除。
+
 ## 长度上限
 
 | 对象 | 目标 | 硬上限 |
@@ -66,13 +78,15 @@ Recall 定义了约 30 个字段。**个人模式只需要 8 个**，其余按�
 | 单条活跃 CHG | 15-40 行 | 80 行 |
 | 宪法（根 `logic_readme.md`） | < 150 行 | 250 行 |
 | 领域 `logic_readme.md`（`logic_domains/<domain>/`） | < 250 行 | 400 行（越过目标 → 拆分领域，大部门拆小部门） |
-| 根 / 领域 `logic_change.md` 全文 | < 150 行 | 300 行 |
+| 根 / 旧领域 / 任务 `logic_change.md` 全文 | < 150 行 | 300 行 |
 | 单条 `VER-*` | 50-150 行 | 200 行 |
 | `SKILL.md` | < 130 行 | 200 行 |
 
 超过硬上限时按顺序处理：压缩失效细节 → 把已结束内容归档到 `logic_version/` → 降低字段层级。不要靠未登记的新文件解决长度问题；正确出口是按 RULE-018 新建或拆分已登记领域（宪法过长 → 把领域内部规则下放到部门法；领域过长 → 拆成更小领域）。
 
 `recall audit`（`audit_logic_map.py --current-state`）的 Density 段按层级报告：`exceeds-hard-limit`（文档越过硬上限）与 `constitution-without-domains`（宪法未登记任何领域）使 current-state / formal-review 静态门失败；`over-target`（领域 readme 附拆分提示）、单条 CHG 越过 80 行（`exceeds-chg-limit`）与 blocked 累积只提示。`--advisory-only` 让前两类也只提示，是存量项目的迁移窗口（RULE-022 ③，VER-20260904-005）。
+
+行数门之外，必读入口的粗估token目标为 `SKILL.md` 3000、根readme及每份已登记领域readme 6000，均只提示，不改变退出码。路由与审计共用同一估算：CJK约1 token/字、其他约4字符/token；它用于比较阅读成本，不是模型的实际计费或分词数。
 
 ## 反模式
 

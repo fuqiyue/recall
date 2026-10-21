@@ -380,18 +380,42 @@ class ProjectRootTests(unittest.TestCase):
             subdir.mkdir(parents=True)
             self.assertEqual(link_ver_git.find_project_root(subdir), root)
 
-    def test_create_ver_falls_back_to_script_project(self):
-        """cwd 向上找不到 logic_readme.md 时退回 Recall 自身，而不是写进 cwd。"""
+    def test_create_ver_missing_root_does_not_write_to_skill(self):
+        from unittest.mock import patch
         with tempfile.TemporaryDirectory() as tmp:
-            old_cwd = Path.cwd()
-            os.chdir(tmp)
-            try:
-                found = create_ver.find_project_root()
-            finally:
-                os.chdir(old_cwd)
-            # 临时目录的父链上可能意外存在 logic_readme.md；
-            # 只断言结果不是无标记的临时目录本身
-            self.assertNotEqual(found, Path(tmp).resolve())
+            missing = Path(tmp) / "unknown"
+            missing.mkdir()
+            with patch.object(create_ver, "_find_root", return_value=missing):
+                with self.assertRaises(ValueError):
+                    create_ver.find_project_root()
+                with patch.object(create_ver.Path, "mkdir") as mkdir, contextlib.redirect_stdout(io.StringIO()):
+                    self.assertEqual(create_ver.create_ver_record("missing", "missing"), 1)
+                    mkdir.assert_not_called()
+
+    def test_explicit_project_is_exact_and_unknown_options_fail(self):
+        with TempProject() as root, contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            child = root / "child"
+            child.mkdir()
+            self.assertEqual(recall.cmd_new(["explicit", "explicit", "--project", str(root)]), 0)
+            self.assertEqual(recall.cmd_new(["wrong", "wrong", "--project", str(child)]), 1)
+            self.assertEqual(recall.cmd_new(["invalid", "invalid", "--typo"]), 2)
+            self.assertEqual(recall.cmd_new(["escape", "../escape"]), 1)
+            self.assertEqual(len(list((root / "logic_version/records").glob("*.md"))), 1)
+
+    def test_nested_cwd_uses_nearest_marked_project(self):
+        with TempProject() as outer:
+            inner = outer / "nested"
+            inner.mkdir()
+            (inner / "logic_readme.md").write_text("# inner", encoding="utf-8")
+            deep = inner / "src"
+            deep.mkdir()
+            self.assertEqual(create_ver.find_project_root(deep), inner.resolve())
+
+    def test_central_template_used_when_consumer_has_no_copy(self):
+        with TempProject() as root, contextlib.redirect_stdout(io.StringIO()):
+            (root / "references/logic-version-template.md").unlink()
+            self.assertEqual(create_ver.create_ver_record("central", "central"), 0)
+            self.assertEqual(len(list((root / "logic_version/records").glob("*.md"))), 1)
 
 
 class StatusLeftoverTests(unittest.TestCase):
@@ -863,6 +887,194 @@ class ChangeIdSingleSourceTests(unittest.TestCase):
         content = "## CHG-20260904-UNIFIED-CLIENT-DATA: 统一客户端数据\n- 修改 RULE-001\n"
         changes = detect_conflicts.extract_changes(content)
         self.assertEqual([c["id"] for c in changes], ["CHG-20260904-UNIFIED-CLIENT-DATA"])
+
+
+
+
+class RootRoutingAndDensityTests(unittest.TestCase):
+    def _root(self, root):
+        RouteDocsTests()._write_project(root)
+        readme = root / "logic_readme.md"
+        readme.write_text("- owned_paths: SKILL.md, scripts/, references/\n" + readme.read_text(encoding="utf-8"), encoding="utf-8")
+        (root / "SKILL.md").write_text("# skill", encoding="utf-8")
+
+    def test_root_file_is_explicit_and_mixed_unknown_is_not_hidden(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._root(root)
+            known = route_docs.build_plan(root, ["SKILL.md"])
+            mixed = route_docs.build_plan(root, ["SKILL.md", "docs/unknown.md", "scripts/git_sync.py"])
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                route_docs._print_plan(known)
+            self.assertEqual(known["matched_root"], ["SKILL.md"])
+            self.assertEqual(known["unmatched_targets"], [])
+            self.assertIn("根直接管辖", out.getvalue())
+            self.assertNotIn("新增领域行", out.getvalue())
+            self.assertEqual(mixed["matched_root"], ["SKILL.md"])
+            self.assertEqual(mixed["unmatched_targets"], ["docs/unknown.md"])
+            self.assertEqual(mixed["matched_domains"], ["logic_domains/sync"])
+
+    def test_outside_root_file_cannot_be_reported_as_owned(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp) / "project"
+            root.mkdir()
+            self._root(root)
+            outside = Path(tmp) / "SKILL.md"
+            outside.write_text("outside", encoding="utf-8")
+            plan = route_docs.build_plan(root, [str(outside)])
+            self.assertEqual(plan["matched_root"], [])
+            self.assertEqual(plan["unmatched_targets"], [str(outside)])
+            inside = route_docs.build_plan(root, [str(root / "SKILL.md")])
+            self.assertEqual(inside["matched_root"], [str(root / "SKILL.md")])
+            escaped = route_docs.build_plan(root, ["../references/tpl.md"])
+            self.assertEqual(escaped["matched_inherited"], [])
+            self.assertEqual(escaped["unmatched_targets"], ["../references/tpl.md"])
+
+    def test_short_lines_cannot_hide_reading_cost_and_notice_does_not_gate(self):
+        from recall_audit.archive import audit_density
+        import recall_common
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            self._root(root)
+            path = root / "logic_readme.md"
+            path.write_text(path.read_text(encoding="utf-8") + "中文" * 3200, encoding="utf-8")
+            report = audit_density(root, [])
+            self.assertEqual(report["issues"], [])
+            self.assertTrue(any("over-token-target" in n for n in report["notices"]))
+            cost = report["reading_costs"]["logic_readme.md"]["tokens_estimate"]
+            self.assertEqual(cost, recall_common.estimate_tokens(path.read_text(encoding="utf-8")))
+            self.assertEqual(cost, route_docs._doc_stats(path)["tokens"])
+
+
+
+
+class PersonalTemplateExampleTests(unittest.TestCase):
+    def _cli(self, root, *args):
+        import subprocess
+        result = subprocess.run(
+            [sys.executable, "-B", "-X", "utf8", str(ROOT / "scripts/recall.py"), *args],
+            cwd=root, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+            text=True, encoding="utf-8", timeout=30,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout)
+        return result.stdout
+
+    def _copy(self, tmp):
+        root = Path(tmp) / "example"
+        shutil.copytree(ROOT / "references/examples/mini-project", root)
+        return root
+
+    def test_first_onboarding_example_runs_real_cli_and_unit_test(self):
+        import json
+        import subprocess
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._copy(tmp)
+            route = json.loads(self._cli(root, "route", "src/app.py", "--json"))
+            self.assertEqual(route["matched_domains"], ["logic_domains/core"])
+            self.assertTrue(json.loads(self._cli(root, "audit", "--json"))["static_gate"]["passed"])
+            self.assertTrue(json.loads(self._cli(root, "index", "--json"))["consistent"])
+            self.assertFalse(json.loads(self._cli(root, "next", "--json"))["items"])
+            result = subprocess.run(
+                [sys.executable, "-B", "-m", "unittest", "discover", "-s", "tests"],
+                cwd=root, capture_output=True, text=True, encoding="utf-8", timeout=30,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("Ran 1 test", result.stderr)
+
+    def test_personal_medium_and_interrupted_promotion_close_without_residue(self):
+        import json
+        import re
+        from datetime import timedelta
+        template = (ROOT / "references/logic-change-template.md").read_text(encoding="utf-8")
+        section = template.split("## personal 最小块\n", 1)[1].split("## 账本骨架", 1)[0]
+        block = section.split("```markdown\n", 1)[1].split("```", 1)[0]
+        block = block.replace("<a id=\"chg-yyyymmdd-nnn\"></a>", "ANCHOR")
+        block = re.sub(r"<[^>]+>", "demo", block).replace("YYYYMMDD-NNN", "20261012-991")
+        block = block.replace("ANCHOR", "<a id=\"chg-20261012-991\"></a>")
+        block = block.replace("status: draft", "status: implementing")
+        block = block.replace("decision_confirmed_by: none", "decision_confirmed_by: user")
+        block = block.replace("decision_confirmed_at: none", "decision_confirmed_at: " + date.today().isoformat())
+        slug = "logic_version-20261012-991-demo"
+        # This fixture intentionally exercises the legacy root/logic_temp pairing.
+        block = block.replace("- task_temp_dirs: none", f"- temp_path: logic_version/working/{slug}/logic_temp.md")
+        with tempfile.TemporaryDirectory() as tmp:
+            root = self._copy(tmp)
+            ledger = root / "logic_change.md"
+            empty = ledger.read_text(encoding="utf-8")
+            ledger.write_text(empty.replace("active_changes: 0", "active_changes: 1") + "\n" + block, encoding="utf-8")
+            work = root / "logic_version/working" / slug
+            work.mkdir(parents=True)
+            (work / "logic_temp.md").write_text(f"""# Temporary Worklog
+## 临时记录控制
+- temp_id: TMP-20261012-991
+- source_change_id: CHG-20261012-991
+- proposal_revision: 1
+- version_id: VER-20261012-991
+- version_slug: {slug}
+- scope: .
+- affected_scopes: .
+- owner: self
+- created: {date.today().isoformat()}
+- last_updated: {date.today().isoformat()}
+- expires: {(date.today()+timedelta(days=7)).isoformat()}
+- state: working
+- disposable: true
+- sensitive_data: none
+## 使用边界
+- purpose: 验证教学示例
+- source_of_truth: logic_change.md
+- cleanup_condition: 示例验证后删除本次work目录
+- temp_path: logic_version/working/{slug}/logic_temp.md
+## 已核实事实
+示例问候测试通过。
+## 待确认问题与选择
+无。
+## 受影响文件、层和测试
+src/app.py与tests/test_app.py。
+## 工作区产物台账
+| path | artifact_kind | disposition | reason | cleaned_at |
+|---|---|---|---|---|
+## 清理与晋升
+- promote_to: logic_version/records/{slug}.md
+- ledger_cleared: yes
+- final_cleanup: 收尾时删除本次work目录
+""", encoding="utf-8")
+            self._cli(root, "index", "--write")
+            self.assertEqual(json.loads(self._cli(root, "next", "--json"))["counts"]["进行中"], 1)
+            report = json.loads(self._cli(root, "audit", "--json"))
+            self.assertTrue(report["static_gate"]["passed"], report["current_integrity"])
+            self.assertEqual(report["logic_temp"]["malformed"], [])
+            # 真正关联当前CHG/revision/slug的草稿不冒充完成记录；定稿后必须清理working。
+            draft = root / "logic_version/records" / f"{slug}.md"
+            draft.parent.mkdir(parents=True)
+            draft_text = f"- version_id: VER-20261012-991\n- version_slug: {slug}\n- change_id: CHG-20261012-991\n- proposal_revision: 1\n- immutable: false\n"
+            draft.write_text(draft_text, encoding="utf-8")
+            self.assertTrue(json.loads(self._cli(root, "audit", "--json"))["static_gate"]["passed"])
+            from recall_audit.archive import audit_temp_working
+            draft.write_text(draft_text.replace("immutable: false", "immutable: true"), encoding="utf-8")
+            issues = audit_temp_working(root, [])["malformed"]
+            self.assertTrue(any("working-temp-conflicts-completed-version" in str(i) for i in issues))
+            draft.unlink()
+            ledger.write_text(ledger.read_text(encoding="utf-8").replace("status: implementing", "status: promoting"), encoding="utf-8")
+            self._cli(root, "index", "--write")
+            self.assertEqual(json.loads(self._cli(root, "next", "--json"))["counts"]["收尾"], 1)
+            # 示例代理按真实路径清理，随后定稿记录；CLI不自动删文件或关案。
+            self.assertTrue(work.resolve().is_relative_to(root.resolve()))
+            (work / "logic_temp.md").unlink()
+            work.rmdir()
+            self._cli(root, "new", "教学整理", "example")
+            record = next((root / "logic_version/records").glob("*.md"))
+            content = re.sub(r"<[^>]+>", "教学证据", record.read_text(encoding="utf-8"))
+            content = content.replace("_待填写_", "none").replace("change_id: none", "change_id: CHG-20261012-991")
+            content += "\n- logic_temp_cleanup: 本次working目录已删除，台账无pending。\n"
+            record.write_text(content, encoding="utf-8")
+            self.assertEqual(validate.check_required_fields(record), [])
+            ledger.write_text(empty, encoding="utf-8")
+            self._cli(root, "index")
+            self.assertFalse(json.loads(self._cli(root, "next", "--json"))["items"])
+            self.assertFalse(work.exists())
+            self.assertTrue(json.loads(self._cli(root, "audit", "--json"))["static_gate"]["passed"])
 
 
 if __name__ == "__main__":

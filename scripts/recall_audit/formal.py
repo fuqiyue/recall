@@ -37,14 +37,37 @@ from .fsclassify import (
 from .semantic import (
     ModuleAudit,
 )
+from recall_common import change_ledgers
+
+
+def all_change_blocks(root):
+    if not (root / "logic_change.md").is_file():
+        return {}, "missing"
+    blocks = {}
+    for label, path in change_ledgers(root):
+        text, error = read_text(path)
+        if error:
+            return {}, f"{label}:{error}"
+        blocks.update(change_blocks(text))
+    return blocks, ""
+
+
+def formal_fields(raw_values):
+    return FORMAL_CHANGE_BLOCK_FIELDS - ({"temp_path"} if "task_temp_dirs" in raw_values else set())
+
+
+def audit_ledgers(root, audits):
+    paths = {root / audit.path / "logic_change.md" for audit in audits if audit.logic_change}
+    paths.update(path for _, path in change_ledgers(root))
+    return [(path.parent.relative_to(root).as_posix(), path) for path in sorted(paths)]
 
 def audit_formal_review(root: Path, test_inventory: dict, temp_working: dict) -> dict:
     proposal_issues: list[str] = []
-    change_text, error = read_text(root / "logic_change.md")
+    blocks, error = all_change_blocks(root)
     if error:
         proposal_issues.append(f"unreadable-root-logic_change:{error}")
     else:
-        for change_id, block in change_blocks(change_text).items():
+        for change_id, block in blocks.items():
             headings = {
                 match.group(1).strip()
                 for match in re.finditer(r"^\s*###\s+(.+?)\s*$", block, re.MULTILINE)
@@ -53,9 +76,9 @@ def audit_formal_review(root: Path, test_inventory: dict, temp_working: dict) ->
                 proposal_issues.append(f"{change_id}:missing-formal-section:{section}")
             raw_values = control_values_raw(block)
             normalized_values = control_values(block)
-            for field in sorted(FORMAL_CHANGE_BLOCK_FIELDS - set(raw_values)):
+            for field in sorted(formal_fields(raw_values) - set(raw_values)):
                 proposal_issues.append(f"{change_id}:missing-formal-field:{field}")
-            for field in FORMAL_CHANGE_BLOCK_FIELDS.intersection(raw_values):
+            for field in formal_fields(raw_values).intersection(raw_values):
                 entries = raw_values[field]
                 if len(entries) != 1:
                     proposal_issues.append(
@@ -355,17 +378,13 @@ def audit_test_inventory(
         "evidence",
         "reviewer/date",
     )
-    for audit in audits:
-        if not audit.logic_change:
-            continue
-        directory = root if audit.path == "." else root / audit.path
-        change = directory / "logic_change.md"
+    for scope, change in audit_ledgers(root, audits):
         text_value, error = read_text(change)
         if error:
             continue
         for change_id, block in change_blocks(text_value).items():
             rows = markdown_table_rows(block, "测试案例与审核矩阵")
-            label = f"{audit.path}:{change_id}"
+            label = f"{scope}:{change_id}"
             if not rows:
                 matrix_issues.append(f"{label}:missing-test-review-matrix")
                 continue

@@ -1,10 +1,61 @@
 # logic_change.md 模板
 
-每份 `logic_readme.md` 配一份 `logic_change.md`（RULE-018）：根账本承载修宪议案（改全局规则、INT 层、登记表行、INV 的 CHG）正文与全项目活跃议案索引；领域账本 `logic_domains/<domain>/logic_change.md` 承载本领域一事一议的 CHG 正文，精简形态见[领域文档模板](logic-domain-template.md)。本模板以根账本为例；用 `CHG-ID`、范围和状态区分事项，不创建 `v2`、`final` 或未登记的副本。本文不是当前制度的执行依据。
+新任务正文放 `logic_changes/<任务>/logic_change.md`，根 `logic_change.md` 只维护派生公报（RULE-018）。同任务修改原文件，用一张修订表区分轮次和方案版本，不创建 `v2`、`final` 或重复交接正文。领域 readme 记录现行规则，任务用 scope/affected_scopes 关联；旧根/领域正文兼容，按任务迁移不复制。操作见[工作路径与任务](workspace-tasks.md)。
 
 按需待办、下一步与根公报自动生成见 [任务上下文](task-context.md)（RULE-027/028）；普通个人任务保留需求与剩余动作，完整字段仅按实际需要使用。
 
 目录：文档控制与索引；议案正文；决策确认、影响、兼容、测试与晋升。
+
+## personal 最小块
+
+默认复制本块到唯一任务文件，填写实际值并运行 `recall index --write`。没有独立跟踪需求的 simple 修改直接执行。
+
+- 机器必填：`status`、`effective: false`、`proposal_revision`、`recall_route`、`changed_by`；进入实施及之后再须真实的 `decision_confirmed_by` / `decision_confirmed_at`。账本已标 personal 时可省块内模式。
+- 任务结构必留：唯一显式 `chg-id` 锚点、已登记的主scope、包含主scope的affected_scopes及根公报行；任务文件不再复制本地索引。
+- 内容必留：目标、理由/当前证据、影响、方案/已有授权、验证与回滚、下一步及[修订记录](workspace-tasks.md#多轮修订)。`owner` / `scope` 用于索引对账。
+- medium/high 必留三字段和正文内产物台账；修改现行规则才追加 `authority_surfaces`，按真实依赖/冲突追加协调字段。见 [字段词汇](field-vocabulary.md)。
+- 未获授权保持 draft；已有授权直接填真实来源并进入 implementing，不重复确认。自审结论另写一行，正式字段仅按治理需要追加。
+
+```markdown
+<a id="chg-yyyymmdd-nnn"></a>
+## CHG-YYYYMMDD-NNN: <标题>
+- governance_mode: personal
+- status: draft
+- effective: false
+- proposal_revision: 1
+- recall_route: medium
+- owner: self
+- changed_by: Codex
+- scope: .
+- affected_scopes: .
+- decision_confirmed_by: none
+- decision_confirmed_at: none
+- raw_request: <忠实转述或稳定来源>
+- decomposition: <本次工作项>
+- fit_analysis: <复用/修改哪个INT及FLOW位置>
+- version_slug: logic_version-YYYYMMDD-NNN-<scope>
+- task_temp_dirs: none
+- next_action: <下一项可执行动作>
+
+### 当前状态、代码逻辑与差距
+<目标；理由和当前代码/测试/运行证据；受影响路径与消费者>
+### 拟议制度
+<最小方案与取舍；已有授权来源；未决选择写明>
+### 验证与回滚
+<验证命令和预期；必要结果与未验证环境；撤销本次增量的方法>
+### 修订记录
+| 轮次 | 日期 | 方案版本 | 原因与修改 | 涉及文件 | 结果/验证 |
+|---|---|---|---|---|---|
+### 晋升与归档
+<更新readme、清理；把需求与修订表搬入同一VER并核对，定稿/index就位后关闭CHG并核公报>
+### 工作区产物台账
+| path | artifact_kind | disposition | reason | cleaned_at |
+|---|---|---|---|---|
+```
+
+## 账本骨架与扩展字段
+
+以下保留根公报及旧账本完整 schema 供兼容；新任务使用上面的最小块，collaborative 或正式审查再追加必要字段，不复制另一份正文。
 
 ~~~markdown
 # <项目名称> Active Changes
@@ -26,29 +77,12 @@
 
 ## 议案规则
 
-- 本文件所有条目默认 `effective: false`；交付关案按技能宪法 RULE-025 与 change-lifecycle.md 执行，AI 审查/必要验证通过后主动完成晋升；不能只记 passed 就停手。
-- 允许状态：draft | awaiting-decision | implementing | verifying | promoting | blocked（`promoting` 是晋升过渡态，见 change-lifecycle.md）。
-- `CHG-ID` 的边界是可独立决策、验收、发布和回滚的最小工作项。两个改动若必须一起实施才能保持同一不变量，就合并为一个 CHG；只有可以独立关闭时才拆分为多个 CHG。
-- `TOPIC-ID` 是同类讨论的容器，可集中多个 CHG 的来源、共享约束和开放问题；它不改变任何 CHG 的决策、发布或回滚边界。一个主题可暂时没有 CHG，多个 CHG 也可属于同一主题；每个活跃 CHG 最多填写一个 `topic_id`。主题最后一个相关 CHG 关闭时，必须把共享背景、约束、讨论来源和最终结论复制到该 CHG 的 `VER-*` 快照，避免主题从活跃文件移除后丢失理由。
-- `recall_route` 标明本条目的分析深度：`simple` 通常不需要创建 CHG，只有用户要求追踪时使用；`medium` 先给出计划、影响范围和验证方式；`high` 必须显式检索消费者与相关历史、比较替代方案，并使用决策门槛。无法确定时升级通道。
-- `proposal_revision` 是同一 CHG 的决策版本。拟议规则、选定方案、范围、影响、兼容/迁移、回滚或退出条件发生实质变化时递增它，并将 `decision_state` 重置为 `pending`，清空旧确认字段。
-- 多个活跃 CHG 必须以 `authority_surfaces` 声明精确的规则、API、Schema、数据字段、开关或用户行为，例如 `RULE-021`、`API:/orders`、`DB:users.email`、`FLAG:checkout-v2`；目录或 `.` 只能用于 `affected_scopes`，不能代替影响面。相同影响面不表示一定冲突，但必须用双方互相引用的 `conflicts_with` 明确处理。
-- `based_on` 固定本 CHG 所依据的现行制度、代码/快照和精确影响面，例如 `policy: logic_readme.md#rule-021; code: commit:abc123; surfaces: RULE-021`。晋升前重新核对它：任何依赖 CHG、同一影响面或现行规则已变更，都要递增 `proposal_revision`，重新确认或转为 `awaiting-decision`/`blocked`，不能带着旧基线继续生效。
-- `raw_request`、`decomposition`、`fit_analysis` 构成需求拆解与融入分析：`medium`/`high` 通道在实施前填写，对照根 `logic_readme.md` 的功能意图与用户流程说明新功能复用/替代/新增哪个 `INT-*`、插入哪条 `FLOW-*` 的哪一步、是否触碰 `UXI-*`；`simple` 不要求。plan 模式产出的计划被批准后，其拆解结论在动代码前落入这三个字段，一次性 plan 本身不作为长期记录。
-- 每个 CHG 记录 `intent_source_refs` 和可审计意图提炼。来源只保存稳定引用（任务、Issue、会话、Plan、Spec、Steering、ADR 或 VER），不复制原始聊天、完整提示词、模型记忆或推理过程。提炼须区分目标、非目标、约束、验收条件和仍会改变方案的问题；`inferred` 只表示待确认推断，不能冒充用户决定。
-- 新请求与仍有效的旧需求、现行规则、活跃议案或已确认意图存在实质矛盾，或者模糊点会改变范围、语义、兼容、数据安全或方案选择时，必须在 `user_intent_gap`、`questions_for_user` 和适用的决策检查点中列明新旧来源、具体矛盾、可行选项、主要影响和建议，并向用户或授权决策方确认。确认前方案只能是 `candidate`，代理的建议不能标成 `selected`，也不得实施受影响部分。只有更高优先级当前指令或已声明的精确唯一权威已经直接裁定时才跳过询问，并记录裁定依据；可客观核实的事实问题先调查。这项咨询义务适用于所有通道，不自动要求把简单/中等事项升级为完整高风险表单。
-- 活跃依赖必须写成 `CHG-...@revision-N`，不能只写 CHG-ID。被依赖 CHG 改版、阻塞或关闭后，依赖方不得继续实施；先阻塞/重新决策，关闭后将事实改写为对应 `VER-*`/ADR/现行规则基线，不保留悬空 CHG 依赖。循环依赖不是等待条件，必须合并、拆分或重排。
-- `conflict_resolution` 只使用 `none`、`unresolved`、`merge`、`supersede` 或 `sequence-and-revalidate`。等待用户或授权决策方选择时使用 `unresolved`，并让受影响 CHG 保持 `blocked`，或在使用正式决策门槛时保持 `awaiting-decision`；`merge`、`supersede` 和 `sequence-and-revalidate` 只能记录已经确认的处理结果，不能由代理自行选定。顺序执行必须由后项用版本绑定依赖指向前项，并在前项关闭后重新核对基线。
-- `effective: false` 表示尚未完成文档晋升，不描述生产是否已部署。用 `runtime_state`、`runtime_environments` 和 `feature_flag` 如实记录运行暴露；开发交付与生产上线分别表述，按 RULE-025 在 AI 审查和必要验证通过后写入所属 readme、创建所需 VER 并关闭 CHG。禁止以未部署为由扣留已完成的开发交付，也禁止把未部署写成 `deployed-active`。
-- `history_retention` 由变更性质决定：`none` 仅用于内部且无制度影响的追踪；中等风险的规则或用户可见行为改动使用 `compact`；高风险/决策门槛改动使用 `full`。`compact` 也要在关闭前保留简短 `VER-*`，至少能恢复变更原因、影响面、基线、结果和回滚信息。
-- `decision_gate: required` 只用于 `recall_route: high`：跨模块、公共契约、数据迁移、兼容性、安全边界，或 adapter、全局开关、双读写/双真源、新抽象等会改变长期复杂度的选择。先在“决策检查点”给出当前事实和 A/B/C 取舍，再由用户或授权决策方确认当前版本。简单/中等事项中的需求矛盾仍必须咨询，只是不因咨询本身自动获得完整高风险表单和历史记录。
-- `decision_confirmed_by`、`decision_ref` 和 `decision_confirmed_at` 记录决策来源；它们不是 Git、文件、分支或部署权限。`decision_confirmed_by: self` 只能表示具备项目决策权的人明确作出选择，当前执行代理不能用它确认自己的建议。`owner` 记录协调责任，`changed_by` 记录实际修改人或代理。`governance_mode: personal` 允许 self 审查但必须保留外部治理引用；`collaborative` 的高风险通过性审查必须由非实施者完成，并由 `governance_ref` 指向真实 PR/CI/保护或审批控制，同时在本次 CHG 的 `governance_execution_ref` 填写实际 PR/CI/审批引用。`governance_evidence` 是责任人核验外部控制的证据，不是 Recall 自己证明权限生效。
-- `semantic_review_*` 只记录实施后的代码语义审查；personal 可由执行 AI 自审并用一行结论与证据代替完整字段组（RULE-025）。它必须独立核对当前代码、调用方、Schema、测试结果和运行证据，不能由用户确认、测试文件存在或静态审计代替。
-- `decision_gate: required` 的 CHG 必须在生效后创建不可变版本记录，保存最终议案快照、确认、实现、审查、验证和回滚信息；不能因关闭条目而丢失决策逻辑。
-- `logic_change.md` 只承担活跃变更的决策正文。高风险 CHG 在关闭前先创建 `VER-*`，必要时创建 ADR；随后由 `logic_readme.md` 的生效关键规则链接该记录，不能把活跃 CHG 当作长期引用目标。
-- 旧的 `approved`、`reviewed_by`/`review_ref` 和 `AUTH-*` 字段直接迁移到当前真实阶段的 `decision_*` 与 `semantic_review_*` 字段；不保留兼容字段、双状态或平行版本文件。
-- 同一 CHG-ID 的正文只能存在一处（所属账本）：触及宪法内容的立在根账本，领域事项立在该领域账本，跨领域正文放主领域、其余领域列入 `affected_scopes`。`affected_scopes` 列出全部受影响根登记 scope_path；领域账本中的 CHG 必含自身领域 scope_path 且不得含 `.`。
-- 本文件不提供实际权限控制；真实权限由 Git、CODEOWNERS、分支保护或外部系统承担。它适合单人或低并发小团队；频繁并行编辑、跨团队排队或组织级审批应转交 Issue、Spec、PR 或变更系统，CHG 只保留提炼和稳定引用。
+- 先按治理模式选择字段：personal 使用下方最小块；collaborative / 正式审查按 [字段词汇](field-vocabulary.md) 追加必要字段。
+- 创建位置、CHG 边界与公报按技能宪法 RULE-018；状态与晋升按 RULE-025 及 [生命周期](change-lifecycle.md)。所有活跃项写 `effective: false`。
+- medium/high 在实施前填写 `raw_request` / `decomposition` / `fit_analysis`；归档原样搬入 VER（RULE-014）。已有明确授权记录其来源，不重复索取同一确认。
+- 本条目的 scope、affected_scopes、proposal_path 与登记表对齐；需要 CHG 时先承接待办，再移除待办行（RULE-027）。
+- 填写实际基线、消费者、确认、验证和剩余动作；字段不提供文件、Git、服务或外部系统权限。
+- 关闭前更新所属 readme、固化所需 VER/index、清理本次工作区，再移除正文并核根公报（RULE-020/025）。
 
 ## 讨论主题索引
 
@@ -66,9 +100,7 @@
 
 本文件的正文行 `proposal_path` 指向本文件内对应的 `#chg-id` 小写锚点，且锚点在文件内唯一。根账本的索引同时是全项目公报：任何领域账本中的每个活跃 CHG 也在此占一行，`proposal_path` 写 `[CHG-...](logic_domains/<domain>/logic_change.md#chg-...)`，正文不复制；`recall validate` 提示缺少公报行的领域 CHG。领域账本的索引只列本领域正文。跨范围协调在同一 CHG 正文的 `affected_scopes`、`related_modules` 和影响表中说明，不另建正文或回链文件。
 
-普通追踪至少保留索引，以及正文中的 `status`、`effective`、`topic_id`、`proposal_revision`、决策门槛/状态、`owner`、`changed_by`、`scope`、`affected_scopes`、`intent_source_refs`、`intent_digest`、`intent_status`、`authority_surfaces`、`based_on`、依赖/冲突、运行暴露、历史保留级别、当前证据、拟议规则、验证/验收、回滚和开放问题；`medium`/`high` 条目另须保留 `raw_request`、`decomposition`、`fit_analysis`。下面的完整字段与矩阵只在用户明确要求正式审查或表单合规时全部填写。
-
-`governance_mode: personal` 的最小块（RULE-023，目标 15-40 行）：元数据只需 `status`、`effective: false`、`proposal_revision`、`recall_route`、`owner`、`changed_by`、`scope`，实施前补 `decision_confirmed_by` + `decision_confirmed_at`（`high` 建议再写 `decision_ref`）；正文保留目标、理由与当前证据、影响范围、`medium`/`high` 三字段、方案与决策、回滚、晋升目标。**要修改现有规则的议案必须写 `authority_surfaces: RULE-xxx`**：这是一法多议案检测的唯一依据——同一规则被多个活跃议案指向须互写 `conflicts_with` 并给出 `conflict_resolution`（后案 `supersede` 前案、或 `sequence-and-revalidate` 排序），规则在议案之后被修订（`last_reviewed` 更晚）时审计与 `recall conflicts` 提示重核 `based_on`。其余字段写了就会被审计器按完整规则校验（缺则不查、写则照查），见 references/field-vocabulary.md。
+字段口径和个人默认块见本文“personal 最小块”。扩展字段缺则按治理档位处理，填写后按实际值校验；不要把下方完整表单当成个人任务的默认必填清单。修改现行规则须写 `authority_surfaces`，同规则并行案须声明冲突关系，基线变化后重核。
 
 普通修复准备引入 adapter、全局 feature flag、dual-read/dual-write、平行真源或新抽象时，不需要补齐整份正式表单，但必须设为 `decision_gate: required`，并记录真实消费者/旧状态证据、最小修复不足的原因、唯一权威源、复杂度增量、负责人、可验证移除触发器和最晚复查日期。缺少这些信息时保持候选，不直接实现临时结构。
 
@@ -110,7 +142,7 @@
 - depends_on: none | <CHG-ID@revision-N；多个用 ; 分隔；关闭后改为 VER/ADR/基线引用>
 - conflicts_with: none | <CHG-ID 或精确 authority_surface；多个用 ; 分隔>
 - conflict_resolution: none | unresolved | merge | supersede | sequence-and-revalidate
-- history_retention: none | compact | full
+- history_retention: compact | full（旧none兼容读取；已有CHG关案至少保留精简VER）
 - runtime_state: not-implemented | implemented-unmerged | merged-not-deployed | deployed-guarded
 - runtime_environments: none | <实际 local/staging/prod/region；多个用 ; 分隔>
 - feature_flag: none | <FLAG:<稳定ID>=state；仅实际部署受开关控制时填写>
@@ -120,7 +152,8 @@
 - unblock_condition: <解除阻塞的可验证条件；非 blocked 填 none>
 - reserved_version_id: <VER-YYYYMMDD-NNN 或 none>
 - version_slug: <logic_version-YYYYMMDD-NNN-<scope> 或 none>
-- temp_path: <logic_version/working/<version_slug>/logic_temp.md；medium/high 必填（RULE-020 收尾台账），simple 填 none>
+- task_temp_dirs: <scratch_root/临时-具体功能；无则none，新任务台账内联>
+- temp_path: <仅旧任务兼容logic_version/working/<version_slug>/logic_temp.md；新任务省略>
 - docs_impact: <logic_readme 规则/代码地图/验证入口、logic_version/ADR 的 update/create/none + 原因>
 
 ### 当前状态、代码逻辑与差距
@@ -167,6 +200,8 @@
 - confirmation_result: <confirmed 时写选项、确认来源和版本；pending 时写 pending；not-required 时填 not-required>
 
 ### 方案与决策
+
+多轮记录沿用“personal 最小块”的一张修订表，关案搬入同一 VER；不再增加独立过程正文。
 
 | 方案 | 收益 | 风险/坏处 | 复杂度增量 | 状态 |
 |---|---|---|---|---|
@@ -240,7 +275,7 @@
 - `verifying`：AI 正在完成必要验证与语义审查，通过即执行晋升；缺陷继续修复，真实前置写明证据和解除动作。默认不等待真人体验（RULE-025）。
 - `promoting`：按 change-lifecycle.md 清单连续完成文档晋升、历史归档与关闭，不是新的人工审批门。
 - `blocked`：保留当前确认或待确认事实，并写清解除条件；不是无限期停车场。
-- `effective`：先重新核对 `based_on`、版本绑定依赖、冲突处理和实际运行暴露，再完成 AI 代码语义审查与必要验证（RULE-025）；对 `history_retention: compact` 或 `full` 的 CHG，先创建相应 `VER-*`，把 `intent_source_refs` 与可审计意图提炼原样固化；对高风险/`decision_record: required` 再保留完整决策快照、必要时 ADR 并更新索引，再更新所属 `logic_readme.md` 的受影响章节和关键规则链接。开发交付时即更新文档，明确实际适用环境与未验证限制；`deployed-active` 不得留在活跃 CHG；最后清理 `logic_temp` 并移除条目。
+- `effective`：仅作为已归档结论；活跃CHG仍为 `effective: false`。按[生命周期](change-lifecycle.md)步骤7–9更新现行制度、核对清理、定稿所需VER/index后移除条目。需求三字段、修订记录与最终意图保全，适用环境如实记录，已启用行为不得长期留在活跃账本。
 - `rejected` / `cancelled`：不得进入当前制度；如果已进行决策检查点，也创建不可变记录保留最终方案与拒绝/取消原因，然后清理临时记录并移除。
 - `rolled-back`：把当前制度恢复为实际状态，生成回滚记录，验证恢复路径，清理临时记录并移除。
 - 无活跃议案时保留 `active_changes: none`（审计器把 `0` 视为同义）。

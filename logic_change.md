@@ -12,15 +12,12 @@
 - governance_evidence: git:https://github.com/fuqiyue/recall@main
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
-- last_updated: 2026-10-11
+- last_updated: 2026-10-20
 - active_changes: 0
 
 ## 议案规则
 
-- 本文件所有条目默认 `effective: false`
-- 允许状态：draft | awaiting-decision | implementing | verifying | promoting | blocked
-- 个人小项目使用简化流程：draft -> implementing -> verifying -> promoting -> 关闭；AI 验证通过主动完成收尾（RULE-025）
-- 高风险修改使用决策流程：draft -> awaiting-decision -> implementing -> verifying -> promoting
+本账本保存全项目任务公报；新任务正文唯一位于logic_changes/<任务>/logic_change.md，旧根/领域正文兼容。状态与需求保全见根 RULE-014/018/025，操作见[生命周期](references/change-lifecycle.md)。所有活跃项保持 `effective: false`；已有授权沿用，不把空公报当作实施授权。
 
 ## 讨论主题索引
 
@@ -34,16 +31,5 @@
 | change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
 |---|---|---|---|---|---|---|---|
 
----
-
-**说明**：
-
-当需要追踪修改时，在此文件中创建 CHG 条目。完成后：
-1. 更新所属 `logic_readme.md`（宪法或领域，如规则变化）
-2. 按通道归档到 `logic_version/records/`（中等规则/行为变化保留精简 VER，高风险完整 VER）
-3. 把 CHG 的需求拆解三字段搬入 VER 记录后再删除 CHG 条目与根公报行（需求保全见 RULE-014；两级账本与公报见 RULE-018；操作步骤见 references/change-lifecycle.md 第 7-9 步）
-
-本账本只放修宪议案（改全局规则、意图层、范围登记表、INV）；领域事务的 CHG 立在 `logic_domains/<domain>/logic_change.md`，并在此处“活跃议案索引”登记一行指向领域账本。
-
-**记住**：logic_change.md 是临时的工作记录，不是长期真相源。
+已完成决定见[历史索引](logic_version/index.md)。
 

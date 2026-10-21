@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-10-11
+- last_updated: 2026-10-20
 - owner: self
 
 ## 关于逻辑回档
@@ -35,6 +35,11 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261020-002 | logic_version-20261020-002-task-revision-history | 2026-10-20 | effective | . | RULE-025, RULE-027 | 1 | 同任务修订表区分执行轮次和方案版本，关案保全至同一历史记录 | [记录](records/logic_version-20261020-002-task-revision-history.md) |
+| VER-20261020-001 | logic_version-20261020-001-workspace-task-governance | 2026-10-20 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-028, RULE-029 | 1 | 项目路径、目录地图、同任务正文与实际产物收尾核对 | [记录](records/logic_version-20261020-001-workspace-task-governance.md) |
+| VER-20261013-001 | logic_version-20261013-001-reliable-context | 2026-10-13 | effective | ., logic_domains/toolchain, logic_domains/git-pipeline | RULE-008, RULE-013, RULE-015, RULE-021, RULE-022, RULE-023, RULE-024, RULE-025 | 1 | 共享草稿口径、追加追溯、流程与阅读成本、Git诊断及Windows持续验证 | [记录](records/logic_version-20261013-001-reliable-context.md) |
+| VER-20261012-002 | logic_version-20261012-002-six-improvements | 2026-10-12 | effective | ., logic_domains/toolchain, references/ | RULE-021, RULE-022, RULE-023, RULE-025 | 1 | 定位防误写、个人模板、阅读成本、收尾顺序、根文件路由和可运行实例一致 | [记录](records/logic_version-20261012-002-six-improvements.md) |
+| VER-20261012-001 | logic_version-20261012-001-skill-document-clarity | 2026-10-12 | effective | ., references/ | RULE-022 | 1 | 技能定位、实施顺序、唯一真源与模板按需披露一致 | [记录](records/logic_version-20261012-001-skill-document-clarity.md) |
 | VER-20261011-003 | logic_version-20261011-003-maintenance-boundaries | 2026-10-11 | effective | ., logic_domains/toolchain | RULE-019, RULE-022 | none | 入口路径、审计边界、运行数据分类与宪法密度优化 | [记录](records/logic_version-20261011-003-maintenance-boundaries.md) |
 | VER-20260907-003 | logic_version-20260907-003-task-context | 2026-09-07 | effective | ., logic_domains/toolchain | RULE-014, RULE-018, RULE-022, RULE-027, RULE-028 | 1 | 任务上下文优先、下一步视图与派生公报 | [记录](records/logic_version-20260907-003-task-context.md) |
 | VER-20261011-001 | logic_version-20261011-001-cleanup-ai-delivery-closure | 2026-10-11 | correction | . | none | 1 | 勘误：清理 AI 自主交付案临时目录并关闭 CHG | [记录](records/logic_version-20261011-001-cleanup-ai-delivery-closure.md) |
@@ -88,3 +93,5 @@
 3. 让相关规则行的"决策记录"列链接该记录；宪法"有效决策索引"只滚动保留最近 3 条（RULE-002），`recall validate` 对既未被规则行链接、也不在宪法索引的生效记录告警
 4. 把 CHG 的需求拆解三字段搬入记录后再删除 CHG 条目（语义见 RULE-014，步骤见 references/change-lifecycle.md §7）
 
+
+| VER-20261013-002 | 2026-10-13 | effective | 工作台账及历史格式追加校验 | [记录](records/logic_version-20261013-002-worklog-schema-validation.md) | 本次源/文档SHA与实际验证；未混合提交共享工作树 |

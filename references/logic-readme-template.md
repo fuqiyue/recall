@@ -56,7 +56,7 @@
 - data_owner: <运行数据/外部系统的负责人；不适用填 none>
 - registry_status: registered | pending-review | retired
 
-“范围登记表”是新文件、新文件夹是否属于体系的第一依据，也是本项目的领域目录：每个 `in-system` 且 `doc_policy: paired` 的非根行产生一个领域的 `logic_domains/<domain>/logic_readme.md` + `logic_change.md`（RULE-018，至少一个）；其余行只定位代码和责任边界，不产生二级文档。
+“范围登记表”定位目录职责：新领域以 `in-system/readme-only` 登记 `logic_domains/<domain>/logic_readme.md`，旧paired领域兼容配对账本。至少一个领域，其余继承范围只定位代码和责任边界；新任务统一在logic_changes。
 
 ## 当前制度
 
@@ -79,6 +79,9 @@
 - layer_policy: <本项目采用的层分类和边界>
 - version_root: logic_version/
 - temp_root: logic_version/working/
+- workspace_root: .
+- scratch_root: .work/
+- data_roots: none
 - 子范围路由：<名称、职责、受影响章节锚点和代码路径>
 - unmapped_paths: <尚未纳入治理的路径及原因；没有填 none>
 
@@ -88,20 +91,13 @@
 |---|---|---|---|---|---|---|---|---|
 | MOD-ROOT | . | in-system | root/runtime-code | paired | [logic_readme.md](logic_readme.md) | [logic_change.md](logic_change.md) | ... | active |
 
-| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | paired | [<name>](logic_domains/<domain>/logic_readme.md) | [changes](logic_domains/<domain>/logic_change.md) | self | active |
+| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | readme-only | [<name>](logic_domains/<domain>/logic_readme.md) | none | self | active |
 | MOD-... | path/to/module | in-system | module/runtime-code | inherited | [root policy](logic_readme.md#scope-mod-example) | [active changes](logic_change.md) | ... | active |
 | EXT-... | path/to/vendor | dependency | dependency | inherited | none | none | ... | active |
 
-`doc_policy` 取值：根行固定 `paired`；领域行（`scope_type/layer: domain/runtime-code`）
-也是 `paired`——两列分别链接 `logic_domains/<domain>/logic_readme.md` 与同目录
-`logic_change.md`，领域文档字段见[领域文档模板](logic-domain-template.md)（RULE-018）。
-不单独成领域的小范围用 `inherited`（正文在根文档或所属领域文档的 `<a id="scope-...">`
-锚点小节，`logic_readme` 列链接带锚点）。`readme-only`（子文档 + `logic_change: none`）
-仅作存量兼容，工具仍接受但不再推荐，新拆分一律建 paired 领域。`logic_domains/`
-下未登记的文档为平行真源违规（INV-001/INV-002）。尚未补全文档的存量模块登记
-`status: pending-docs`（见项目接入流程）。
+`doc_policy`：根为paired；新领域为readme-only，logic_change列填none，任务由根公报指向logic_changes；旧paired领域继续兼容。其余继承范围用inherited。目录登记是职责边界，不按每个文件夹创建规则文档。
 
-`registry-every-folder` 只要求每个纳入体系的目录在本表中有记录和稳定锚点，不因此产生二级文档（二级文档只来自 paired 领域行）；机器检查该策略时需要完整目录扫描。`governed-boundaries` 只登记有独立职责、契约、数据或风险边界的范围。
+`registry-every-folder` 要求每个纳入体系的目录有记录和锚点，机器检查需完整扫描；`governed-boundaries` 只登记职责、契约、数据或风险边界。文件清单由inventory派生，不逐文件建规则文档。
 
 新增文件或文件夹时，先更新/核对此表：落在某领域 `owned_paths` 内的，补该领域文档的代码地图；形成新职权边界的，按 RULE-018 先在本表登记领域再建其两份文档，不创建未登记的二级文档。不单独成领域的 in-system 子范围使用显式稳定锚点，例如：
 
@@ -153,7 +149,7 @@
 
 文档策略约束：
 
-- `paired` 用于项目根与已登记领域：根行两条链接指向根 `logic_readme.md` 与根 `logic_change.md`，领域行指向 `logic_domains/<domain>/` 下的两份文件；每个项目至少一个领域行。
+- 根用paired；新领域用readme-only，旧paired兼容。至少一个领域；新任务正文统一在logic_changes，目录与台账操作见[工作路径与任务](workspace-tasks.md)。
 - 其余子范围标为 `inherited`，不得有本地 `logic_readme.md` 或 `logic_change.md`；其制度和议案入口是所属领域文档或根文件。external/generated/dependency 可写 none。
 
 ## 代码、生成物与运行数据边界
@@ -224,7 +220,7 @@ ADR（如有）登记在 `logic_version/index.md` 的"决策记录"表，由规�
 ## 活跃议案入口
 
 - 唯一入口：[logic_change.md](logic_change.md)
-- 相关 CHG-ID：<none 或 CHG-...；修宪议案正文在根账本，领域议案正文在所属领域账本，根账本公报每项一行>
+- 相关 CHG-ID：<none 或 CHG-...；正文在logic_changes任务文件，根公报每项一行>
 
 这里只放链接和 CHG-ID，不复制议案正文。
 
@@ -247,7 +243,7 @@ ADR（如有）登记在 `logic_version/index.md` 的"决策记录"表，由规�
 
 维护规则：
 
-- 仅保留已经生效的当前知识；尚未生效的内容进入所属账本（修宪案入根 logic_change.md，领域事项入领域账本），已结束内容进入 `logic_version/records/`。`intent_summary` 只保留长期有效的提炼结果，并经 `intent_sources` 追溯；不要复制原始聊天、Plan 或 Spec。
+- 仅保留已经生效的当前知识；尚未生效的内容进入所属账本（新任务入logic_changes，根change保留索引），已结束内容进入 `logic_version/records/`。`intent_summary` 只保留长期有效的提炼结果，并经 `intent_sources` 追溯；不要复制原始聊天、Plan 或 Spec。
 - 功能对目标环境实际启用时，在同一受控发布变更中更新本文件、必要的 `VER-*` 和索引，再从 `logic_change.md` 关闭对应 CHG；不能让已激活行为长期只留在议案中。
 - 一句 why 用于理解规则目的，不等同于过程性思考；关键规则的完整取舍链接具体 ADR 或 VER。变更期间先在 `logic_change.md` 记录，关闭前再固化为 VER，不能让已关闭 CHG 成为唯一依据。
 - last_verified 表示已对照代码、测试或运行环境核实，不能仅因编辑文档而更新。`review_trigger` 必须包含 `interval:<Nd|Nw|Nm|Ny>` 或 `due:YYYY-MM-DD`；审计器会将 `last_verified` 与每条规则的 `last_reviewed` 视为到期基线，并在过期时报告漂移。

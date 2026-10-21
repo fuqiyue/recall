@@ -2,7 +2,7 @@
 
 每个已结束且需要保留设计原因的变更生成一份不可变文件，集中放在项目根
 `logic_version/records/`。机器 ID 固定为 `VER-YYYYMMDD-NNN`；文件 slug 固定为
-`logic_version-YYYYMMDD-NNN-<scope>`。完成后语义内容不可静默改写（INV-003：
+`logic_version-YYYYMMDD-NNN-<scope>`。由关联CHG追踪的未完成文件是草稿，尚未归档；完成清理并定稿后语义内容不可静默改写（INV-003：
 唯一合法变更是受管理 hook 对 `after_commit` 占位符的一次性回填，RULE-013）。
 
 本文件是决策记录字段名的**唯一权威来源**（RULE-009）：`scripts/create_ver.py`
@@ -19,6 +19,7 @@
 ## 快速模板
 
 `personal` 治理模式（个人/小团队）的默认记录结构。
+早建文件保持 `immutable: false`，创建后补关联 `change_id`、`proposal_revision` 和CHG中的同一 `version_slug`；关联的活跃CHG是草稿依据。清理事实齐备后设 `immutable: true` 并登记索引，才作为已归档记录。既有未标immutable的历史仍按已归档处理。
 本块内不要嵌套 ``` 代码围栏：`scripts/create_ver.py` 以第一个独立的 ``` 行为块结束标记。
 
 ```markdown
@@ -29,6 +30,7 @@
 - version_id: VER-YYYYMMDD-NNN
 - version_slug: logic_version-YYYYMMDD-NNN-<scope>
 - status: effective
+- immutable: false
 - date: YYYY-MM-DD
 - change_id: none
 - before_commit: <before-commit-hash>
@@ -55,6 +57,10 @@
 
 **选中方案与原因**：
 <为什么选这个方案？权衡了什么？>
+
+## 修订记录
+
+<从 CHG 搬入已精简的修订表，保留轮次、日期、方案版本、原因与修改、涉及文件、结果/验证；无 CHG 填不适用，旧案缺记录如实说明，不补造。>
 
 ## 影响范围
 
@@ -92,12 +98,15 @@
 ```bash
 # 推荐：用 CLI 自动取号并按模板生成
 recall new "添加暗色模式支持" "add-dark-mode"
+# 从其他目录明确选目标（项目根须已存在logic_readme.md）
+recall new "添加暗色模式支持" "add-dark-mode" --project /path/to/project
 
 # 生成 logic_version/records/logic_version-20260808-001-add-dark-mode.md
 ```
 
-### 2. 实施并提交
+### 2. 实施、验证与定稿
 
+先按生命周期步骤7–8更新现行制度、执行清理并把真实结果写入草稿；定稿VER与索引后才关案。
 提交时在 commit message 中引用决策记录（`Ref: logic_version/records/<filename>.md`）。
 提交后无需手动操作：post-commit hook 解析 Ref 行（或同一提交内的规范命名记录），
 把 `- after_commit: _待填写_` 占位符自动回填为提交哈希（RULE-013）。
@@ -105,10 +114,12 @@ recall new "添加暗色模式支持" "add-dark-mode"
 
 ### 3. 归档议案
 
-归档语义见 RULE-014（需求保全与落选方案归档）；操作步骤见
+归档语义见 RULE-014/025/027（需求、修订过程与落选方案保全）；操作步骤见
 [变更与决策生命周期](change-lifecycle.md) 第 7-9 步。
 
 ---
+
+先交付后提交且已定稿的记录，通过[追加追溯](git-sync.md#先交付后提交的追加追溯)补链，不能覆盖原记录的 `after_commit: none`。
 
 ## 字段说明（最小集）
 
@@ -224,6 +235,10 @@ recall new "添加暗色模式支持" "add-dark-mode"
 - compatibility_and_exit: <旧状态证据、迁移/适配/开关策略、唯一权威源和退出条件>
 - acceptance_and_rollback: <验收、测试、运行观察和回滚路径>
 
+## 修订记录
+
+<从同一 CHG 搬入修订表，沿用快速模板要求；只记录简短事实和决策变化，不附逐轮全文或失效临时路径。>
+
 ## 变更摘要
 
 - before: <结束前的规则或行为>
@@ -280,7 +295,7 @@ recall new "添加暗色模式支持" "add-dark-mode"
 
 ## 维护规则
 
-- 每次结束事件单独建文件，不把所有历史追加到一份巨型台账。
+- 每次结束事件单独建文件；同一任务多轮修订归入该文件，不逐轮创建 VER，也不把所有任务历史追加到一份巨型台账。
 - `decision_record: required` 时，`decision_state: confirmed` 必须绑定 `proposal_revision`，并且代码语义审查必须 `passed`；未实施即拒绝/取消时可以标记 `not-confirmed` 或 `not-applicable`，但要在最终议案快照说明原因。
 - `decision_record: required` 时，`intent_source_refs`、`intent_digest`、`intent_status`、`intent_distilled_by` 和 `intent_distilled_at` 必须可审计；`inferred` 或 `mixed` 不可写成用户已确认的要求。
 - `governance_mode: personal` 允许 `semantic_reviewed_by: self`，但 `governance_ref` 与 `after_commit`/发布证据必须能追溯。`collaborative` 的有效高风险记录必须有非 `changed_by` 的通过性语义审查人、执行级 PR/CI/审批引用和可追溯治理证据；模板和审计只能核对证据，不能替代该平台的权限执行。
@@ -289,4 +304,8 @@ recall new "添加暗色模式支持" "add-dark-mode"
 - `recall_route` 保留本次采用的分析深度。高风险记录应列出全部 `promoted_rule_ids`，使后续从现行规则可以反向找到本记录；普通局部改动可填 `none`。
 - 勘误通过新建 `status: correction` 的记录完成；新记录指向原记录，原记录保持不可变，集中索引同时列出两者。
 - 这是历史决策记录，不是旧源码、旧 README 或运行数据副本。旧源码交给 Git；确需快照时进入根 `logic_version/backups/`。
-- 格式化、变量改名或无制度影响的内部修改不生成记录；交付时报告 `docs_impact: none`。
+- 未建CHG的格式化、变量改名或无制度影响的simple修改不生成记录；已有CHG按RULE-025保全精简历史。
+
+## 已归档记录的格式补充
+
+原记录缺标准章节或可核实控制字段时，另建符合本模板的记录：status: correction、immutable: true、corrects: 原VER-ID，并用corrected_record_sha256绑定原文件的完整字节SHA256。正文用一个 `recall-schema-supplement` 围栏保存补充字段和章节；补充描述只引用实际来源，不补造当时验证或实施日期。校验器核纠正记录自己的完整schema、唯一目标和原SHA后，仅将此块用于原记录的格式检查。错目标、原字节变化、草稿或缺少自身章节均报错；原记录、业务事实和原提交证据不改写。正常记录及提交关联仍沿原有校验。

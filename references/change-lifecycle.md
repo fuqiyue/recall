@@ -2,7 +2,7 @@
 
 只有真正需要决策的变更才走完整流程。简单、局部且没有实质方案选择的修复不必创建 CHG 或历史记录。
 
-**一旦创建了需要决策的 CHG，确认和不可变记录不能省略。**
+**已创建 CHG 的任务，结束时须保全简短修订与结论；决策确认按已有授权及实际决策门槛执行。**
 
 交付判据见技能宪法 [RULE-025](../logic_readme.md)：personal 默认由 AI 完成审查、必要验证与关案。当前用户请求已经明确授权的方案直接记录该来源，不为同一个决定再索取确认。
 
@@ -39,35 +39,37 @@ AI 完成验证后立即进入文档晋升窗口；源码/本地交付不要求�
 
 ### 晋升检查清单
 
+顺序为：更新readme与待定稿VER的链接 → 核对并执行清理 → 定稿VER及索引 → 移除CHG并核公报。实施前可用 `recall new` 预留ID、创建草稿；草稿保持immutable:false，关联CHG/revision/同一slug，尚未归档，不代表已交付。
+
 CHG 进入 `promoting` 时建立以下清单：
 
 - [ ] AI 语义审查与必要本地/受控验证已通过，结论与证据已记录
 - [ ] 交付范围与真实部署/开关状态已核对；未上线、真机未测等边界据实保留（RULE-025）
 - [ ] 所属 `logic_readme.md`（宪法或领域）最终规则已写入，旧规则已删除
-- [ ] 按通道所需的 `VER-*` 已创建（ADR 按需）
+- [ ] 关键规则已链接到本次预留的 `VER-*` / ADR
+- [ ] `recall workspace --closing CHG-ID` 核台账与真实文件；临时代码目录和旧working目录已删除，清理结果提炼到CHG
+- [ ] `VER-*` 已保全需求三字段、修订表与最终结论，轮次/最终版本/结果及引用核对完成；真实清理结果齐备后定稿（ADR按需）
 - [ ] `logic_version/index.md` 索引行已添加
-- [ ] 关键规则已链接到 `VER-*` / ADR
-- [ ] `logic_temp.md` 工作区产物台账已清零（`delete` 项均已删除、无 `pending`），随后整个 working 目录已删除（RULE-020）
 - [ ] 可以从所属账本移除 CHG 条目，并删除根账本公报中的对应行
 
 全部完成后执行关闭动作：从所属 `logic_change.md` 移除该 CHG，并删除根账本公报行。
 
 ### 中断恢复
 
-会话恢复时若发现 CHG 停在 `promoting`，读取其清单，继续未完成项。
+会话恢复时若发现 CHG 停在 `promoting`，读取其清单及实际文件，继续未完成项。已有readme变更无需重复实施；VER草稿补齐事实、清理后设immutable:true并定稿，已定稿VER只核对不改写，新增纠正另建记录。
 
 ## 完整生命周期（9 步）
 
 ### 1. 写议案
 
-在所属账本（领域事项写该领域的 `logic_domains/<domain>/logic_change.md`，修宪案写根 `logic_change.md`；RULE-018）同一 `CHG-ID` 内写出，并在根账本的全项目活跃议案索引加一行（领域 CHG 的 `proposal_path` 指向领域账本锚点）：
+在 `logic_changes/<任务>/logic_change.md` 的同一 `CHG-ID` 内写出，以 scope/affected_scopes 关联领域；根公报的 proposal_path 指向任务锚点。同任务修改原文件，旧账本可在本任务迁移时更新引用，不复制正文：
 
 - `proposal_revision`
 - 当前事实、方案取舍
 - 精确 `authority_surfaces`、`based_on`
 - 依赖/冲突、运行暴露、历史保留级别、`docs_impact`
 
-`governance_mode: personal` 只强制前两项加 `recall_route`/`changed_by`，其余字段缺则不查、写则照查（RULE-023；最小块见 references/logic-change-template.md）。实质性修改方案、影响面、基线或协调关系时递增版本。
+personal 的块级必填、确认与账本结构要求统一见[个人最小块](logic-change-template.md#personal-最小块)；authority_surfaces 等条件字段按 RULE-023 缺则不查、写则照查。实质性修改方案、影响面、基线或协调关系时递增版本；执行轮次独立记录，普通实现修复不因此升版，见[多轮修订](workspace-tasks.md#多轮修订)。
 
 ### 2. 获得确认
 
@@ -95,7 +97,7 @@ CHG 进入 `promoting` 时建立以下清单：
 
 ### 4. 实施
 
-实施已确认且基线仍有效的方案，记录实际运行环境与开关暴露。
+实施已确认且基线仍有效的方案，记录实际运行环境与开关暴露；在任务正文的修订表追加有意义的修改和验证节点，更新当前计划及下一步，不复制逐轮正文。
 
 ### 5. 代码语义审查
 
@@ -115,17 +117,7 @@ CHG 进入 `promoting` 时建立以下清单：
 
 审查与必要验证通过且无未决设计/实质阻塞后，AI 主动将 CHG 转为 `promoting`，建立并执行晋升检查清单，不以“等用户看一下”为结束回复（RULE-025）。
 
-### 7. 创建历史记录
-
-对使用决策检查点或 `history_retention: full` 的 CHG 创建完整 `logic_version/records/logic_version-YYYYMMDD-NNN-<scope>.md`；对 `history_retention: compact` 的中等行为/规则变更创建精简记录。
-
-两者都更新 `logic_version/index.md`，长期跨范围约束按需创建 ADR。
-
-创建记录时复制最终 `intent_traceability`，并把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 原样搬入记录（需求保全：CHG 关闭后即删除，需求拆解必须落在不可变记录中，否则只剩 git 考古可查）；若关闭的是主题最后一个 CHG，同时固化四个 `topic_*` 共享快照字段。同议题多方案竞争时，落选方案的需求原文与否决原因随胜出记录的方案分析归档；曾独立立案的落选 CHG 创建 `status: rejected` 的精简 `VER-*` 并同样搬运三字段。
-
-协作治理还要记录已核验的控制证据和本次执行引用。
-
-### 8. 更新现行制度
+### 7. 更新现行制度
 
 开发交付验证通过后，在本次交付变更中：
 
@@ -136,17 +128,33 @@ CHG 进入 `promoting` 时建立以下清单：
 
 无需等生产启用再交付；生产确已启用时不能把 `deployed-active` 长期留给未关闭 CHG。上线本身若是当前任务目标，继续完成获授权的发布步骤或记录真实外部前置，不能只关开发案就宣称整个上线任务完成。
 
+### 8. 清理与定稿历史记录
+
+先核正文台账无 pending、delete已逐项执行，运行 `recall workspace --closing CHG-ID` 对照实物；临时代码和空目录删除，必要代码/证据先晋升正式位置，旧working目录一并退出。提炼真实清理结果后定稿VER；未建CHG且无需VER的simple修改在最终汇报保留结果。加入.gitignore不等于清理。
+
+对使用决策检查点或 `history_retention: full` 的 CHG 定稿完整 `logic_version/records/logic_version-YYYYMMDD-NNN-<scope>.md`；对 `history_retention: compact` 的中等行为/规则变更定稿精简记录。
+
+两者都更新 `logic_version/index.md`，长期跨范围约束按需创建 ADR。
+
+将 CHG 中已精简的“修订记录”原样搬入同一 VER；取消、否决的任务也保留已有修改及结束原因。删除任务正文前逐行核对轮次、日期、方案版本、原因、涉及文件和结果，最终方案版本须与记录控制一致；旧案缺失过程如实说明，不补造。修订表中的相对链接随归档位置调整，不能只指向将被删除的任务或临时文件。已有 CHG 即使只需简短历史，也用一份精简 VER 保全记录；未建 CHG 的 simple 修改不新增记录要求。
+
+创建记录时复制最终 `intent_traceability`，并把 CHG 的 `raw_request`/`decomposition`/`fit_analysis` 原样搬入记录（需求保全：CHG 关闭后即删除，需求拆解必须落在不可变记录中，否则只剩 git 考古可查）；若关闭的是主题最后一个 CHG，同时固化四个 `topic_*` 共享快照字段。同议题多方案竞争时，落选方案的需求原文与否决原因随胜出记录的方案分析归档；曾独立立案的落选 CHG 创建 `status: rejected` 的精简 `VER-*` 并同样搬运三字段。
+
+协作治理还要记录已核验的控制证据和本次执行引用。
+
 ### 9. 关闭 CHG
 
-最后从所属账本移除已结束条目，并删除根账本公报中的对应行。移除前先核对 `logic_temp.md` 的工作区产物台账已清零（RULE-020：`delete` 项全部执行、无 `pending`），再删除整个 working 目录，并把结果写入 `VER-*` 的 `logic_temp_cleanup`。
+最后移除已结束任务正文及空任务目录，并用 `recall index --write` 更新根公报。旧混合账本只移除对应CHG。移除前核步骤8的清理证据与已定稿VER、索引均就位；不得在关案后修改已归档VER以补写尚未发生的清理。
 
 回滚时先让所属 `logic_readme.md` 反映实际恢复状态，再记录回滚结论和后续限制。
 
 ### 交付后的反馈与旧案清理
 
-按 RULE-025，人工后测发现问题时，在原所属 `logic_change.md` 新增 CHG-ID，并引用原 VER 与复现证据；不创建第二个账本，不重开已关闭 CHG 或改写历史。简单修复仍走简单通道。
+按 RULE-025，人工后测发现问题且需要立案时，在新的任务目录创建 CHG-ID，引用原 VER 与复现证据；不重开已关闭 CHG 或改写历史。简单修复仍走简单通道。
 
 清理旧 verifying 项时逐项核对当前实现和验证证据：满足交付条件就执行步骤 6–9；仅余真人体验或上线取证的限制写入现行规则的环境说明和 VER，已有发布任务可链接，不另造“等待人工”的影子 CHG 队列。确有缺陷、必要验证失败、未完成实现或明确授权前置则继续处理，不批量改成通过。上游关闭后复核下游基线并改绑 VER/现行规则；纯文书等待不能替代真实依赖判断。
+
+中等修改与中断恢复的实例见[三个操作示例](practical-examples.md)。
 
 ## CHG 边界
 

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from datetime import date, timedelta
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -57,6 +58,9 @@ RECALL_AGENT_CONFIG_ROOT: <project-root>/{config_root}
 
 INHERITED_APP_ROW = "| MOD-APP | src | in-system | module/runtime-code | inherited | [app policy](logic_readme.md#scope-mod-app) | [changes](logic_change.md) | self | active |"
 
+# 普通夹具使用相对运行日期的截止日；时效用例显式设置周期，保留固定的规则/议案基线。
+FIXTURE_REVIEW_TRIGGER = f"due:{(date.today() + timedelta(days=90)).isoformat()}; event:release"
+
 # 默认夹具自带的领域行：RULE-018 ④ 要求至少一个领域，否则 current-state 门失败（VER-20260904-005）
 CORE_DOMAIN_ROW = "| MOD-CORE | logic_domains/core | in-system | domain/runtime-code | paired | [core](logic_domains/core/logic_readme.md) | [changes](logic_domains/core/logic_change.md) | self | active |"
 
@@ -89,7 +93,7 @@ def child_readme(policy: str = "readme-only") -> str:
 - governance_verified_at: 2026-07-22
 - effective_from: 2026-07-22
 - last_verified: 2026-07-22
-- review_trigger: interval:90d; event:release
+- review_trigger: {FIXTURE_REVIEW_TRIGGER}
 - source_of_truth: src/app.py
 - source_decisions: none
 - intent_summary: keep the app module logic discoverable
@@ -154,7 +158,7 @@ def root_readme(
 - governance_verified_at: 2026-07-22
 - effective_from: 2026-07-22
 - last_verified: 2026-07-22
-- review_trigger: interval:90d; event:release
+- review_trigger: {FIXTURE_REVIEW_TRIGGER}
 - source_of_truth: src/app.py
 - source_decisions: none
 - intent_summary: keep current project logic discoverable
@@ -578,7 +582,7 @@ DOMAIN_GAZETTE_ROW = (
 
 def core_domain_readme() -> str:
     """默认夹具的 core 领域 readme（最小部门法）。"""
-    return """# Core Domain Logic
+    return f"""# Core Domain Logic
 
 ## 文档控制
 
@@ -600,7 +604,7 @@ def core_domain_readme() -> str:
 - governance_verified_at: 2026-07-22
 - effective_from: 2026-07-22
 - last_verified: 2026-07-22
-- review_trigger: interval:90d; event:release
+- review_trigger: {FIXTURE_REVIEW_TRIGGER}
 - source_of_truth: src/core
 - source_decisions: none
 - intent_summary: keep the core module logic discoverable
@@ -1116,16 +1120,20 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
         self.assertTrue(self.fails(report))
 
     def test_stale_policy_review_interval_fails_current_state(self) -> None:
+        stale_date = (date.today() - timedelta(days=91)).isoformat()
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             self.write_project(root)
             readme = (root / "logic_readme.md").read_text(encoding="utf-8")
             readme = readme.replace(
                 "- last_verified: 2026-07-22",
-                "- last_verified: 2025-01-01",
+                f"- last_verified: {stale_date}",
             ).replace(
                 "| valid | 2026-07-22 | self |",
-                "| valid | 2025-01-01 | self |",
+                f"| valid | {stale_date} | self |",
+            ).replace(
+                f"- review_trigger: {FIXTURE_REVIEW_TRIGGER}",
+                "- review_trigger: interval:90d; event:release",
             )
             (root / "logic_readme.md").write_text(readme, encoding="utf-8")
             report = self.collect(root)
@@ -2388,6 +2396,13 @@ class RootOnlyAuditTests(ProjectFixtureMixin, unittest.TestCase):
 
     def test_review_freshness_accepts_current_interval_and_rejects_expiry(self) -> None:
         today = AUDIT.date(2026, 7, 24)
+        # 到期日当天仍有效，次日必须报告过期；不依赖测试运行时的系统日期。
+        for check_day, expired in ((AUDIT.date(2026, 10, 20), False), (AUDIT.date(2026, 10, 21), True)):
+            with self.subTest(today=check_day):
+                issues = AUDIT.review_freshness_issues(
+                    "2026-07-22", "interval:90d; event:release", label="rule", today=check_day
+                )
+                self.assertEqual(bool(issues), expired)
         self.assertFalse(
             AUDIT.review_freshness_issues(
                 "2026-07-22", "interval:90d; event:release", label="rule", today=today

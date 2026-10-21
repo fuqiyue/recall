@@ -17,7 +17,7 @@
 
 ## 议案规则
 
-- 本账本只放 Git 管道领域一事一议的 CHG 正文；触及宪法（根规则、意图层、范围登记表、INV）的议案写在根 `logic_change.md`（RULE-018）。每条 CHG 同时在根账本"活跃议案索引"登记一行。字段与状态机见 references/logic-change-template.md，所有条目默认 `effective: false`
+旧领域账本兼容入口；新任务正文写入logic_changes/任务/logic_change.md，并由根公报索引。现行规则只在领域readme，操作见根RULE-018及任务模板。
 
 ## 讨论主题索引
 

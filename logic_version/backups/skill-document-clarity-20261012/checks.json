@@ -1,0 +1,243 @@
+{
+  "phase": "read-only staged validation",
+  "audit_summary": {
+    "candidate_directories": 9,
+    "skipped_directories": 3,
+    "logic_readmes": 3,
+    "logic_changes": 3,
+    "version_records": 0,
+    "decision_records": 0,
+    "missing_map_candidates": 0,
+    "runtime_data_candidates": 0,
+    "malformed_current_docs": 0,
+    "v2_document_gaps": 0,
+    "module_binding_issues": 0,
+    "module_route_issues": 0,
+    "logic_temp_records": 0,
+    "logic_temp_issues": 0,
+    "test_files": 6,
+    "test_matrix_issues": 0,
+    "broken_links": 0,
+    "misplaced_history": 0,
+    "agent_entrypoint_issues": 0,
+    "missing_required_agent_entries": 0,
+    "missing_default_agent_entry": 0,
+    "current_integrity_issues": 0,
+    "formal_review_issues": 0,
+    "density_issues": 0,
+    "private_agent_knowledge_files": 0,
+    "private_agent_knowledge_candidates": 0,
+    "duplicate_change_ids": 0,
+    "unindexed_module_changes": 0,
+    "unknown_root_change_ids": 0,
+    "closed_changes_still_active": 0,
+    "parallel_current_candidates": 0,
+    "nonroot_current_documents": 0,
+    "misplaced_logic_temp": 0
+  },
+  "density": {
+    "issues": [],
+    "notices": [],
+    "limits_checked": [
+      "SKILL.md",
+      "logic_readme.md",
+      "logic_change.md",
+      "logic_domains/git-pipeline/logic_readme.md",
+      "logic_domains/toolchain/logic_readme.md"
+    ]
+  },
+  "validate_errors": [],
+  "validate_warnings": [
+    "⚠️  logic_version-20261012-001-skill-document-clarity.md 未关联 Git commit",
+    "⚠️  Git 不可用或未安装"
+  ],
+  "index_consistent": true,
+  "active_cases": 0,
+  "semantic_review": "passed: target/authority/depth/requirements-before-implementation/single-rule-source/schema/history/closure",
+  "application": {
+    "files": [
+      "SKILL.md",
+      "logic_readme.md",
+      "logic_change.md",
+      "README.md",
+      "references/logic-change-template.md",
+      "references/document-model.md",
+      "logic_version/index.md"
+    ],
+    "sha256": {
+      "SKILL.md": "5ea56aad1ed9c81cce74b35b86ddfa80c35be39daff85f20bc269550cb3d7cdd",
+      "logic_readme.md": "6430949e1190cfaa4198e52c72e064017287c9a88d3430d112e8ff943fb37440",
+      "logic_change.md": "07753e37404278ed51849287c259af2100121f36e739829ead3066ddf18acbe5",
+      "README.md": "149f59cc0bda1f2b4f765fb97223c7bab5072b02610cf301d29ffc6f8c4d222e",
+      "references/logic-change-template.md": "33482df68bf96238fb0f117cac5efd5e18a0f151a53ee3cbe8def85fb48679f9",
+      "references/document-model.md": "ef664346af4e15a3b8ffc802fb1c50117380ebdaaa02ff039bd61948569635ba",
+      "logic_version/index.md": "aca7b608fe46302d8e418b773b24ef6629628675843e41bbdb3eba176fa83f37"
+    },
+    "old_records_unchanged": 30,
+    "working_cleanup": "one own temp file and empty directory removed",
+    "quick_validate": "passed with isolated PyYAML 6.0.3",
+    "committed_or_pushed": false
+  },
+  "metrics": [
+    {
+      "path": "SKILL.md",
+      "changed": true,
+      "before_bytes": 6164,
+      "after_bytes": 5998,
+      "before_lines": 73,
+      "after_lines": 74
+    },
+    {
+      "path": "logic_readme.md",
+      "changed": true,
+      "before_bytes": 30574,
+      "after_bytes": 30664,
+      "before_lines": 149,
+      "after_lines": 149
+    },
+    {
+      "path": "logic_change.md",
+      "changed": true,
+      "before_bytes": 2017,
+      "after_bytes": 1313,
+      "before_lines": 49,
+      "after_lines": 34
+    },
+    {
+      "path": "README.md",
+      "changed": true,
+      "before_bytes": 3040,
+      "after_bytes": 3348,
+      "before_lines": 63,
+      "after_lines": 66
+    },
+    {
+      "path": "references/logic-change-template.md",
+      "changed": true,
+      "before_bytes": 26449,
+      "after_bytes": 18899,
+      "before_lines": 247,
+      "after_lines": 230
+    },
+    {
+      "path": "references/document-model.md",
+      "changed": true,
+      "before_bytes": 9481,
+      "after_bytes": 9533,
+      "before_lines": 74,
+      "after_lines": 74
+    },
+    {
+      "path": "logic_version/index.md",
+      "changed": false,
+      "before_bytes": 14830,
+      "after_bytes": 14830,
+      "before_lines": 90,
+      "after_lines": 90
+    }
+  ],
+  "final_validation": {
+    "actual_commands": [
+      {
+        "name": "audit",
+        "exit_code": 0,
+        "output": {
+          "summary": {
+            "candidate_directories": 9,
+            "skipped_directories": 3,
+            "logic_readmes": 3,
+            "logic_changes": 3,
+            "version_records": 0,
+            "decision_records": 0,
+            "missing_map_candidates": 0,
+            "runtime_data_candidates": 0,
+            "malformed_current_docs": 0,
+            "v2_document_gaps": 0,
+            "module_binding_issues": 0,
+            "module_route_issues": 0,
+            "logic_temp_records": 0,
+            "logic_temp_issues": 0,
+            "test_files": 6,
+            "test_matrix_issues": 0,
+            "broken_links": 0,
+            "misplaced_history": 0,
+            "agent_entrypoint_issues": 0,
+            "missing_required_agent_entries": 0,
+            "missing_default_agent_entry": 0,
+            "current_integrity_issues": 0,
+            "formal_review_issues": 0,
+            "density_issues": 0,
+            "private_agent_knowledge_files": 0,
+            "private_agent_knowledge_candidates": 0,
+            "duplicate_change_ids": 0,
+            "unindexed_module_changes": 0,
+            "unknown_root_change_ids": 0,
+            "closed_changes_still_active": 0,
+            "parallel_current_candidates": 0,
+            "nonroot_current_documents": 0,
+            "misplaced_logic_temp": 0
+          },
+          "density": {
+            "issues": [],
+            "notices": [],
+            "limits_checked": [
+              "SKILL.md",
+              "logic_readme.md",
+              "logic_change.md",
+              "logic_domains/git-pipeline/logic_readme.md",
+              "logic_domains/toolchain/logic_readme.md"
+            ]
+          }
+        }
+      },
+      {
+        "name": "validate",
+        "exit_code": 0,
+        "output": "\r\n🔍 开始验证 Recall 系统一致性...\r\n\r\n\r\n============================================================\r\n📋 Recall 验证报告\r\n============================================================\r\n\r\n🟡 警告 (建议修复):\r\n  ⚠️  logic_version-20261012-001-skill-document-clarity.md 未关联 Git commit\r\n  ⚠️  Git 不可用或未安装\r\n\r\n🔵 信息:\r\n  ℹ️  找到 28 条规则定义（含 2 份已登记子文档）\r\n  ℹ️  功能意图层（logic_readme.md）: 15 个 INT、5 条 FLOW 校验完成\r\n  ℹ️  在 3 份议案账本中找到 0 个变更议案（含 2 份领域账本）\r\n  ℹ️  在 logic_version/records/ 中找到 30 个决策记录\r\n\r\n✅ 没有错误，但有一些警告需要注意。\r\n\r\n"
+      },
+      {
+        "name": "index",
+        "exit_code": 0,
+        "output": {
+          "consistent": true
+        }
+      },
+      {
+        "name": "next",
+        "exit_code": 0,
+        "output": {
+          "counts": {
+            "收尾": 0,
+            "进行中": 0,
+            "可做候选": 0,
+            "待决策": 0,
+            "阻塞": 0,
+            "待核对": 0,
+            "想法": 0
+          },
+          "warnings": []
+        }
+      },
+      {
+        "name": "route",
+        "exit_code": 0,
+        "output": "\r\n📚 Recall 读取清单（目标：references/logic-change-template.md）\r\n============================================================\r\n1. logic_readme.md  [宪法（一级 readme）]  150 行 ≈ 8894 token\r\n   理由：每个任务必读：全局规则、领域目录、功能意图\r\n2. logic_change.md  [修宪议案 + 全项目活跃议案索引]  35 行 ≈ 370 token\r\n   理由：必读：看是否有在办议案触及目标领域\r\n\r\n合计约 185 行 ≈ 9264 token\r\n\r\n🏛️  命中宪法直辖模块（inherited：无部门法，规则在宪法对应小节）：\r\n   • MOD-TEMPLATES (references) ← references/logic-change-template.md；读 logic_readme.md#scope-mod-templates\r\n\r\n"
+      },
+      {
+        "name": "skill",
+        "exit_code": 0,
+        "output": "Skill is valid!\r\n"
+      }
+    ],
+    "semantic_review": "passed: explicit target, user authority, ordered requirements, rule references, field schema, unique current source and history fidelity",
+    "validation_dependency": "PyYAML 6.0.3 installed only in scratch; removed at closure"
+  },
+  "verified_at_utc": "2026-10-12T12:20:25.207725+00:00",
+  "scratch_cleanup": {
+    "path": "C:\\Users\\FU\\Documents\\ChatGPT\\教材\\.tmp\\recall-skill-optimization",
+    "files": 84,
+    "directories": 21,
+    "disposition": "own scratch, rollback staging and isolated validation dependency deleted; empty own directories removed",
+    "other_task_files": "untouched"
+  }
+}

@@ -1,6 +1,6 @@
 # Git 自动同步与推送责任
 
-本文承载 SKILL.md 按需下沉的 Git 同步细节（RULE-022 按需披露）。权威语义是本技能目录 `logic_readme.md` 的 RULE-010 / RULE-011 / RULE-013：这些编号属于 Recall 工具自身，与消费项目 `logic_readme.md` 里的同名编号无关。需要初始化管道、排查同步或判断"谁负责推送"时再读。
+本文承载 SKILL.md 按需下沉的 Git 同步细节（RULE-022 按需披露）。权威语义是本技能 [Git管道部门法](../logic_domains/git-pipeline/logic_readme.md) 的 RULE-010 / RULE-011 / RULE-013：这些编号属于 Recall 工具自身，与消费项目 `logic_readme.md` 里的同名编号无关。需要初始化管道、排查同步或判断"谁负责推送"时再读。
 
 ## 自动同步是默认值，不是保证
 
@@ -32,3 +32,19 @@ post-commit hook 场景绝不自动提交其他脏文件（UXI-003）。
 ## 项目接入（文档初稿从哪来）
 
 `recall init` 只建 Git 管道，不生成文档内容。文档采用模块化渐进接入：接入时只建根骨架，存量模块登记为 `pending-docs`，此后按触发时机补全；AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目区分（RULE-016）。步骤见[项目接入流程](project-onboarding.md)。
+
+## 先交付后提交的追加追溯
+
+定稿时尚无实施提交，应诚实写 `after_commit: none` 并保留测试/文件校验等现有证据。它不是hook占位符，后续不能把原不可变记录改成SHA。
+
+真正提交后，先核该commit包含实际交付，再用 `recall new "追加已交付变更的提交关联" "commit-link"` 创建新的勘误记录。填 `status: correction`、`corrects: VER-原记录ID`、`after_commit: 实施提交SHA`，说明核对的文件与验证证据，保留原记录。按正常清理/定稿顺序设immutable:true并登记全量index；无CHG的简单补链将需求三字段填none，有CHG则保全原字段。
+
+`validate` 仅接受已归档且SHA在项目中有效的追加证据；活跃草稿、自指、不存在的目标或无效SHA均不能替代原记录的提交关联。`query commit` 可同时找到勘误及被补链的原决策。尚未提交时保留“未关联Git commit”提示，不把计划提交说成已发生。
+
+需要手动提交时，一次命令同时写标题与Ref，例如：
+
+```bash
+git commit -m "feat: 描述本次变更" -m "Ref: logic_version/records/<实际文件名>.md"
+```
+
+正常受管理hook仍只一次性回填模板占位符。Git检查失败时，status/validate保留具体原因；先判断仓库路径、工作树、权限或沙箱访问，再决定修复方式。

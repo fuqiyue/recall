@@ -250,7 +250,6 @@ class FunctionLengthGateTests(unittest.TestCase):
         ("scripts/recall_audit/report.py", "strict_failure"): 170,
         ("scripts/recall_audit/semantic.py", "semantic_issues"): 398,
         ("scripts/recall_audit/semantic.py", "audit_module"): 251,
-        ("scripts/validate.py", "validate_recall"): 170,
     }
 
     @staticmethod

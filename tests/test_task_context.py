@@ -27,6 +27,13 @@ def ledger(body=""):
 
 
 class TaskContextTests(unittest.TestCase):
+    def test_inline_empty_anchor_is_not_a_task_or_bulletin_title(self):
+        text = '## CHG-20260907-001: 具体任务 <a id="chg-20260907-001"></a>\n- status: implementing\n'
+        items = tasks.read_changes(text, 'logic_change.md')
+        self.assertEqual(items[0]['id'], 'CHG-20260907-001')
+        self.assertEqual(items[0]['title'], '具体任务')
+        self.assertNotIn('<a ', tasks.bulletin(items))
+
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="recall-task-test-")
         self.addCleanup(self.temp.cleanup)

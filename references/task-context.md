@@ -4,7 +4,7 @@
 
 ## 想法与已决定的待办
 
-在所属 `logic_change.md` 按需添加 `## 待办` 表。根公报仍只索引 CHG，待办由 `recall next` 跨已登记账本汇总。没有待办就不用创建空表。
+在根 `logic_change.md` 按需添加 `## 待办` 表。根公报只索引 CHG，待办由 `recall next` 跨账本汇总。启动后正文放 `logic_changes/<任务>/logic_change.md`；同任务的计划、进度、变更说明及产物台账在同一文件更新，见[工作路径与任务](workspace-tasks.md)。没有待办就不用创建空表。
 
 ```markdown
 ## 待办
@@ -45,4 +45,4 @@ CHG 可用以下既有/轻量字段补足接手信息；只在信息有用时写
 
 先检查输出再按需要写入。未知表头或重复 ID 会拒绝写入，避免覆盖人工正文；其他段落和领域账本不写。公报是派生索引，修改任务请编辑所属正文再生成公报。日期取正文的 `last_updated`、`last_status_change` 或决定日期，不伪造本次复核日期。
 
-运行 `recall validate` 与 `recall audit` 继续核查规则、链接与生命周期。公报一致不代表任务通过审查。旧 CHG 可直接使用，无需批量迁移或补齐新字段。
+运行 `recall validate` 与 `recall audit` 核查规则、链接、生命周期和实际产物，关案前运行 `recall workspace --closing CHG-ID`。公报一致不代表通过审查。旧 CHG 继续兼容；按任务迁移时保留ID、移动正文并改公报/历史草稿/临时台账回链。

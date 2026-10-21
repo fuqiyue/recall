@@ -21,8 +21,7 @@ import sys
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
-# Recall 自身的仓库根（skill 安装目录）；供 create_ver 等在 cwd 链上
-# 找不到 logic_readme.md 时回退。
+# Recall 自身的仓库根；用于集中部署的模板等技能资源，不是消费项目写入目标。
 SELF_ROOT = Path(__file__).resolve().parent.parent
 
 ROOT_MARKER = "logic_readme.md"
@@ -33,6 +32,12 @@ ROOT_MARKER = "logic_readme.md"
 # slug 型议案的三字段检查静默跳过（2026-09-03 eduai 实测）。
 CHANGE_ID_PATTERN = r"CHG-[A-Za-z0-9][A-Za-z0-9-]*"
 CHANGE_ID_RE = re.compile(rf"^{CHANGE_ID_PATTERN}$", re.IGNORECASE)
+
+
+def estimate_tokens(text: str) -> int:
+    """粗估上下文成本：CJK约1 token/字，其他约4字符/token；不是模型分词结果。"""
+    cjk = sum(1 for ch in text if ord(ch) >= 0x2E80)
+    return cjk + (len(text) - cjk) // 4
 
 
 def force_utf8_output() -> None:
@@ -58,8 +63,7 @@ def find_project_root(
     """从 ``start``（默认 cwd）向上查找含 ``logic_readme.md`` 的目录。
 
     找不到时返回 ``fallback``；未给 fallback 则返回起点本身。
-    ``create_ver`` 传 ``fallback=SELF_ROOT``：skill 被集中安装、用户在无
-    logic_readme.md 的目录运行时，记录应落回 Recall 自身而不是 cwd。
+    此函数只提供路径发现；写入方必须核项目标记，不把资源目录用作隐式目标。
     """
     origin = (start or Path.cwd()).resolve()
     current = origin
@@ -101,6 +105,24 @@ def run_git(
         (result.stdout or "").rstrip(),
         (result.stderr or "").rstrip(),
     )
+
+
+def describe_git_failure(error: str, operation: str = 'Git 检查') -> str:
+    detail = ' '.join(error.split()) or '命令未返回具体原因'
+    lowered = detail.casefold()
+    if any(mark in lowered for mark in ('permission denied', 'access is denied', 'winerror 5', 'errno 13', 'unsafe repository', 'dubious ownership')):
+        kind = '权限或沙箱限制'
+    elif 'not a git repository' in lowered:
+        kind = '目标不是 Git 仓库'
+    elif 'must be run in a work tree' in lowered:
+        kind = '无法访问工作树；请核对仓库类型、路径与沙箱访问'
+    elif 'timed out' in lowered or 'timeout' in lowered:
+        kind = '命令超时'
+    elif any(mark in lowered for mark in ('winerror 2', 'errno 2', 'not recognized', 'command not found')):
+        kind = 'Git 可执行文件或运行目录不存在'
+    else:
+        kind = '命令执行失败'
+    return f"{operation}失败（{kind}）：{detail}"
 
 
 def git_output(
@@ -289,11 +311,7 @@ def inherited_modules(root: Path) -> List[InheritedModule]:
 
 
 def change_ledgers(root: Path) -> List[Tuple[str, Path]]:
-    """全部议案账本：``[("logic_change.md", 根), ("logic_domains/x/logic_change.md", 领域), ...]``。
-
-    根账本承载修宪议案与全项目活跃议案索引；领域账本承载本领域一事一议的 CHG 正文。
-    只返回文件存在的账本。
-    """
+    """根公报、存量领域账本与 logic_changes/*/logic_change.md；只返回现有文件。"""
     ledgers: List[Tuple[str, Path]] = []
     root_change = root / "logic_change.md"
     if root_change.exists():
@@ -301,4 +319,6 @@ def change_ledgers(root: Path) -> List[Tuple[str, Path]]:
     for domain in registered_domains(root):
         if domain.change is not None and domain.change.exists():
             ledgers.append((f"{domain.scope_path}/logic_change.md", domain.change))
+    from workspace_paths import task_ledgers
+    ledgers.extend(task_ledgers(root))
     return ledgers

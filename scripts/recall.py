@@ -20,6 +20,7 @@ from recall_common import (  # noqa: E402  RULE-021：根查找/Git 调用/编�
     find_project_root,
     registered_domains,
     force_utf8_output,
+    describe_git_failure,
     run_git,
     unpushed_commit_count,
 )
@@ -80,8 +81,8 @@ def print_help():
     示例: recall sync --auto      # 恢复自动保存（默认）
     示例: recall sync --disable   # 完全关闭自动同步
 
-  new <描述> <短标签>
-    创建新的决策记录
+  new <描述> <短标签> [--project <项目根>]
+    在已定位的项目创建决策记录；缺项目文档失败，不退回技能目录
     示例: recall new "添加暗色模式" "dark-mode"
 
   query file <文件路径>
@@ -117,6 +118,15 @@ def print_help():
 
   index [--write] [--json]
     生成并核对根公报；仅 --write 写入派生表与根正文计数
+
+  inventory [目录 ...] [--data-root 资产库] [--write] [--json]
+    有界目录盘点；--write 更新 logic_domains 中可重建文件地图
+
+  path <项目相对路径> [--project 项目根]
+    写入前核对实际绝对路径，拒绝越界、重复项目根和链接路径
+
+  workspace [--closing CHG-ID] [--json]
+    核对任务台账与真实临时文件（含忽略文件），不自动删除
 
   conflicts
     检测规则间的潜在冲突
@@ -179,14 +189,11 @@ def cmd_new(args):
         print("示例: recall new \"添加暗色模式\" \"dark-mode\"")
         return 1
 
-    title = args[0]
-    scope = args[1]
-
     try:
         import create_ver
 
         # 路径解析（项目根、模板、输出目录）由 create_ver 内部完成
-        return create_ver.create_ver_record(title, scope)
+        return create_ver.main(args)
     except ImportError:
         print("❌ 错误: 找不到 create_ver.py")
         return 1
@@ -343,6 +350,10 @@ def cmd_status():
         if records_dir.exists():
             records = find_version_records(records_dir)
             print(f"📚 决策记录: {len(records)} 个文件")
+            from record_context import active_change_controls, version_record_state
+            controls = active_change_controls(root)
+            states = [version_record_state(path.read_text(encoding='utf-8'), path, controls) for path in records]
+            print(f"   活跃草稿: {states.count('draft')}；草稿关联待修复: {states.count('invalid-draft')}")
 
             # 显示最近 3 条：文件名自带日期和序号，按名字倒序比 mtime 稳定
             if records:
@@ -354,33 +365,28 @@ def cmd_status():
 
         # 检查 Git 状态（run_git 固定 utf-8：中文提交信息在 GBK 下曾让本命令崩溃）
         ok_log, last_commit, log_err = run_git(['log', '-1', '--format=%h %s'], cwd=root, timeout=5)
-        git_missing = not ok_log and any(
-            marker in log_err for marker in ('not recognized', 'No such file', 'WinError 2', 'Errno 2')
-        )
-        if git_missing:
-            print(f"\n🔖 Git: ⚠️  未安装或不可用")
+        if ok_log:
+            print(f"\n🔖 最近提交: {last_commit}")
         else:
-            if ok_log:
-                print(f"\n🔖 最近提交: {last_commit}")
-            else:
-                print(f"\n🔖 最近提交: ⚠️  无法读取")
-
-            ok_status, porcelain, _ = run_git(['status', '--porcelain'], cwd=root, timeout=5)
-            if ok_status:
-                tracked, untracked = classify_porcelain(porcelain)
-                if tracked:
-                    print(f"⚠️  未提交变更: {len(tracked)} 个已跟踪文件")
-                if untracked:
-                    # RULE-020：未跟踪文件单列，只提示不删除
-                    print(f"🧹 未跟踪文件（待处置候选，RULE-020 收尾归零）: {len(untracked)} 个")
-                    shown = untracked[:10]
-                    for path in shown:
-                        print(f"   • {path}")
-                    if len(untracked) > len(shown):
-                        print(f"   … 另 {len(untracked) - len(shown)} 个")
-                    print("   交付物请 git add；非交付物请删除或加入 .gitignore")
-                if not tracked and not untracked:
-                    print(f"✅ 工作区状态: 干净")
+            print("\n🔖 " + describe_git_failure(log_err, '最近提交读取'))
+        ok_status, porcelain, status_err = run_git(['status', '--porcelain'], cwd=root, timeout=5)
+        if not ok_status:
+            print("⚠️  " + describe_git_failure(status_err, 'Git 状态检查'))
+        else:
+            tracked, untracked = classify_porcelain(porcelain)
+            if tracked:
+                print(f"⚠️  未提交变更: {len(tracked)} 个已跟踪文件")
+            if untracked:
+                # RULE-020：未跟踪文件单列，只提示不删除
+                print(f"🧹 未跟踪文件（待处置候选，RULE-020 收尾归零）: {len(untracked)} 个")
+                shown = untracked[:10]
+                for path in shown:
+                    print(f"   • {path}")
+                if len(untracked) > len(shown):
+                    print(f"   … 另 {len(untracked) - len(shown)} 个")
+                print("   交付物请核对归属后 git add；非交付物请删除，加入 .gitignore 不等于清理")
+            if not tracked and not untracked:
+                print(f"✅ 工作区状态: 干净")
             unpushed_line = describe_unpushed(unpushed_commit_count(root))
             if unpushed_line:
                 print(unpushed_line)
@@ -456,7 +462,11 @@ def main():
     args = sys.argv[2:]
 
     import task_context
+    import workspace_cli
     commands = {
+        'inventory': lambda: workspace_cli.main(args, command='inventory'),
+        'path': lambda: workspace_cli.main(args, command='path'),
+        'workspace': lambda: workspace_cli.main(args, command='workspace'),
         'next': lambda: task_context.main(args),
         'index': lambda: task_context.main(args, command='index'),
         'init': lambda: cmd_init(args),

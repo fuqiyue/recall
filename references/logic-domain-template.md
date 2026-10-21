@@ -1,18 +1,18 @@
 # 领域文档模板（logic_domains/<domain>/）
 
-二级文档（部门法）模板，对应 RULE-018 一二级拆分法。一个领域 = `logic_domains/<domain>/logic_readme.md` + `logic_domains/<domain>/logic_change.md` 一对文件，并以 `doc_policy: paired` 登记在宪法（根 `logic_readme.md`）的范围登记表。未登记即平行真源（INV-001/INV-002），审计拒绝。宪法模板见 [logic_readme 模板](logic-readme-template.md)，根账本模板见 [logic_change 模板](logic-change-template.md)。
+领域只记录现行规则和代码地图，对应 RULE-018；新领域 `logic_domains/<domain>/logic_readme.md` 以 `doc_policy: readme-only` 登记，任务集中在 `logic_changes/`。可重建文件清单由 `recall inventory --write` 生成到领域 `file_map.md`。旧paired领域仍兼容，迁移时不复制任务正文。模板见[根文档](logic-readme-template.md)及[任务](logic-change-template.md)。
 
 ## 何时新建 / 拆分 / 合并领域
 
 - **新建**：接入时至少一个领域（小项目用 `logic_domains/core/` 覆盖全部代码即可）；出现独立职权路径、独立发布节奏或团队边界时再增。
 - **拆分（大部门拆小部门）**：领域 readme 越过目标 250 行（Density 段 `over-target` 提示）且压缩后仍不足，或某组规则/代码地图行明显自成一块。拆出的新领域接管一部分 `owned_paths`，原领域相应收窄。
 - **合并**：两个领域规则都很少、职权路径频繁一起改动时，合回一个大部门。
-- 三者都是修宪案：在根 `logic_change.md` 立 CHG，改登记表行，再动领域文件；步骤见[项目接入流程](project-onboarding.md)的"领域划分与拆分"。
+- 三者都是修宪案：在唯一任务文件立 CHG 并登记根公报，改登记表行，再动领域文件；步骤见[项目接入流程](project-onboarding.md)的"领域划分与拆分"。
 
 ## 宪法范围登记表中要加的行
 
 ```markdown
-| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | paired | [<name>](logic_domains/<domain>/logic_readme.md) | [changes](logic_domains/<domain>/logic_change.md) | self | active |
+| MOD-<NAME> | logic_domains/<domain> | in-system | domain/runtime-code | readme-only | [<name>](logic_domains/<domain>/logic_readme.md) | none | self | active |
 ```
 
 ## 领域 logic_readme.md
@@ -30,7 +30,7 @@
 - membership: in-system
 - scope_type: domain
 - layer: runtime-code
-- module_doc_policy: paired
+- module_doc_policy: readme-only
 - status: active | transitional
 - owner: <self/团队/角色>
 - governance_mode: <与宪法相同：personal | collaborative>
@@ -58,7 +58,7 @@
 ## 范围登记与归属
 
 - canonical_readme: logic_domains/<domain>/logic_readme.md
-- canonical_change: logic_domains/<domain>/logic_change.md
+- canonical_change: none
 - owned_paths: <职权路径，逗号分隔；例如 src/orders/, tests/test_orders.py>
 - child_policy: inherit
 - data_owner: <运行数据负责人；不适用填 none>
@@ -94,61 +94,13 @@ RULE 编号与宪法及其他领域共用同一编号空间，不得重复；只
 
 ## 活跃议案入口
 
-- 唯一入口：[logic_change.md](logic_change.md)
+- 全项目任务入口：[logic_change.md](../../logic_change.md)
 
 ## 当前限制（可选）
 
 - <已确认且仍存在的限制>
 ~~~
 
-## 领域 logic_change.md
+## 旧领域账本兼容
 
-~~~markdown
-# <领域名称> Active Changes
-
-## 文档控制
-
-- scope: logic_domains/<domain>
-- scope_path: logic_domains/<domain>
-- module_id: MOD-<NAME>
-- current_policy: logic_readme.md
-- owner: <self/团队/角色>
-- governance_mode: <与宪法相同>
-- governance_ref: <实际 Git/PR/CI 控制引用>
-- governance_evidence: <控制证据>
-- governance_verification: verified | recorded | unavailable | not-applicable
-- governance_verified_at: YYYY-MM-DD | none
-- last_updated: YYYY-MM-DD
-- active_changes: <本文件 CHG 正文数量；无正文填 none（0 同义）>
-
-## 议案规则
-
-- 议案语义见 RULE-018 与 [logic_change 模板](../../references/logic-change-template.md)；本账本只放本领域一事一议的 CHG 正文，`affected_scopes` 必含 `logic_domains/<domain>`、不得含 `.`（触及宪法的议案立在根账本），每个 CHG 同时在根账本公报占一行。
-
-## 讨论主题索引
-
-| topic_id | 同类议题/共享问题 | coordinator | discussion_refs | related_changes | status |
-|---|---|---|---|---|---|
-| TOPIC-YYYYMMDD-NNN | ... | ... | ... | CHG-... / none | open |
-
-## 活跃议案索引
-
-| change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
-|---|---|---|---|---|---|---|---|
-| CHG-YYYYMMDD-NNN | draft | logic_domains/<domain> | ... | ... | none | [CHG-YYYYMMDD-NNN](logic_change.md#chg-yyyymmdd-nnn) | YYYY-MM-DD |
-
-<a id="chg-yyyymmdd-nnn"></a>
-## CHG-YYYYMMDD-NNN: <议案标题>
-
-- status: draft
-- effective: false
-- proposal_revision: 1
-- recall_route: simple | medium | high
-- owner: <...>
-- changed_by: self
-- scope: <路径、契约或行为>
-- affected_scopes: logic_domains/<domain>[; logic_domains/<other>]
-- 目标 / 理由与当前证据 / 影响范围 / 方案与决策 / 回滚 / 晋升目标：<personal 最小块，见 logic_change 模板 RULE-023 段>
-~~~
-
-维护要点：领域文档与宪法同受 `recall validate`（编号唯一、公报一致）和 `audit --current-state`（表结构、Density）检查；`recall route <路径>` 应能命中本领域，命不中说明 `owned_paths` 漏登。
+旧paired领域的change可继续读取；新任务写到logic_changes，全部关闭后可将登记改为readme-only并删除空旧账本。

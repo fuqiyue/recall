@@ -1,0 +1,49 @@
+{
+  "purpose": "Recall技能文档优化前原字节；非现行规则",
+  "date": "2026-10-12",
+  "source_root": "D:\\vscode3\\recall",
+  "files": [
+    {
+      "source": "SKILL.md",
+      "snapshot": "SKILL.md.txt",
+      "sha256": "c3aabe6f7917a80dced65b1b56d832fc8b3e1b5d6e0601c911cced199f14957b",
+      "bytes": 6164
+    },
+    {
+      "source": "logic_readme.md",
+      "snapshot": "logic_readme.md.txt",
+      "sha256": "e568f66a0ac620b0072713003e0aca60ccba6942cb0847d88e71f86a372b0a58",
+      "bytes": 30574
+    },
+    {
+      "source": "logic_change.md",
+      "snapshot": "logic_change.md.txt",
+      "sha256": "1d8390cc469c0240da0a26006f6807de18f60956e10d2a8114eb852b5ac2f47d",
+      "bytes": 2017
+    },
+    {
+      "source": "README.md",
+      "snapshot": "README.md.txt",
+      "sha256": "fb5f288df85dd378124d0670430551332b5020f59a670f48487fed6f35bd5555",
+      "bytes": 3040
+    },
+    {
+      "source": "references/logic-change-template.md",
+      "snapshot": "references--logic-change-template.md.txt",
+      "sha256": "0d8002561f46901e4f748de4c3704b50913094d8816246e4c07cf19d92bb0580",
+      "bytes": 26449
+    },
+    {
+      "source": "references/document-model.md",
+      "snapshot": "references--document-model.md.txt",
+      "sha256": "37511f8c280205a32d2802e711eec911de12416a386fe8eb4b32bc664ce81400",
+      "bytes": 9481
+    },
+    {
+      "source": "logic_version/index.md",
+      "snapshot": "logic_version--index.md.txt",
+      "sha256": "d33eb1bda6b532649788b9c248cbf13414dcae611f34066788acd433db87d0fc",
+      "bytes": 14830
+    }
+  ]
+}

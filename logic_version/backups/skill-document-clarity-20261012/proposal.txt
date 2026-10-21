@@ -1,0 +1,18 @@
+## CHG-20261012-001: Recall技能文档一致性与入口精简
+- status: implementing
+- effective: false
+- proposal_revision: 1
+- recall_route: medium
+- owner: Codex
+- changed_by: Codex
+- scope: .
+- affected_scopes: .; references/
+- authority_surfaces: RULE-022
+- last_updated: 2026-10-12
+- decision_confirmed_by: user
+- decision_confirmed_at: 2026-10-12
+- decision_ref: user:2026-10-12 请优化recall文档；随后明确目标Recall技能自身D:/vscode3/recall
+- raw_request: 请优化目前的recall文档，根据recall skill；目标为Recall技能自身的文档（D:/vscode3/recall）。
+- decomposition: 明确项目定位/技能维护边界；统一读取、授权、通道与关案入口；压缩重复模板制度；修正文档真源、实施顺序、标题与日期字段；保留字段schema、接口及历史。
+- fit_analysis: 复用INT-20260816-003与FLOW-002，沿RULE-019/022渐进披露；不新增领域、字段、CLI行为或业务授权。
+- next_action: 完成技能元数据、引用、现行审计/validate/route/next/index核验，保全原字节并归档关案清理。

@@ -9,7 +9,9 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
-from recall_common import run_git  # RULE-021：Git 调用只此一份
+from record_context import is_active_version_draft
+from task_context import unfenced
+from recall_common import estimate_tokens, run_git  # RULE-021：Git 调用只此一份
 from .constants import (
     ADR_NAME_RE,
     AGENT_ENTRY_CONFIG_DIRS,
@@ -116,11 +118,10 @@ def _collect_active_change_blocks(
 ) -> dict[str, tuple[Path, str]]:
     """Collect (logic_change path, block text) for every active change id (casefolded)."""
     active_blocks: dict[str, tuple[Path, str]] = {}
-    for audit in audits:
-        if not audit.logic_change:
-            continue
-        directory = root if audit.path == "." else root / audit.path
-        change_file = directory / "logic_change.md"
+    from recall_common import change_ledgers
+    paths = {root / audit.path / "logic_change.md" for audit in audits if audit.logic_change}
+    paths.update(path for _, path in change_ledgers(root))
+    for change_file in sorted(paths):
         change_text, change_error = read_text(change_file)
         if change_error:
             continue
@@ -129,7 +130,12 @@ def _collect_active_change_blocks(
     return active_blocks
 
 
-def _collect_completed_version_ids(history_root: Path) -> set[str]:
+def _is_active_version_draft(values: dict, record: Path, active_blocks: dict) -> bool:
+    controls = {identity: control_values(block[1]) for identity, block in active_blocks.items()}
+    return is_active_version_draft(values, record, controls)
+
+
+def _collect_completed_version_ids(history_root: Path, active_blocks: dict | None = None) -> set[str]:
     """Collect casefolded version_id values of every archived version record."""
     completed_version_ids: set[str] = set()
     records_root = history_root / "records"
@@ -138,7 +144,10 @@ def _collect_completed_version_ids(history_root: Path) -> set[str]:
             record_text, record_error = read_text(record)
             if record_error:
                 continue
-            for version_id in control_values(record_text).get("version_id", []):
+            values = control_values(unfenced(record_text))
+            if _is_active_version_draft(values, record, active_blocks or {}):
+                continue
+            for version_id in values.get("version_id", []):
                 if VERSION_ID_RE.fullmatch(version_id):
                     completed_version_ids.add(version_id.casefold())
     return completed_version_ids
@@ -391,13 +400,14 @@ def audit_temp_working(root: Path, audits: list[ModuleAudit]) -> dict:
     if index.is_file():
         index_text, _ = read_text(index)
     index_rows = markdown_table_rows(index_text, "活跃临时记录")
+    active_blocks = _collect_active_change_blocks(root, audits)
     ctx = _TempWorkingContext(
         root=root,
         history_root=history_root,
         working_root=working_root,
         active_ids=active_change_ids(root, audits),
-        active_blocks=_collect_active_change_blocks(root, audits),
-        completed_version_ids=_collect_completed_version_ids(history_root),
+        active_blocks=active_blocks,
+        completed_version_ids=_collect_completed_version_ids(history_root, active_blocks),
         indexed_temp_paths=[
             (row, _canonical_index_temp_path(root, history_root, row))
             for row in index_rows
@@ -1090,7 +1100,7 @@ def registered_domain_scopes(root: Path) -> list[str]:
         policy = (row.get("doc_policy") or "").strip().strip("`").lower()
         membership = (row.get("membership") or "").strip().strip("`").lower()
         scope_norm = normalize_scope_path((row.get("scope_path") or "").strip().strip("`"))
-        if policy == "paired" and membership == "in-system" and scope_norm not in {"", "."}:
+        if policy in {"paired", "readme-only"} and membership == "in-system" and scope_norm not in {"", "."}:
             scopes.append(scope_norm)
     return scopes
 
@@ -1119,6 +1129,8 @@ def registered_child_document_paths(root: Path) -> set[str]:
         allowed.add(f"{scope_norm}/logic_readme.md".casefold())
         if policy == "paired":
             allowed.add(f"{scope_norm}/logic_change.md".casefold())
+    from workspace_paths import task_ledgers
+    allowed.update(label.casefold() for label, _ in task_ledgers(root))
     return allowed
 
 
@@ -1404,6 +1416,22 @@ def _density_check(
         notices.append(f"{label}:over-target:{lines}>{target} (hard limit {limit}; {hint or 'compress or archive before it bites'})")
 
 
+def _reading_costs(root: Path, notices: list[str]) -> dict:
+    """必读入口的token成本只提示；不改变既有行数门。"""
+    costs = {}
+    targets = [("SKILL.md", 3000), ("logic_readme.md", 6000)]
+    targets.extend((f"{scope}/logic_readme.md", 6000) for scope in registered_domain_scopes(root))
+    for label, target in targets:
+        text, error = read_text(root / label)
+        if error:
+            continue
+        tokens = estimate_tokens(text)
+        costs[label] = {"tokens_estimate": tokens, "target": target}
+        if tokens > target:
+            notices.append(f"{label}:over-token-target:{tokens}>{target} (estimate; advisory only)")
+    return costs
+
+
 def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
     """行数密度检查：``issues`` 使 current-state / formal-review 静态门失败，``notices`` 只提示。
 
@@ -1428,6 +1456,9 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
     _density_check("logic_change.md", _count_lines(root / "logic_change.md") if (root / "logic_change.md").exists() else None, 150, 300, issues, notices)
 
     domain_scopes = registered_domain_scopes(root)
+    from workspace_paths import task_ledgers
+    for label, path in task_ledgers(root):
+        _density_check(label, _count_lines(path), 150, 300, issues, notices)
     if not domain_scopes and (root / "logic_readme.md").exists():
         issues.append(
             "logic_readme.md:constitution-without-domains (RULE-018: register at least one "
@@ -1478,5 +1509,6 @@ def audit_density(root: Path, audits: list[ModuleAudit]) -> dict:
     return {
         "issues": issues,
         "notices": notices,
+        "reading_costs": _reading_costs(root, notices),
         "limits_checked": ["SKILL.md", "logic_readme.md", "logic_change.md", *[f"{scope}/logic_readme.md" for scope in domain_scopes]],
     }

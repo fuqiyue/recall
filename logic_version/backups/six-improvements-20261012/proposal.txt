@@ -1,0 +1,29 @@
+## CHG-20261012-002: Recall六项一致性优化
+- status: implementing
+- effective: false
+- proposal_revision: 1
+- recall_route: high
+- owner: self
+- changed_by: Codex
+- scope: .
+- affected_scopes: .; logic_domains/toolchain; references
+- authority_surfaces: RULE-021; RULE-022; RULE-023; RULE-025
+- decision_confirmed_by: user
+- decision_confirmed_at: 2026-10-12
+- created: 2026-10-12
+- decision_ref: user:2026-10-12 认可六项建议并要求逐个优化
+- raw_request: 认可，请你帮我逐个进行优化；承接本轮已列出的六项Recall技能优化，目标D:/vscode3/recall。
+- decomposition: 依次修复项目定位防误写、个人CHG模板、根宪法阅读成本、收尾顺序、根文件路由提示，并补首次接入/中等修改/中断接手示例及对应验证。
+- fit_analysis: 复用INT-20260816-003/004/008/010、INT-20260903-002和INT-20260907-001；沿FLOW-002/003/005完善入口、制度、模板与CLI一致性；共享该不变量的六步留同一CHG，分步验证，不新增业务制度或外部授权。
+- version_slug: logic_version-20261012-002-six-improvements
+- temp_path: logic_version/working/logic_version-20261012-002-six-improvements/logic_temp.md
+- based_on: policy: logic_readme.md; code: f2b1e09d7082eaebd11a57415ee7aa7ceeec0ca3及既有未提交文档; surfaces: RULE-021; RULE-022; RULE-023; RULE-025
+- next_action: 先完成目标定位和模板，然后流程/密度/路由/示例，逐项验证后交付归档
+
+### 当前证据、方案与影响
+已有文档优化未提交；本轮基于当前字节增量修改。new无项目标记会退回技能目录；普通字段与个人最小字段矛盾；根文档估算8894 token；收尾顺序不同；根文件route提示未命中；缺小型完整示例。
+选最小修改并增加真实回归；保持现状留缺陷，另建工作流/平行规则增复杂度，均不采用。new缺根失败、显式--project选根；路由JSON只追加字段；token提示不增加阻断门。无数据迁移与生产部署。
+
+### 验证、审查与回滚
+基线及改后unittest；new无根/显式根/嵌套根/错误参数、根/inherited/领域/未知混合路由、短行长文密度提示；三个示例跑真实CLI。检查现行规则与模板不漂移、旧历史字节不改，audit/validate/index/next收尾。
+回滚只撤本轮增量；参考Git基线和工作区原始哈希，不覆盖先前修改，不恢复危险隐式回退；历史追加纠正记录。现有安装入口仍转发维护源，无需另改。

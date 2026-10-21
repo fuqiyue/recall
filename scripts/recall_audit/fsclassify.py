@@ -140,6 +140,7 @@ def iter_directories(
             name
             for name in dir_names
             if name not in excludes
+            and not (current == root and name == "logic_changes")
             and not name.startswith(".")
             and (max_depth is None or depth < max_depth)
         )
