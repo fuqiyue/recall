@@ -17,6 +17,7 @@ from route_docs import build_plan
 from task_context import snapshot, index_update
 from workspace_check import check_workspace
 from workspace_inventory import inventory, write_maps
+from workspace_maps import read_map
 from workspace_paths import project_path
 
 ID = "CHG-20261020-001"
@@ -36,7 +37,7 @@ class WorkspaceTests(unittest.TestCase):
         path.write_text(text, encoding="utf-8")
         return path
 
-    def task(self, rows="", extra="", slug="feature", scope="."):
+    def task(self, rows="", extra="", slug="feature", scope=".", change_id=ID):
         text = (f'# 任务\n\n<a id="{ID.lower()}"></a>\n## {ID}: 目录治理\n'
                 '- governance_mode: personal\n- status: implementing\n- effective: false\n'
                 '- proposal_revision: 1\n- recall_route: medium\n- owner: self\n- changed_by: Codex\n'
@@ -46,6 +47,7 @@ class WorkspaceTests(unittest.TestCase):
                 '- fit_analysis: 复用已登记目录\n' + extra +
                 '\n### 工作区产物台账\n| path | artifact_kind | disposition | reason | cleaned_at |\n'
                 '|---|---|---|---|---|\n' + rows)
+        text = text.replace(ID, change_id).replace(ID.lower(), change_id.lower())
         path = self.write(f"logic_changes/{slug}/logic_change.md", text)
         index, _, updated = index_update(self.root, snapshot(self.root))
         index.write_text(updated, encoding="utf-8")
@@ -116,7 +118,11 @@ class WorkspaceTests(unittest.TestCase):
         self.task(scope="logic_domains/core")
         self.assertTrue(any(p.startswith("logic_changes/") for p, _ in change_ledgers(self.root)))
         self.assertEqual(len(snapshot(self.root)["items"]), 1)
-        self.assertTrue(any(r["path"].startswith("logic_changes/") for r in build_plan(self.root, ["src/app.py"])["reading_order"]))
+        plan = build_plan(self.root, ["src/app.py"])
+        self.assertEqual(plan["related_changes"][0]["id"], ID)
+        self.assertFalse(any(r["path"].startswith("logic_changes/") for r in plan["reading_order"]))
+        self.assertTrue(any(r["path"].startswith("logic_changes/") for r in
+                            build_plan(self.root, ["src/app.py"], include_related=True)["reading_order"]))
         for args in [("index",), ("next", "--json"), ("workspace", "--closing", ID), ("audit", "--json")]:
             with self.subTest(args=args):
                 result = self.cli(*args)
@@ -223,6 +229,147 @@ class WorkspaceTests(unittest.TestCase):
         result = self.cli("inventory", "src", "--json", "--max-entries", "10")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(json.loads(result.stdout)["entries"])
+
+    def test_task_identity_routes_declared_rules_without_other_task_bodies(self):
+        path = self.task(scope="logic_domains/core")
+        other = self.task(slug="other", scope="logic_domains/core", change_id="CHG-20261020-002")
+        other.write_text(other.read_text(encoding="utf-8").replace(ID, "CHG-20261020-002"), encoding="utf-8")
+        for target in [ID.lower(), str(path), "logic_changes/feature", "logic_changes/feature/logic_change.md#" + ID.lower()]:
+            with self.subTest(target=target):
+                data = build_plan(self.root, [target])
+                self.assertEqual(data["matched_domains"], ["logic_domains/core"])
+                self.assertEqual(data["unmatched_targets"], [])
+                self.assertEqual([i["id"] for i in data["matched_tasks"]], [ID])
+                reading = [r["path"] for r in data["reading_order"]]
+                self.assertIn("logic_domains/core/logic_readme.md", reading)
+                self.assertIn("logic_changes/feature/logic_change.md", reading)
+                self.assertNotIn("logic_changes/other/logic_change.md", reading)
+
+    def test_task_scopes_include_primary_and_report_unregistered_scopes(self):
+        path = self.task(scope="MOD-CORE")
+        text = path.read_text(encoding="utf-8").replace("- affected_scopes: MOD-CORE", "- affected_scopes: .; logic_domains/missing")
+        path.write_text(text, encoding="utf-8")
+        data = build_plan(self.root, [ID])
+        self.assertEqual(data["matched_domains"], ["logic_domains/core"])
+        self.assertTrue(any("logic_domains/missing" in w for w in data["routing_warnings"]))
+        unknown = build_plan(self.root, ["CHG-19990101-999"])
+        self.assertEqual(unknown["matched_domains"], [])
+        self.assertEqual(unknown["unmatched_targets"], ["CHG-19990101-999"])
+
+    def test_duplicate_task_id_is_reported_without_silent_selection(self):
+        path = self.task()
+        self.write("logic_changes/duplicate/logic_change.md", path.read_text(encoding="utf-8"))
+        data = build_plan(self.root, [ID])
+        self.assertEqual(len(data["matched_tasks"]), 2)
+        self.assertTrue(data["routing_warnings"])
+
+    def saved_map(self):
+        return read_map((self.root / "logic_domains/file_map.md").read_text(encoding="utf-8"))
+
+    def test_partial_map_update_retains_other_scopes_and_timestamps(self):
+        self.write("content/lesson.py")
+        write_maps(self.root, inventory(self.root, ["src", "content"]))
+        before = self.saved_map()
+        self.write("src/new.py")
+        write_maps(self.root, inventory(self.root, ["src"]))
+        after = self.saved_map()
+        old = next(r for r in before["entries"] if r["path"] == "content/lesson.py")
+        self.assertIn(old, after["entries"])
+        self.assertIn("src/new.py", {r["path"] for r in after["entries"]})
+        self.assertEqual(len(after["scans"]), 2)
+
+    def test_truncated_or_shallow_scan_preserves_unseen_children(self):
+        self.write("src/sub/deep.py")
+        self.write("src/tail.py")
+        write_maps(self.root, inventory(self.root, ["src"]))
+        old = {r["path"] for r in self.saved_map()["entries"]}
+        write_maps(self.root, inventory(self.root, ["src"], max_entries=1))
+        self.assertEqual(old, {r["path"] for r in self.saved_map()["entries"]})
+        self.assertFalse(next(c for c in self.saved_map()["coverage"] if c["path"] == "src")["complete"])
+        write_maps(self.root, inventory(self.root, ["src"], max_depth=0))
+        self.assertEqual(old, {r["path"] for r in self.saved_map()["entries"]})
+
+    def test_complete_scan_removes_vanished_subtree_from_map_only(self):
+        path = self.write("src/sub/deep.py")
+        write_maps(self.root, inventory(self.root, ["src"]))
+        path.unlink()
+        path.parent.rmdir()
+        write_maps(self.root, inventory(self.root, ["src"], max_depth=0))
+        self.assertFalse(any(r["path"].startswith("src/sub") for r in self.saved_map()["entries"]))
+        self.assertTrue((self.root / "src/app.py").exists())
+
+    def test_legacy_map_upgrade_keeps_unscanned_coverage(self):
+        self.write("logic_domains/file_map.md", "<!-- recall-generated-file-map -->\n# 文件地图\n\n"
+                   "扫描时间：2026-10-21\n范围：content；深度 3；预算 1000。\n"
+                   "| 路径 | 简要说明 | 领域 |\n|---|---|---|\n| content/lesson.py | 代码/界面文件 | 待登记 |\n"
+                   "\n扫描边界：\n- 数据边界未深入\n")
+        write_maps(self.root, inventory(self.root, ["src"]))
+        data = self.saved_map()
+        self.assertEqual(data["legacy_boundary"]["generated_at"], "2026-10-21")
+        self.assertTrue(any(r["path"] == "content/lesson.py" and r["scanned_at"] == "2026-10-21" for r in data["entries"]))
+
+    def test_task_closure_separates_other_task_errors_and_exit_status(self):
+        self.task()
+        other = self.task(slug="other", extra="- task_temp_dirs: .work/临时-其他\n", change_id="CHG-20261020-002")
+        other.write_text(other.read_text(encoding="utf-8").replace(ID, "CHG-20261020-002").replace(
+            "status: implementing", "status: promoting"), encoding="utf-8")
+        (self.root / ".work/临时-其他").mkdir(parents=True)
+        data = check_workspace(self.root, closing=ID)
+        self.assertTrue(data["task_result"]["ok"])
+        self.assertFalse(data["global_result"]["ok"])
+        self.assertFalse(data["ok"])
+        self.assertTrue(data["other_findings"])
+        self.assertEqual(self.cli("workspace", "--closing", ID).returncode, 0)
+        self.assertNotEqual(self.cli("workspace").returncode, 0)
+        self.assertFalse(check_workspace(self.root, task="CHG-19990101-999")["selection_ok"])
+
+    def test_shared_temp_directory_blocks_both_tasks(self):
+        self.task(extra="- task_temp_dirs: .work/临时-共用\n")
+        other = self.task(slug="other", extra="- task_temp_dirs: .work/临时-共用\n", change_id="CHG-20261020-002")
+        other.write_text(other.read_text(encoding="utf-8").replace(ID, "CHG-20261020-002"), encoding="utf-8")
+        for task in (ID, "CHG-20261020-002"):
+            data = check_workspace(self.root, task=task)
+            self.assertFalse(data["selection_ok"])
+            self.assertIn("shared-temp-directory", {f["code"] for f in data["task_result"]["findings"]})
+
+    def test_task_ledger_supports_existing_level_two_sections(self):
+        self.write(".work/临时-诊断/run.py")
+        path = self.task("| .work/临时-诊断 | scratch | delete | 临时 | - |\n",
+                         "- task_temp_dirs: .work/临时-诊断\n")
+        path.write_text(path.read_text(encoding="utf-8").replace("### 工作区产物台账", "## 工作区产物台账"), encoding="utf-8")
+        data = check_workspace(self.root, task=ID)
+        self.assertTrue(data["selection_ok"])
+        self.assertEqual({f["code"] for f in data["task_result"]["findings"]}, {"delete-still-exists"})
+
+    def extended_task(self, rows):
+        path = self.task(extra="- task_temp_dirs: .work/临时-多轮\n")
+        text = path.read_text(encoding="utf-8").replace(
+            "| path | artifact_kind | disposition | reason | cleaned_at |\n|---|---|---|---|---|",
+            "| path | artifact_kind | disposition | reason | cleaned_at | retention_basis | exit_condition | round |\n"
+            "|---|---|---|---|---|---|---|---|")
+        path.write_text(text + rows, encoding="utf-8")
+
+    def test_finished_round_cleans_own_rows_while_next_round_continues(self):
+        self.write(".work/临时-多轮/round02/run.py")
+        self.extended_task("| .work/临时-多轮/round01 | scratch | delete | 第一轮 | 2026-10-24 | - | 轮末清理 | 01 |\n"
+                           "| .work/临时-多轮/round02 | scratch | delete | 第二轮 | - | - | 轮末清理 | 02 |\n")
+        data = check_workspace(self.root, task=ID, round_id="1")
+        self.assertTrue(data["round_result"]["ok"])
+        self.assertFalse(check_workspace(self.root, task=ID, round_id="2")["selection_ok"])
+        self.assertFalse(check_workspace(self.root, closing=ID)["selection_ok"])
+        self.assertFalse(check_workspace(self.root, task=ID, round_id="3")["selection_ok"])
+        self.assertEqual(self.cli("workspace", "--task", ID, "--round", "1").returncode, 0)
+
+    def test_retained_evidence_and_runtime_data_need_basis_and_exit(self):
+        self.write("data/live.json")
+        self.write("logic_version/evidence/result.json")
+        self.extended_task("| data/live.json | runtime-data | keep | 运行数据 | - | 业务查询引用 | 停用并确认无引用后复核 | 01 |\n"
+                           "| logic_version/evidence/result.json | evidence | keep | 正式证据 | - | - | - | 01 |\n")
+        self.assertIn("missing-retention-basis", self.codes())
+        path = self.root / "logic_changes/feature/logic_change.md"
+        path.write_text(path.read_text(encoding="utf-8").replace("| 正式证据 | - | - | - | 01 |",
+            "| 正式证据 | - | 关案结论的验证依据 | 对应决定被替代且无引用时复核 | 01 |"), encoding="utf-8")
+        self.assertTrue(check_workspace(self.root, closing=ID)["selection_ok"])
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@
 
 ## personal 最小块
 
-默认复制本块到唯一任务文件，填写实际值并运行 `recall index --write`。没有独立跟踪需求的 simple 修改直接执行。
+先查活跃案，相同或接近需求能统一验收与收尾时合并原正文；确需新案再复制本块，填写实际值并运行 `recall index --write`。合并保留来源和原修订事实，方法见[工作路径与任务](workspace-tasks.md)。没有独立跟踪需求的 simple 修改直接执行。
 
 - 机器必填：`status`、`effective: false`、`proposal_revision`、`recall_route`、`changed_by`；进入实施及之后再须真实的 `decision_confirmed_by` / `decision_confirmed_at`。账本已标 personal 时可省块内模式。
 - 任务结构必留：唯一显式 `chg-id` 锚点、已登记的主scope、包含主scope的affected_scopes及根公报行；任务文件不再复制本地索引。
@@ -35,9 +35,10 @@
 - fit_analysis: <复用/修改哪个INT及FLOW位置>
 - version_slug: logic_version-YYYYMMDD-NNN-<scope>
 - task_temp_dirs: none
+- current_result: <仅此处维护当前进展及阻塞；旧结果压入修订表>
 - next_action: <下一项可执行动作>
 
-### 当前状态、代码逻辑与差距
+### 目标与依据
 <目标；理由和当前代码/测试/运行证据；受影响路径与消费者>
 ### 拟议制度
 <最小方案与取舍；已有授权来源；未决选择写明>
@@ -49,8 +50,8 @@
 ### 晋升与归档
 <更新readme、清理；把需求与修订表搬入同一VER并核对，定稿/index就位后关闭CHG并核公报>
 ### 工作区产物台账
-| path | artifact_kind | disposition | reason | cleaned_at |
-|---|---|---|---|---|
+| path | artifact_kind | disposition | reason | cleaned_at | retention_basis | exit_condition | round |
+|---|---|---|---|---|---|---|---|
 ```
 
 ## 账本骨架与扩展字段

@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, backups
-- last_updated: 2026-10-20
+- last_updated: 2026-10-24
 - owner: self
 
 ## 关于逻辑回档
@@ -35,6 +35,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261024-001 | logic_version-20261024-001-task-context-workspace | 2026-10-24 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-029 | 1 | 任务声明路由、保留覆盖的局部地图、相近需求合并及分任务/轮次清理 | [记录](records/logic_version-20261024-001-task-context-workspace.md) |
 | VER-20261020-002 | logic_version-20261020-002-task-revision-history | 2026-10-20 | effective | . | RULE-025, RULE-027 | 1 | 同任务修订表区分执行轮次和方案版本，关案保全至同一历史记录 | [记录](records/logic_version-20261020-002-task-revision-history.md) |
 | VER-20261020-001 | logic_version-20261020-001-workspace-task-governance | 2026-10-20 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-028, RULE-029 | 1 | 项目路径、目录地图、同任务正文与实际产物收尾核对 | [记录](records/logic_version-20261020-001-workspace-task-governance.md) |
 | VER-20261013-001 | logic_version-20261013-001-reliable-context | 2026-10-13 | effective | ., logic_domains/toolchain, logic_domains/git-pipeline | RULE-008, RULE-013, RULE-015, RULE-021, RULE-022, RULE-023, RULE-024, RULE-025 | 1 | 共享草稿口径、追加追溯、流程与阅读成本、Git诊断及Windows持续验证 | [记录](records/logic_version-20261013-001-reliable-context.md) |

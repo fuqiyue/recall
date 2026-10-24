@@ -6,6 +6,7 @@ from pathlib import Path
 
 from recall_common import registered_domains
 from workspace_paths import contract, linked, project_path, repeated_root, scan_entries
+from workspace_maps import merge_map, read_map, render_map
 
 SKIP = {".git", ".agents", ".codex", ".claude", ".venv", "venv", "node_modules",
         "__pycache__", ".pytest_cache", "logic_domains", "logic_changes", "logic_version"}
@@ -52,7 +53,8 @@ def inventory(root, targets=(), *, data_roots=(), max_depth=3, max_entries=1000)
         if not path.is_dir():
             raise ValueError(f"目录不存在：{target}")
         queue.append((path, 0))
-    rows, notices, seen = [], [], set()
+    rows, notices, seen, scanned = [], [], set(), []
+    generated_at = datetime.now(timezone.utc).isoformat()
     consumed = 0
     while queue and consumed < max_entries:
         directory, depth = queue.popleft()
@@ -60,6 +62,7 @@ def inventory(root, targets=(), *, data_roots=(), max_depth=3, max_entries=1000)
             continue
         seen.add(directory)
         entries, truncated = scan_entries(directory, max_entries - consumed)
+        scanned.append({"path": directory.relative_to(root).as_posix(), "complete": not truncated})
         consumed += len(entries)
         if truncated:
             notices.append(f"条目预算截断：{directory.relative_to(root).as_posix()}")
@@ -77,6 +80,7 @@ def inventory(root, targets=(), *, data_roots=(), max_depth=3, max_entries=1000)
             rows.append({"path": rel, "kind": "link" if is_link else "directory" if is_dir else "file",
                          "description": "链接（未遍历）" if is_link else describe(path, is_dir, is_data),
                          "domains": covering_domains(rel, ownership),
+                         "scanned_at": generated_at,
                          "classification_source": "declared" if declared_data else "filename-heuristic",
                          "suspected_duplicate_root": duplicate})
             if is_link:
@@ -96,32 +100,24 @@ def inventory(root, targets=(), *, data_roots=(), max_depth=3, max_entries=1000)
                     queue.append((path, depth + 1))
     if queue:
         notices.append(f"预算用尽，尚有 {len(queue)} 个目录未遍历")
-    return {"project_root": root.as_posix(), "generated_at": datetime.now(timezone.utc).isoformat(),
+    return {"project_root": root.as_posix(), "generated_at": generated_at, "scanned_directories": scanned,
             "targets": list(targets or ["."]), "max_depth": max_depth, "max_entries": max_entries,
             "entries_inspected": consumed, "entries": rows, "notices": notices,
             "complete": not notices, "domains": [d.scope_path for d in domains]}
 
 
 def markdown(data, domain=None):
-    rows = [r for r in data["entries"] if domain is None or domain in r["domains"]]
-    lines = [MARKER, "# 文件地图", "", f"扫描时间：{data['generated_at']}",
-             f"范围：{', '.join(data['targets'])}；深度 {data['max_depth']}；预算 {data['max_entries']}。",
-             "这是可重建的文件名索引，不是规则或已确认功能说明；未映射项由领域 owned_paths 补充归属。",
-             "", "| 路径 | 简要说明 | 领域 |", "|---|---|---|"]
-    for row in rows:
-        values = [row["path"], row["description"], ", ".join(row["domains"]) or "待登记"]
-        lines.append("| " + " | ".join(v.replace("|", "&#124;").replace("\n", " ") for v in values) + " |")
-    lines += ["", "扫描边界："] + [f"- {n}" for n in data["notices"]]
-    if not data["notices"]:
-        lines.append("- 已遍历所选范围（排除工具配置、依赖及 Recall 自身文档目录）。")
-    return "\n".join(lines) + "\n"
+    return render_map(merge_map(None, data), domain)
 
 
 def write_maps(root, data):
     """Preflight all outputs; never overwrite hand-authored prose or create a domain."""
     root = Path(root).resolve()
-    outputs = [("logic_domains/file_map.md", markdown(data))]
-    outputs += [(scope + "/file_map.md", markdown(data, scope)) for scope in data["domains"]]
+    master = project_path(root, "logic_domains/file_map.md")
+    previous = read_map(master.read_text(encoding="utf-8")) if master.exists() else None
+    merged = merge_map(previous, data)
+    outputs = [("logic_domains/file_map.md", render_map(merged))]
+    outputs += [(scope + "/file_map.md", render_map(merged, scope)) for scope in data["domains"]]
     prepared = [(project_path(root, name), text) for name, text in outputs]
     for path, _ in prepared:
         if path.exists() and not path.read_text(encoding="utf-8").startswith(MARKER):

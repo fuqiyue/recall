@@ -22,10 +22,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-09-04
-- last_verified: 2026-10-20
+- last_verified: 2026-10-24
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: scripts/recall.py, scripts/recall_common.py, scripts/recall_audit/, scripts/validate.py
-- source_decisions: VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
+- source_decisions: VER-20261024-001, VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
 - intent_summary: 全部 CLI 在非交互与重定向环境可用、跨平台入口不错行、机器检查只此一份实现且自身有测试
 - intent_sources: INT-20260816-004, INT-20260816-006, INT-20260816-007, INT-20260816-008, INT-20260816-009, INT-20260903-002（宪法功能意图登记）
 - decision_validity: valid
@@ -42,7 +42,7 @@
 
 - canonical_readme: logic_domains/toolchain/logic_readme.md
 - canonical_change: logic_domains/toolchain/logic_change.md
-- owned_paths: scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
+- owned_paths: scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_maps.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
 - child_policy: inherit
 - data_owner: none
 - registry_status: registered
@@ -75,21 +75,21 @@
 | scripts/record_context.py | source/runtime-code | internal | VER生命周期、commit解析与追加证据的共享判断 | 账本与记录 | 状态/证据 | 所属文档与记录 | yes | tests/test_record_context.py |
 | scripts/task_context.py | source/runtime-code | public | next任务视图与根公报派生（RULE-028） | 已登记账本、CLI 选项 | 文本/JSON，显式请求更新根公报 | 所属账本正文 | yes | tests/test_task_context.py |
 | scripts/recall.py | source/runtime-code | public | 子命令调度、任务/草稿/Git状态摘要 | 子命令与参数 | 退出码 | 脚本文件 | yes | tests/test_recall_cli.py（含子进程冒烟） |
-| scripts/route_docs.py | source/runtime-code | public | 按路径/关键词/INT路由，报告根/inherited/未知目标及成本 | 路径、关键词或 INT-ID、`--json` | 读取清单 | 脚本文件 | yes | tests/test_recall_cli.py |
+| scripts/route_docs.py | source/runtime-code | public | 任务ID/路径按声明范围路由；代码路径/关键词/INT按需匹配，相关任务先摘要，保留成本与未知目标 | 路径、关键词或 INT-ID、`--json` | 读取清单 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/audit_logic_map.py | source/runtime-code | public | 兼容入口，须与recall_audit整包部署 | 项目根路径 | 审计报告与静态门退出码 | 脚本文件 | yes | tests/test_audit_logic_map.py |
 | scripts/recall_audit/ | source/runtime-code | internal | 分层静态审计：制度/范围/CHG/归档/链接/密度/代理入口 | 项目根路径 | 审计报告 dict | 包目录 | yes | tests/test_audit_logic_map.py |
 | scripts/validate.py | source/runtime-code | public | 跨根/领域/账本/历史/Git的一致性检查 | 项目根路径 | 验证报告 | 脚本文件 | yes | tests/test_validate.py |
 | scripts/create_ver.py | source/runtime-code | public | 核项目标记、规范取号并从项目或集中模板创建草稿 | 描述与 scope | 记录文件 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/link_ver_git.py | source/runtime-code | public | 文件/commit/INT双向追溯与草稿标记、追加提交证据 | 文件路径、commit 或 INT-ID | 关联报告 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/detect_conflicts.py | source/runtime-code | public | 规则/议案冲突启发式；潜在冲突退出2 | logic 文档 | 冲突报告与退出码（0 无冲突 / 2 有潜在冲突） | 脚本文件 | yes | tests/test_recall_cli.py |
-| scripts/workspace_paths.py、workspace_inventory.py、workspace_check.py、workspace_cli.py | source/runtime-code | public | 根相对路径校验、有界目录地图、任务产物与实物对账 | 项目/目录/任务 | 路径、地图、残留问题 | 所属文档和真实文件 | yes | tests/test_workspace.py |
+| scripts/workspace_paths.py、workspace_inventory.py、workspace_maps.py、workspace_check.py、workspace_cli.py | source/runtime-code | public | 根相对路径校验、保留覆盖的增量地图、分任务/轮次与全局的实物核对 | 项目/目录/任务 | 路径、地图、残留问题 | 所属文档和真实文件 | yes | tests/test_workspace.py |
 | tests/ | test/test-fixture | internal | unittest与CLI真跑回归 | unittest | 断言 | 测试文件 | yes | `python -m unittest discover -s tests` |
 | references/examples/audit-repro-legacy/ | test/test-fixture | internal | 独立嵌套项目的审计复现夹具 | 审计脚本读取 | 复现场景 | 夹具文件 | yes | none |
 
 ## 旧行为消费者
 
 - 审计器须部署完整scripts/，包含recall_audit、record_context与task_context；已知消费者沿技能目录引用完整源，不支持单文件复制。
-- JSON保留原键，成本增加登记领域；路由仍含matched_root/matched_inherited/unmatched_targets。草稿显示与历史告警修正不改变索引表格式。
+- JSON保留原键；route新增matched_tasks/related_changes/routing_warnings，相关任务正文须按ID或--include-related展开。workspace原ok/findings仍为全局，新增task_result/round_result/global_result/other_findings/selection_ok，筛选时退出码按selection_ok。草稿显示与历史告警修正不改变索引表格式。
 - 历史不改写；先交付后提交用correction追加证据，操作见[Git追溯](../../references/git-sync.md#先交付后提交的追加追溯)。
 
 ## 测试与验证
@@ -106,7 +106,7 @@
 - 静态审计不证明语义、消费者、部署或测试已运行。文档硬限/无领域进门，其余密度/台账提示见RULE-022；advisory-only只改退出码。
 - workspace核任务声明路径与临时根，包含Git忽略文件；未登记在其他位置的旧产物不保证全量发现，inventory报告扫描边界。
 - 函数白名单现存10项，准确列表和行数以FunctionLengthGateTests为准，触及时只减不增。
-- route/conflicts为子串启发式；路由依赖owned_paths，项目外路径不命中；代码锚点不解析语法。规则基线检测只比日期，未更新last_reviewed的正文变化可能漏检。
+- 任务ID/路径路由按scope/affected_scopes确定，未知或重复声明告警；代码路径依赖owned_paths，关键词/conflicts仍是子串启发式，代码锚点不解析语法。规则基线检测只比日期，未更新last_reviewed的正文变化可能漏检。
 - pr:/release:等非SHA证据仍需另核；代码段外的示意链接/占位符会被当真实字段处理。
 - 当前优化经本机Windows验证；远端CI结果以实际运行记录为准。
 

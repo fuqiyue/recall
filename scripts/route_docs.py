@@ -21,13 +21,15 @@ from typing import Dict, List, Optional
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from recall_common import (  # noqa: E402
     LogicDomain,
+    CHANGE_ID_PATTERN,
+    change_ledgers,
     estimate_tokens,
     find_project_root,
     force_utf8_output,
     inherited_modules,
     registered_domains,
 )
-from workspace_paths import task_ledgers, split_paths
+from workspace_paths import split_paths
 from task_context import read_changes
 
 
@@ -231,7 +233,7 @@ def classify_unrouted_targets(root: Path, targets: List[str]) -> tuple[list[str]
     """区分根直接管辖与未登记目标；逐目标判断，混合请求不掩盖遗漏。"""
     text = (root / "logic_readme.md").read_text(encoding="utf-8", errors="replace")
     match = re.search(r"^- owned_paths:\s*(.+)$", text, re.MULTILINE)
-    owned = [p.strip().strip("`") for p in match.group(1).split(",")] if match else []
+    owned = split_paths(match.group(1)) if match else []
     direct = {"logic_readme.md", "logic_change.md"}
     direct.update(_normalize(p) for p in owned if "/" not in p.strip("/") and "\\" not in p)
     root_hits, unknown = [], []
@@ -266,15 +268,77 @@ def _gazette_hits(root: Path, scopes: List[str]) -> List[str]:
     return lines
 
 
-def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
+def task_scopes(item, domains):
+    aliases = {d.module_id.casefold(): d.scope_path for d in domains}
+    aliases.update({d.scope_path.casefold(): d.scope_path for d in domains})
+    aliases.update({"mod-root": ".", ".": "."})
+    values = split_paths(item.get("scope", "")) + split_paths(item.get("affected_scopes", ""))
+    return sorted({aliases.get(v.casefold(), v) for v in values})
+
+
+def select_tasks(root, targets):
+    """Resolve task identity before keyword routing; do not infer ownership from prose."""
+    items = [item for label, path in change_ledgers(root)
+             for item in read_changes(path.read_text(encoding="utf-8"), label)]
+    selected, recognized, warnings = [], [], []
+    for target in targets:
+        path_part, _, anchor = target.partition("#")
+        relative = _relative_target(root, path_part)
+        is_id = bool(re.fullmatch(CHANGE_ID_PATTERN, target, re.I))
+        matches = []
+        for item in items:
+            path_match = relative == item["path"] or (
+                item["path"].startswith("logic_changes/") and relative == str(Path(item["path"]).parent).replace("\\", "/"))
+            if (is_id and item["id"].casefold() == target.casefold()) or (
+                path_match and (not anchor or anchor.casefold() == item["id"].casefold())) or (
+                not is_id and not _looks_like_path(root, target) and target.casefold() in item["title"].casefold()):
+                matches.append(item)
+        if matches:
+            recognized.append(target)
+            for item in matches:
+                if item not in selected:
+                    selected.append(item)
+            if is_id and len(matches) > 1:
+                warnings.append(f"重复任务 ID，不能唯一定位：{target}")
+        elif is_id:
+            warnings.append(f"未找到活跃任务：{target}；必要时按历史索引查归档")
+    return items, selected, recognized, warnings
+
+
+def task_summary(item, domains):
+    return {"id": item["id"], "title": item["title"], "status": item.get("status", "unknown"),
+            "path": item["path"], "scopes": task_scopes(item, domains),
+            "reference": item["path"] + "#" + item["id"].lower()}
+
+
+def build_plan(root: Path, targets: List[str], *, include_related=False) -> Dict[str, object]:
+    root = root.resolve()
     domains = registered_domains(root)
-    intents = match_intents(root, targets) if targets else []
-    hits = match_domains(root, targets, intents) if targets else {}
-    inherited = match_inherited(root, targets) if targets else []
-    root_targets, unmatched_targets = classify_unrouted_targets(root, targets)
+    tasks, selected, recognized, warnings = select_tasks(root, targets)
+    ordinary = [t for t in targets if t not in recognized and not re.fullmatch(CHANGE_ID_PATTERN, t, re.I)]
+    intents = match_intents(root, ordinary) if ordinary else []
+    hits = match_domains(root, ordinary, intents) if ordinary else {}
+    inherited = match_inherited(root, ordinary) if ordinary else []
+    root_targets, unmatched_targets = classify_unrouted_targets(root, ordinary)
+    unmatched_targets += [t for t in targets if t not in recognized and re.fullmatch(CHANGE_ID_PATTERN, t, re.I)]
+    registered = {d.scope_path for d in domains}
+    for item in selected:
+        scopes = task_scopes(item, domains)
+        if not scopes:
+            warnings.append(f"{item['id']} 缺少 scope/affected_scopes")
+        for scope in scopes:
+            if scope in registered:
+                hits.setdefault(scope, []).append(f"任务 {item['id']} 声明所属/受影响领域")
+            elif scope != ".":
+                warnings.append(f"{item['id']} 声明未登记领域：{scope}")
+    related = [item for item in tasks if item not in selected and targets and
+               (set(task_scopes(item, domains)) & (set(hits) | {"."}) or
+                any(item["id"] in s.get("depends_on", "").upper() for s in selected))]
     reading: List[Dict[str, object]] = []
 
     def add(path: Path, role: str, reason: str) -> None:
+        if any(r["path"] == path.relative_to(root).as_posix() for r in reading):
+            return
         entry = {"path": path.relative_to(root).as_posix(), "role": role, "reason": reason}
         entry.update(_doc_stats(path))
         reading.append(entry)
@@ -286,12 +350,8 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
             add(domain.readme, f"部门法 {domain.module_id}", "; ".join(hits[domain.scope_path]))
             if domain.change is not None:
                 add(domain.change, f"领域议案 {domain.module_id}", "该领域一事一议的活跃 CHG 正文")
-    for label, path in task_ledgers(root):
-        items = read_changes(path.read_text(encoding="utf-8"), label)
-        if any(set(split_paths(item.get("affected_scopes", ""))) & (set(hits) | {"."})
-               or any(t.casefold() in (label + " " + item["id"] + " " + item["title"]).casefold() for t in targets)
-               for item in items):
-            add(path, "任务负责人账本", "命中任务或受影响领域；计划、进度与产物同一正文")
+    for item in selected + (related if include_related else []):
+        add(root / item["path"], "任务负责人账本", "明确命中任务；计划、进度与产物同一正文" if item in selected else "显式展开相关任务")
     total_tokens = sum(int(item["tokens"]) for item in reading)
     total_lines = sum(int(item["lines"]) for item in reading)
     all_domains = [
@@ -316,6 +376,9 @@ def build_plan(root: Path, targets: List[str]) -> Dict[str, object]:
         "matched_intents": [
             {k: v for k, v in intent.items()} for intent in intents
         ],
+        "matched_tasks": [task_summary(i, domains) for i in selected],
+        "related_changes": [task_summary(i, domains) for i in related],
+        "routing_warnings": warnings,
         "in_flight_changes": _gazette_hits(root, sorted(hits)) + [
             r["path"] for r in reading if r["role"] == "任务负责人账本"],
         "domains": all_domains,
@@ -343,6 +406,12 @@ def _print_plan(plan: Dict[str, object]) -> None:
         print("\n🔄 命中领域有在办议案：")
         for line in plan["in_flight_changes"]:
             print(f"   • {line}")
+    if plan["related_changes"]:
+        print("\n相关任务（先读摘要；按 ID 精确读取或 --include-related 展开）：")
+        for item in plan["related_changes"]:
+            print(f"   • {item['id']} [{item['status']}] {item['title']} → {item['reference']}")
+    for warning in plan["routing_warnings"]:
+        print("提示：" + warning)
     inherited = plan.get("matched_inherited") or []
     if inherited:
         print("\n🏛️  命中宪法直辖模块（inherited：无部门法，规则在宪法对应小节）：")
@@ -375,12 +444,15 @@ def main(argv: Optional[List[str]] = None) -> int:
     force_utf8_output()
     args = list(sys.argv[1:] if argv is None else argv)
     as_json = "--json" in args
-    targets = [a for a in args if a != "--json"]
+    if "--help" in args or "-h" in args:
+        print("recall route <任务ID、任务路径、代码路径、关键词或 INT-ID> [--json] [--include-related]")
+        return 0
+    targets = [a for a in args if a not in {"--json", "--include-related"}]
     root = find_project_root()
     if not (root / "logic_readme.md").exists():
         print("❌ 未找到 logic_readme.md（宪法）；先建立根文档", file=sys.stderr)
         return 1
-    plan = build_plan(root, targets)
+    plan = build_plan(root, targets, include_related="--include-related" in args)
     if as_json:
         print(json.dumps(plan, ensure_ascii=False, indent=2))
     else:

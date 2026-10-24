@@ -67,7 +67,9 @@
 | `scratch_root` | 根readme；默认`.work/`，临时代码放其下`临时-具体功能` |
 | `data_roots` | 根readme；逗号/分号分隔的数据目录，盘点默认仅列上层 |
 | `task_temp_dirs` | CHG；项目相对路径，任务独占，无则none |
-| `path / artifact_kind / disposition / reason / cleaned_at` | 任务正文“工作区产物台账”表；keep仅限deliverable/evidence，非交付物delete，gitignore不是处置 |
+| `path / artifact_kind / disposition / reason / cleaned_at` | 任务正文产物台账基础五列；keep限deliverable/runtime-data/evidence，临时物任务完成后delete，gitignore不是处置 |
+| `retention_basis / exit_condition / round` | 新台账扩展列：保留依据、移除或复核触发条件、所属轮次；keep须有前两项，旧五列兼容，轮次核对须有round |
+| `current_result / next_action / merged_from` | 顶部唯一当前结果与下一步；merged_from按需保留被并入的活跃CHG-ID，来源、修订事实随同一VER归档 |
 
 新任务正文在logic_changes，原temp_root/temp_path仅供旧logic_temp兼容；操作见[工作路径与任务](workspace-tasks.md)。台账与文件核对不会自动删除。
 
