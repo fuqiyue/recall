@@ -9,7 +9,7 @@
 - change_id: CHG-20261025-001
 - proposal_revision: 2
 - before_commit: b002d36bffb7f99ace49077a16c4aaa334cd3e38
-- after_commit: _待填写_
+- after_commit: 34419cf
 
 ## 为什么做这个决策？
 已归档正文因删除受阻反复占据活跃队列。用户要求允许保全移动到历史目录集中处理，同时维持清理事实。
