@@ -57,7 +57,7 @@ AGENT_ENTRY_CONFIG_DIRS = {
 
 CURRENT_HISTORY_ROOT = "logic_version"
 LEGACY_HISTORY_ROOTS = {"logic_archive"}
-HISTORY_ALLOWED_CHILDREN = {"index.md", "records", "working", "decisions", "backups"}
+HISTORY_ALLOWED_CHILDREN = {"index.md", "records", "working", "decisions", "backups", "pending_cleanup"}
 
 BACKUP_DIR_NAMES = {
     "backup",

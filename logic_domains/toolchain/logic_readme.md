@@ -22,10 +22,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-09-04
-- last_verified: 2026-10-24
+- last_verified: 2026-10-25
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: scripts/recall.py, scripts/recall_common.py, scripts/recall_audit/, scripts/validate.py
-- source_decisions: VER-20261024-001, VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
+- source_decisions: VER-20261025-001, VER-20261024-001, VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
 - intent_summary: 全部 CLI 在非交互与重定向环境可用、跨平台入口不错行、机器检查只此一份实现且自身有测试
 - intent_sources: INT-20260816-004, INT-20260816-006, INT-20260816-007, INT-20260816-008, INT-20260816-009, INT-20260903-002（宪法功能意图登记）
 - decision_validity: valid
@@ -42,7 +42,7 @@
 
 - canonical_readme: logic_domains/toolchain/logic_readme.md
 - canonical_change: logic_domains/toolchain/logic_change.md
-- owned_paths: scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_maps.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
+- owned_paths: scripts/pending_cleanup.py, tests/test_pending_cleanup.py, scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_maps.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
 - child_policy: inherit
 - data_owner: none
 - registry_status: registered
@@ -82,14 +82,14 @@
 | scripts/create_ver.py | source/runtime-code | public | 核项目标记、规范取号并从项目或集中模板创建草稿 | 描述与 scope | 记录文件 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/link_ver_git.py | source/runtime-code | public | 文件/commit/INT双向追溯与草稿标记、追加提交证据 | 文件路径、commit 或 INT-ID | 关联报告 | 脚本文件 | yes | tests/test_recall_cli.py |
 | scripts/detect_conflicts.py | source/runtime-code | public | 规则/议案冲突启发式；潜在冲突退出2 | logic 文档 | 冲突报告与退出码（0 无冲突 / 2 有潜在冲突） | 脚本文件 | yes | tests/test_recall_cli.py |
-| scripts/workspace_paths.py、workspace_inventory.py、workspace_maps.py、workspace_check.py、workspace_cli.py | source/runtime-code | public | 根相对路径校验、保留覆盖的增量地图、分任务/轮次与全局的实物核对 | 项目/目录/任务 | 路径、地图、残留问题 | 所属文档和真实文件 | yes | tests/test_workspace.py |
+| scripts/pending_cleanup.py、workspace_paths.py、workspace_inventory.py、workspace_maps.py、workspace_check.py、workspace_cli.py | source/runtime-code | public | 根相对路径校验、保留覆盖的增量地图、分任务/轮次与全局的实物核对、集中待清理副本及SHA核验 | 项目/目录/任务 | 路径、地图、残留问题 | 所属文档和真实文件 | yes | tests/test_workspace.py |
 | tests/ | test/test-fixture | internal | unittest与CLI真跑回归 | unittest | 断言 | 测试文件 | yes | `python -m unittest discover -s tests` |
 | references/examples/audit-repro-legacy/ | test/test-fixture | internal | 独立嵌套项目的审计复现夹具 | 审计脚本读取 | 复现场景 | 夹具文件 | yes | none |
 
 ## 旧行为消费者
 
 - 审计器须部署完整scripts/，包含recall_audit、record_context与task_context；已知消费者沿技能目录引用完整源，不支持单文件复制。
-- JSON保留原键；route新增matched_tasks/related_changes/routing_warnings，相关任务正文须按ID或--include-related展开。workspace原ok/findings仍为全局，新增task_result/round_result/global_result/other_findings/selection_ok，筛选时退出码按selection_ok。草稿显示与历史告警修正不改变索引表格式。
+- JSON保留原键；workspace新增pending_cleanup（items/findings/count/cleanup_complete），保全移动仍报告warning；异常或未登记副本报error。route新增matched_tasks/related_changes/routing_warnings，相关任务正文须按ID或--include-related展开。workspace原ok/findings仍为全局，新增task_result/round_result/global_result/other_findings/selection_ok，筛选时退出码按selection_ok。草稿显示与历史告警修正不改变索引表格式。
 - 历史不改写；先交付后提交用correction追加证据，操作见[Git追溯](../../references/git-sync.md#先交付后提交的追加追溯)。
 
 ## 测试与验证

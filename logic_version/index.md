@@ -5,8 +5,8 @@
 - history_format: 2
 - history_root: logic_version/
 - root_only: true
-- allowed_children: records, index.md, working, backups
-- last_updated: 2026-10-24
+- allowed_children: records, index.md, working, decisions, backups, pending_cleanup
+- last_updated: 2026-10-25
 - owner: self
 
 ## 关于逻辑回档
@@ -35,6 +35,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261025-001 | logic_version-20261025-001-pending-cleanup | 2026-10-25 | effective | ., logic_domains/toolchain | RULE-020, RULE-025 | 2 | 已归档重复正文保全移动、原位待清理与活跃过滤 | [记录](records/logic_version-20261025-001-pending-cleanup.md) |
 | VER-20261024-002 | logic_version-20261024-002-commit-link | 2026-10-24 | correction | . | RULE-013 | none | 追加本次优化的真实实施提交，原记录保持不可变 | [记录](records/logic_version-20261024-002-commit-link.md) |
 | VER-20261024-001 | logic_version-20261024-001-task-context-workspace | 2026-10-24 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-029 | 1 | 任务声明路由、保留覆盖的局部地图、相近需求合并及分任务/轮次清理 | [记录](records/logic_version-20261024-001-task-context-workspace.md) |
 | VER-20261020-002 | logic_version-20261020-002-task-revision-history | 2026-10-20 | effective | . | RULE-025, RULE-027 | 1 | 同任务修订表区分执行轮次和方案版本，关案保全至同一历史记录 | [记录](records/logic_version-20261020-002-task-revision-history.md) |
@@ -97,3 +98,9 @@
 
 
 | VER-20261013-002 | 2026-10-13 | effective | 工作台账及历史格式追加校验 | [记录](records/logic_version-20261013-002-worklog-schema-validation.md) | 本次源/文档SHA与实际验证；未混合提交共享工作树 |
+
+## 待清理文件
+
+| task_id | original_path | path | archive | sha256 | reason | recorded_at | exit_condition |
+|---|---|---|---|---|---|---|---|
+| CHG-20261025-001 | logic_changes/pending-cleanup/logic_change.md | logic_version/pending_cleanup/CHG-20261025-001/logic_change.md.txt | logic_version/records/logic_version-20261025-001-pending-cleanup.md | 222f708b7cb160beb1dbd17f20c2c1c7b319c84eba0751bd9e854cbf9b4e4c79 | 已归档重复正文删除命令被blocked by policy拒绝；原生移动成功且SHA一致，原空目录仍保留 | 2026-10-25 | 执行策略允许后核归档与指纹，删除副本及logic_changes/pending-cleanup空目录，再移除此行 |

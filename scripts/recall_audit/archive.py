@@ -823,9 +823,10 @@ def _check_index_control(
         for item in re.split(r"[,;，；]", value)
         if item.strip()
     }
-    if len(allowed_values) != 1 or allowed_children != {
-        item.casefold() for item in HISTORY_ALLOWED_CHILDREN
-    }:
+    expected = {item.casefold() for item in HISTORY_ALLOWED_CHILDREN}
+    # Existing indexes remain valid until the optional pending area is used.
+    compatible = [expected] if (root / "logic_version/pending_cleanup").exists() else [expected, expected - {"pending_cleanup"}]
+    if len(allowed_values) != 1 or allowed_children not in compatible:
         fields.append("allowed_children-mismatch")
     index_issue: str | None = None
     if sections or fields:
@@ -1131,6 +1132,8 @@ def registered_child_document_paths(root: Path) -> set[str]:
             allowed.add(f"{scope_norm}/logic_change.md".casefold())
     from workspace_paths import task_ledgers
     allowed.update(label.casefold() for label, _ in task_ledgers(root))
+    from pending_cleanup import retired_task_paths
+    allowed.update(label.casefold() for label in retired_task_paths(root))
     return allowed
 
 

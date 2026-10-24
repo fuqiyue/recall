@@ -75,11 +75,13 @@ def task_ledgers(root):
     if not base.is_dir():
         return []
     project_path(root, "logic_changes")
+    from pending_cleanup import retired_task_paths
+    retired = retired_task_paths(root)
     result = []
     for child in sorted(base.iterdir()):
         if child.is_dir():
             path = project_path(root, child.relative_to(root).as_posix() + "/logic_change.md")
-            if path.is_file():
+            if path.is_file() and path.relative_to(root).as_posix() not in retired:
                 result.append((path.relative_to(root).as_posix(), path))
     return result
 

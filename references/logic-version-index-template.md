@@ -10,7 +10,7 @@
 - history_format: 2
 - history_root: logic_version/
 - root_only: true
-- allowed_children: records, working, decisions, backups, index.md
+- allowed_children: records, working, decisions, backups, index.md, pending_cleanup
 - last_updated: YYYY-MM-DD
 - owner: <团队/角色>
 

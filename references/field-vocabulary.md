@@ -49,6 +49,8 @@
 
 被依赖条目改版、阻塞或关闭时，依赖项转为 `awaiting-decision` 或 `blocked`，不沿用旧确认继续实施。禁止循环依赖。
 
+已结束任务的重复正文保全移动或原位待清理不新增CHG状态；退出活跃队列后，既有历史索引的“待清理文件”表保留 `task_id/original_path/path/archive/sha256/reason/recorded_at/exit_condition`。字段与步骤见[集中待清理](workspace-tasks.md#删除受阻的集中待清理)。workspace的 `pending_cleanup.cleanup_complete` 独立表示实物清理，不把移动当删除。
+
 `conflict_resolution` 的非 `unresolved` 取值只记录已确认或已被更高优先级指令裁定的结果，不由代理自行选择。
 
 ## compliance 层（+13 个）

@@ -21,6 +21,9 @@ def print_workspace(result):
         findings = view["findings"]
         counts = {level: sum(f["severity"] == level for f in findings) for level in ("error", "warning", "info")}
         print(f"{title}：{'通过' if view['ok'] else '未通过'}；错误 {counts['error']}，提示 {counts['warning']}，进行中 {counts['info']}")
+    pending = result.get("pending_cleanup", {})
+    if pending and not pending["cleanup_complete"]:
+        print(f"集中待清理：{pending['count']} 项登记；清理未完成（见 logic_version/index.md）")
     shown = result["round_result"] or result["task_result"] or result
     for finding in shown["findings"][:20]:
         print(f"  [{finding['severity']}] {finding['code']} {finding['path']}：{finding['message']}")

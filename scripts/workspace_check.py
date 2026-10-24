@@ -7,6 +7,7 @@ import re
 from recall_common import CHANGE_ID_PATTERN, _table_rows_under_heading, change_ledgers
 from task_context import meaningful, read_changes, unfenced
 from workspace_paths import contract, field, linked, project_path, scan_entries, split_paths
+from pending_cleanup import check_pending_cleanup
 
 
 def artifact_rows(text):
@@ -205,6 +206,8 @@ def check_workspace(root, *, closing=None, task=None, round_id=None, max_entries
             rel = (scratch / entry.name).relative_to(root).as_posix()
             if rel not in declared:
                 add(findings, "orphan-temp-artifact", rel, "临时根中没有活跃任务归属；核实旧任务/用户文件后处置", "warning")
+    pending = check_pending_cleanup(root, ids, max_entries)
+    findings.extend(pending["findings"])
     labels = {label for label, _, item in records if item["id"] == selected}
     task_findings = [f for f in findings if f["task"] == selected or (not f["task"] and f["path"] in labels)] if selected else []
     task_result = dict(result_view(task_findings), task=selected) if selected else None
@@ -215,6 +218,7 @@ def check_workspace(root, *, closing=None, task=None, round_id=None, max_entries
     global_result = result_view(findings)
     return {"project_root": root.as_posix(), "closing": closing, **global_result,
             "task_result": task_result, "round_result": round_result,
+            "pending_cleanup": pending,
             "global_result": {"ok": global_result["ok"],
                               "counts": dict(Counter(f["severity"] for f in findings))},
             "other_findings": [f for f in findings if f not in task_findings] if selected else [],
