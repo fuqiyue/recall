@@ -35,6 +35,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261024-002 | logic_version-20261024-002-commit-link | 2026-10-24 | correction | . | RULE-013 | none | 追加本次优化的真实实施提交，原记录保持不可变 | [记录](records/logic_version-20261024-002-commit-link.md) |
 | VER-20261024-001 | logic_version-20261024-001-task-context-workspace | 2026-10-24 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-029 | 1 | 任务声明路由、保留覆盖的局部地图、相近需求合并及分任务/轮次清理 | [记录](records/logic_version-20261024-001-task-context-workspace.md) |
 | VER-20261020-002 | logic_version-20261020-002-task-revision-history | 2026-10-20 | effective | . | RULE-025, RULE-027 | 1 | 同任务修订表区分执行轮次和方案版本，关案保全至同一历史记录 | [记录](records/logic_version-20261020-002-task-revision-history.md) |
 | VER-20261020-001 | logic_version-20261020-001-workspace-task-governance | 2026-10-20 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-028, RULE-029 | 1 | 项目路径、目录地图、同任务正文与实际产物收尾核对 | [记录](records/logic_version-20261020-001-workspace-task-governance.md) |
