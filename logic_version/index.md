@@ -103,4 +103,3 @@
 
 | task_id | original_path | path | archive | sha256 | reason | recorded_at | exit_condition |
 |---|---|---|---|---|---|---|---|
-| CHG-20261025-001 | logic_changes/pending-cleanup/logic_change.md | logic_version/pending_cleanup/CHG-20261025-001/logic_change.md.txt | logic_version/records/logic_version-20261025-001-pending-cleanup.md | 222f708b7cb160beb1dbd17f20c2c1c7b319c84eba0751bd9e854cbf9b4e4c79 | 已归档重复正文删除命令被blocked by policy拒绝；原生移动成功且SHA一致，原空目录仍保留 | 2026-10-25 | 执行策略允许后核归档与指纹，删除副本及logic_changes/pending-cleanup空目录，再移除此行 |
