@@ -36,6 +36,9 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261026-004 | logic_version-20261026-004-policy-boundary-commit-link | 2026-10-26 | correction | . | RULE-013 | none | 追加现行/历史边界更新的真实提交证据 | [记录](records/logic_version-20261026-004-policy-boundary-commit-link.md) |
+| VER-20261026-003 | logic_version-20261026-003-audit-summary-commit-link | 2026-10-26 | correction | logic_domains/toolchain | RULE-013 | none | 追加审计提示汇总修复的真实提交证据 | [记录](records/logic_version-20261026-003-audit-summary-commit-link.md) |
+| VER-20261026-002 | logic_version-20261026-002-root-domain-slim | 2026-10-26 | effective | ., logic_domains/document-governance, logic_domains/task-workflow | RULE-016, RULE-018, RULE-020, RULE-022, RULE-025, RULE-026, RULE-027, RULE-029 | 1 | 七条完整规则下放，根必读成本减少约36%，规则唯一且按需路由 | [记录](records/logic_version-20261026-002-root-domain-slim.md) |
 | VER-20261026-001 | logic_version-20261026-001-current-policy-archive-boundary | 2026-10-26 | effective | . | RULE-002, RULE-003, RULE-027 | 1 | 现行规则独立完整、历史仅留档；保留增量修改并及时更新任务进度 | [记录](records/logic_version-20261026-001-current-policy-archive-boundary.md) |
 | VER-20261025-006 | logic_version-20261025-006-audit-boundary-summary | 2026-10-25 | effective | ., logic_domains/toolchain, scripts/, tests/ | RULE-020, RULE-022 | 1 | audit/validate将重复临时目录边界告警汇总显示，JSON逐路径保留 | [记录](records/logic_version-20261025-006-audit-boundary-summary.md) |
 | VER-20261025-001 | logic_version-20261025-001-pending-cleanup | 2026-10-25 | effective | ., logic_domains/toolchain | RULE-020, RULE-025 | 2 | 已归档重复正文保全移动、原位待清理与活跃过滤 | [记录](records/logic_version-20261025-001-pending-cleanup.md) |

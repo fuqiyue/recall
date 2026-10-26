@@ -30,7 +30,6 @@
 
 | change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
 |---|---|---|---|---|---|---|---|
-| CHG-20261026-002 | promoting | . | self | 精简根现行规则并同步 GitHub | none | [CHG-20261026-002](logic_changes/root-domain-slim/logic_change.md#chg-20261026-002) | 2026-10-26 |
 
 已完成决定见[历史索引](logic_version/index.md)。
 

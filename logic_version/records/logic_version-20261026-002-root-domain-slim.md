@@ -4,7 +4,7 @@
 - version_id: VER-20261026-002
 - version_slug: logic_version-20261026-002-root-domain-slim
 - status: effective
-- immutable: false
+- immutable: true
 - date: 2026-10-26
 - change_id: CHG-20261026-002
 - proposal_revision: 1
@@ -15,7 +15,7 @@
 - decision_confirmed_by: user
 - decision_confirmed_at: 2026-10-26
 - before_commit: 0e38394bf6ce3abafbff2d54175b222630e5b90d
-- after_commit: none
+- after_commit: 752b2ce53871de40b648a6f9172975a1e58fbfd8
 - promoted_rules: RULE-016; RULE-018; RULE-020; RULE-022; RULE-025; RULE-026; RULE-027; RULE-029
 
 ## 为什么做这个决策？
@@ -37,6 +37,8 @@
 | 02 | 2026-10-26 | 1 | 迁移七条规则，更新导航/范围/引用与领域职权 | 根和四个领域、相关references、SKILL | 根读取成本约降36%，两类路径路由正确；完整回归见第03轮 |
 
 | 03 | 2026-10-26 | 1 | 核规则保全、路由及发布回归 | 全部现行readme、路由、既有测试 | 29条规则无重复/缺失/语义丢失；353测试OK（1环境跳过）；audit零问题；skill有效 |
+
+| 04 | 2026-10-26 | 1 | 已验证实现提交752b2ce；追加前轮留档的提交关联，核清理与归档保全 | 新VER、历史index、任务公报 | 实施SHA已核验；旧记录不改；无临时物；最终GitHub同步随后执行 |
 
 ## 影响范围
 - logic_readme.md：根从156行/约8870估算token降至140行/约5715token（约减少36%）；删除领域规则的根副本及重复的说明段，保留29条规则的全局唯一编号空间、16个INT和5个FLOW。
