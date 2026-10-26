@@ -4,8 +4,8 @@
 
 1. 先读根 `logic_readme.md`（宪法：全局规则、领域目录与功能意图/用户流程层）
 2. 再读根 `logic_change.md`（修宪议案 + 全项目活跃议案索引）
-3. 运行 `recall route <目标路径或关键词>`，只读命中领域的 `logic_domains/<domain>/logic_readme.md` + `logic_change.md`
-4. 然后读相关代码、测试和必要的运行证据
+3. 运行 `recall route <任务ID、目标路径或关键词>`，先读命中领域的现行 `logic_readme.md`，再读相关任务的 `logic_change.md`（兼容旧领域账本）
+4. 然后读相关代码、测试和必要的运行证据；历史仅在任务明确要求查阅时按 ID 读取（RULE-003）
 
 代理自审按自身能力执行，但先以上述上下文校验设计意图。
 

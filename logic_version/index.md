@@ -6,14 +6,15 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, decisions, backups, pending_cleanup
-- last_updated: 2026-10-25
+- last_updated: 2026-10-26
 - owner: self
 
 ## 关于逻辑回档
 
-本目录保存**设计逻辑的历史记录**，而非代码快照：
+本目录保存**修改事实与必要理由的历史留档**；现行规则见所属 `logic_readme.md`，日常修改不加载此处历史：
 
 **✅ 保存（轻量）：**
+- 修改了什么及验证结果？
 - 为什么做这个决策？
 - 考虑过哪些方案（A/B/C）？
 - 为什么选择当前方案？
@@ -27,7 +28,7 @@
 - 原始对话记录
 - 思维推理过程
 
-**目的**：避免上下文膨胀，让 AI 能快速回忆"当初为什么这么设计"。
+**目的**：保全变更事实，在明确要求查阅历史时提供追溯入口。
 
 ---
 
@@ -35,6 +36,8 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261026-001 | logic_version-20261026-001-current-policy-archive-boundary | 2026-10-26 | effective | . | RULE-002, RULE-003, RULE-027 | 1 | 现行规则独立完整、历史仅留档；保留增量修改并及时更新任务进度 | [记录](records/logic_version-20261026-001-current-policy-archive-boundary.md) |
+| VER-20261025-006 | logic_version-20261025-006-audit-boundary-summary | 2026-10-25 | effective | ., logic_domains/toolchain, scripts/, tests/ | RULE-020, RULE-022 | 1 | audit/validate将重复临时目录边界告警汇总显示，JSON逐路径保留 | [记录](records/logic_version-20261025-006-audit-boundary-summary.md) |
 | VER-20261025-001 | logic_version-20261025-001-pending-cleanup | 2026-10-25 | effective | ., logic_domains/toolchain | RULE-020, RULE-025 | 2 | 已归档重复正文保全移动、原位待清理与活跃过滤 | [记录](records/logic_version-20261025-001-pending-cleanup.md) |
 | VER-20261024-002 | logic_version-20261024-002-commit-link | 2026-10-24 | correction | . | RULE-013 | none | 追加本次优化的真实实施提交，原记录保持不可变 | [记录](records/logic_version-20261024-002-commit-link.md) |
 | VER-20261024-001 | logic_version-20261024-001-task-context-workspace | 2026-10-24 | effective | ., logic_domains/toolchain | RULE-018, RULE-020, RULE-027, RULE-029 | 1 | 任务声明路由、保留覆盖的局部地图、相近需求合并及分任务/轮次清理 | [记录](records/logic_version-20261024-001-task-context-workspace.md) |

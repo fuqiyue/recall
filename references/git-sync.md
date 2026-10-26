@@ -31,7 +31,7 @@ post-commit hook 场景绝不自动提交其他脏文件（UXI-003）。
 
 ## 项目接入（文档初稿从哪来）
 
-`recall init` 只建 Git 管道，不生成文档内容。文档采用模块化渐进接入：接入时只建根骨架，存量模块登记为 `pending-docs`，此后按触发时机补全；AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目区分（RULE-016）。步骤见[项目接入流程](project-onboarding.md)。
+`recall init` 只建 Git 管道，不生成文档内容。文档采用模块化渐进接入：接入时只建根骨架，存量模块登记为 `pending-docs`，此后按触发时机补全；AI 从代码扫描得出的描述标 `code-derived`，与用户确认的条目区分（[文档治理 RULE-016](../logic_domains/document-governance/logic_readme.md)）。步骤见[项目接入流程](project-onboarding.md)。
 
 ## 先交付后提交的追加追溯
 

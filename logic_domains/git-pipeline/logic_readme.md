@@ -22,7 +22,7 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-09-04
-- last_verified: 2026-10-13
+- last_verified: 2026-10-26
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: scripts/git_sync.py, scripts/init_recall.py
 - source_decisions: VER-20260811-001, VER-20260811-003, VER-20260816-002, VER-20260816-005, VER-20260903-004, VER-20260906-001
@@ -34,15 +34,15 @@
 ## 目标与边界
 
 - 负责：`recall init` 的 Git 管道、`recall sync` 的自动保存与推送、受管理 post-commit hook 与 after_commit 回填
-- 不负责：文档制度（宪法）、审计/校验/CLI 基础设施（MOD-TOOLCHAIN）
-- 上级制度：根 logic_readme.md（RULE-001..004、RULE-014、RULE-016..020、RULE-022）
+- 不负责：文档治理与任务交付、审计/校验/CLI 基础设施（MOD-TOOLCHAIN）
+- 上级制度：根全局规则；文档与任务规则按[领域导航](../../logic_readme.md)读取。
 - 允许的例外：none
 
 ## 范围登记与归属
 
 - canonical_readme: logic_domains/git-pipeline/logic_readme.md
 - canonical_change: logic_domains/git-pipeline/logic_change.md
-- owned_paths: scripts/git_sync.py, scripts/init_recall.py, tests/test_git_sync.py
+- owned_paths: logic_domains/git-pipeline/, scripts/git_sync.py, scripts/init_recall.py, tests/test_git_sync.py, references/git-sync.md
 - child_policy: inherit
 - data_owner: none
 - registry_status: registered

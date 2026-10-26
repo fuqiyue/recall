@@ -1,6 +1,6 @@
-# logic_version 不可变决策记录模板（唯一模板）
+# logic_version 不可变变更留档模板（唯一模板）
 
-每个已结束且需要保留设计原因的变更生成一份不可变文件，集中放在项目根
+每个已结束且需要保留修改事实与必要理由的变更生成一份不可变文件，集中放在项目根
 `logic_version/records/`。机器 ID 固定为 `VER-YYYYMMDD-NNN`；文件 slug 固定为
 `logic_version-YYYYMMDD-NNN-<scope>`。由关联CHG追踪的未完成文件是草稿，尚未归档；完成清理并定稿后语义内容不可静默改写（INV-003：
 唯一合法变更是受管理 hook 对 `after_commit` 占位符的一次性回填，RULE-013）。
@@ -11,7 +11,8 @@
 
 **核心原则**：
 - **代码变化交给 Git** - 不在此记录代码快照
-- **文字说明记录原因** - 为什么改、背景、决策过程
+- **文字说明记录修改** - 改了什么、必要理由、取舍与验证结果
+- **现行规则归入 readme** - 本记录仅供留档；日常修改的历史读取边界见 RULE-003
 - **通过 commit hash 关联** - 文档 ↔ 代码双向追溯
 
 ---
@@ -303,7 +304,7 @@ recall new "添加暗色模式支持" "add-dark-mode" --project /path/to/project
 - `intent_traceability` 使用稳定的 `INT -> RULE -> test -> VER` 四段链；它是复杂变更的追踪索引，不保存原始提示词或隐藏推理。
 - `recall_route` 保留本次采用的分析深度。高风险记录应列出全部 `promoted_rule_ids`，使后续从现行规则可以反向找到本记录；普通局部改动可填 `none`。
 - 勘误通过新建 `status: correction` 的记录完成；新记录指向原记录，原记录保持不可变，集中索引同时列出两者。
-- 这是历史决策记录，不是旧源码、旧 README 或运行数据副本。旧源码交给 Git；确需快照时进入根 `logic_version/backups/`。
+- 这是变更留档，现行规则由所属 readme 完整表达；不保存旧源码、旧 README 或运行数据副本。旧源码交给 Git；确需快照时进入根 `logic_version/backups/`。
 - 未建CHG的格式化、变量改名或无制度影响的simple修改不生成记录；已有CHG按RULE-025保全精简历史。
 
 ## 已归档记录的格式补充

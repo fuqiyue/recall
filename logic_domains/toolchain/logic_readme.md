@@ -22,10 +22,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-09-04
-- last_verified: 2026-10-25
+- last_verified: 2026-10-26
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: scripts/recall.py, scripts/recall_common.py, scripts/recall_audit/, scripts/validate.py
-- source_decisions: VER-20261025-001, VER-20261024-001, VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
+- source_decisions: VER-20261025-006, VER-20261025-001, VER-20261024-001, VER-20261012-002, VER-20260808-002, VER-20260811-002, VER-20260816-002, VER-20260816-005, VER-20260903-002, VER-20260903-003, VER-20260903-004, VER-20260904-001, VER-20260904-003, VER-20260904-004, VER-20260904-005, VER-20260906-001, VER-20261011-003
 - intent_summary: 全部 CLI 在非交互与重定向环境可用、跨平台入口不错行、机器检查只此一份实现且自身有测试
 - intent_sources: INT-20260816-004, INT-20260816-006, INT-20260816-007, INT-20260816-008, INT-20260816-009, INT-20260903-002（宪法功能意图登记）
 - decision_validity: valid
@@ -34,15 +34,15 @@
 ## 目标与边界
 
 - 负责：`recall` 双平台入口与调度、`recall_common` 公共基础设施、审计器（`audit_logic_map.py` + `recall_audit/`）、`validate`、`new`/`query`/`list`/`conflicts`/`route` 子命令、tests/ 与审计夹具
-- 不负责：Git 管道（MOD-GIT-PIPELINE）、文档制度本身（宪法）
-- 上级制度：根 logic_readme.md（RULE-001..004、RULE-014、RULE-016..020、RULE-022）
+- 不负责：Git 管道（MOD-GIT-PIPELINE）、文档治理与任务交付
+- 上级制度：根全局规则；文档与任务规则按[领域导航](../../logic_readme.md)读取。
 - 允许的例外：none
 
 ## 范围登记与归属
 
 - canonical_readme: logic_domains/toolchain/logic_readme.md
 - canonical_change: logic_domains/toolchain/logic_change.md
-- owned_paths: scripts/pending_cleanup.py, tests/test_pending_cleanup.py, scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_maps.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
+- owned_paths: logic_domains/toolchain/, scripts/pending_cleanup.py, tests/test_pending_cleanup.py, scripts/workspace_paths.py, scripts/workspace_inventory.py, scripts/workspace_maps.py, scripts/workspace_check.py, scripts/workspace_cli.py, tests/test_workspace.py, scripts/record_context.py, scripts/task_context.py, scripts/recall.py, scripts/recall_common.py, scripts/audit_logic_map.py, scripts/recall_audit/, scripts/validate.py, scripts/create_ver.py, scripts/link_ver_git.py, scripts/detect_conflicts.py, scripts/route_docs.py, recall.bat, recall.sh, .gitattributes, tests/test_audit_logic_map.py, tests/test_recall_cli.py, tests/test_validate.py, tests/test_recall_common.py, tests/test_task_context.py, tests/test_record_context.py, tests/test_platform_entry.py, references/examples/, tests/test_validate_recall_boundaries.py
 - child_policy: inherit
 - data_owner: none
 - registry_status: registered
@@ -89,8 +89,10 @@
 ## 旧行为消费者
 
 - 审计器须部署完整scripts/，包含recall_audit、record_context与task_context；已知消费者沿技能目录引用完整源，不支持单文件复制。
-- JSON保留原键；workspace新增pending_cleanup（items/findings/count/cleanup_complete），保全移动仍报告warning；异常或未登记副本报error。route新增matched_tasks/related_changes/routing_warnings，相关任务正文须按ID或--include-related展开。workspace原ok/findings仍为全局，新增task_result/round_result/global_result/other_findings/selection_ok，筛选时退出码按selection_ok。草稿显示与历史告警修正不改变索引表格式。
+- JSON保留原键；workspace新增pending_cleanup（items/findings/count/cleanup_complete），保全移动仍报告warning；异常或未登记副本报error。重复的`incomplete-temp-scan`边界项在audit/validate文本中按临时目录汇总并保留数量与样例，JSON及workspace findings仍保留逐路径明细。route新增matched_tasks/related_changes/routing_warnings，相关任务正文须按ID或--include-related展开。workspace原ok/findings仍为全局，新增task_result/round_result/global_result/other_findings/selection_ok，筛选时退出码按selection_ok。草稿显示与历史告警修正不改变索引表格式。
 - 历史不改写；先交付后提交用correction追加证据，操作见[Git追溯](../../references/git-sync.md#先交付后提交的追加追溯)。
+
+任务状态、路径/地图与清理的现行语义见[任务交付](../task-workflow/logic_readme.md)；本领域维护其实现与兼容契约。
 
 ## 测试与验证
 
@@ -103,7 +105,7 @@
 
 ## 当前限制
 
-- 静态审计不证明语义、消费者、部署或测试已运行。文档硬限/无领域进门，其余密度/台账提示见RULE-022；advisory-only只改退出码。
+- 静态审计不证明语义、消费者、部署或测试已运行。文档硬限/无领域进门，其余密度/台账提示见[文档治理 RULE-022](../document-governance/logic_readme.md)；advisory-only只改退出码。
 - workspace核任务声明路径与临时根，包含Git忽略文件；未登记在其他位置的旧产物不保证全量发现，inventory报告扫描边界。
 - 函数白名单现存10项，准确列表和行数以FunctionLengthGateTests为准，触及时只减不增。
 - 任务ID/路径路由按scope/affected_scopes确定，未知或重复声明告警；代码路径依赖owned_paths，关键词/conflicts仍是子串启发式，代码锚点不解析语法。规则基线检测只比日期，未更新last_reviewed的正文变化可能漏检。

@@ -72,7 +72,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | RULE-<NNN> | key/ordinary | ... | ... | [VER-...](../../logic_version/records/logic_version-...md) / none | 用户确认/ADR/VER | code/test/runtime | valid/under-review | YYYY-MM-DD | ... |
 
-RULE 编号与宪法及其他领域共用同一编号空间，不得重复；只写 `owned_paths` 内已生效的规则。
+RULE 编号与宪法及其他领域共用同一编号空间，不得重复；只写 `owned_paths` 内已生效的规则。迁移时保留原编号和完整条款，更新范围与引用；根只留阅读触发条件，不留规则副本。
 
 ## 代码地图
 

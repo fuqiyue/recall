@@ -15,7 +15,11 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from recall_common import change_ledgers
 from route_docs import build_plan
 from task_context import snapshot, index_update
-from workspace_check import check_workspace
+from workspace_check import (
+    check_workspace,
+    format_incomplete_temp_scan_summary,
+    summarize_incomplete_temp_scan_paths,
+)
 from workspace_inventory import inventory, write_maps
 from workspace_maps import read_map
 from workspace_paths import project_path
@@ -59,6 +63,21 @@ class WorkspaceTests(unittest.TestCase):
 
     def codes(self, **options):
         return {f["code"] for f in check_workspace(self.root, **options)["findings"]}
+
+    def test_boundary_summary_preserves_count_and_groups_roots(self):
+        paths = [
+            ".work/临时-全部已入课提示词更新/lessons/c_a",
+            ".work/临时-全部已入课提示词更新/cli-jobs/c_b",
+            ".work/临时-523课提示词更新",
+            ".work/临时-全部已入课提示词更新/lessons/c_a",
+        ]
+        summary = summarize_incomplete_temp_scan_paths(paths)
+        self.assertEqual(summary["count"], 4)
+        self.assertEqual(summary["root_count"], 2)
+        text = format_incomplete_temp_scan_summary(paths)
+        self.assertIn("4 项", text)
+        self.assertIn("2 个临时目录", text)
+        self.assertIn("完整路径仍保留在 JSON 明细中", text)
 
     def test_paths_reject_escapes_windows_drives_and_duplicate_roots(self):
         for path in ["../outside", "D:/vscode3/教材/.work", "C:probe.py",

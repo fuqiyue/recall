@@ -170,13 +170,13 @@ class ValidationResult:
 
         if self.errors:
             print("🔴 错误 (必须修复):")
-            for err in self.errors:
+            for err in _compact_workspace_boundary_messages(self.errors):
                 print(f"  {err}")
             print()
 
         if self.warnings:
             print("🟡 警告 (建议修复):")
-            for warn in self.warnings:
+            for warn in _compact_workspace_boundary_messages(self.warnings):
                 print(f"  {warn}")
             print()
 
@@ -192,6 +192,36 @@ class ValidationResult:
             print("✅ 没有错误，但有一些警告需要注意。\n")
         else:
             print("❌ 验证失败，请修复上述错误。\n")
+
+
+def _compact_workspace_boundary_messages(messages):
+    """Collapse repeated workspace budget-boundary lines for terminal output.
+
+    ValidationResult still stores every original message, so callers that need
+    exact paths can inspect the structured result or rerun workspace --json.
+    """
+    from workspace_check import format_incomplete_temp_scan_summary
+
+    boundary_prefix = "❌ 工作区 incomplete-temp-scan: "
+    warning_prefix = "⚠️  工作区 incomplete-temp-scan: "
+    boundary_paths = []
+    boundary_markers = set()
+    compacted = []
+    for message in messages:
+        if message.startswith(boundary_prefix):
+            boundary_markers.add("❌")
+            boundary_paths.append(message[len(boundary_prefix):].split(" — ", 1)[0])
+        elif message.startswith(warning_prefix):
+            boundary_markers.add("⚠️")
+            boundary_paths.append(message[len(warning_prefix):].split(" — ", 1)[0])
+        else:
+            compacted.append(message)
+    if boundary_paths:
+        marker = "❌" if "❌" in boundary_markers else "⚠️"
+        compacted.append(
+            marker + "  " + format_incomplete_temp_scan_summary(boundary_paths)
+        )
+    return compacted
 
 def extract_rule_definitions(readme_path: Path) -> List[Tuple[str, int]]:
     """提取规则**定义行**（当前制度表格里以 RULE-ID 开头的行）。

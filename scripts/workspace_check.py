@@ -39,6 +39,44 @@ def add(findings, code, path, message, severity="error", task=""):
     findings.append(dict(code=code, path=path, message=message, severity=severity, task=task))
 
 
+def summarize_incomplete_temp_scan_paths(paths, sample_limit=3):
+    """Return a compact, human-readable summary for budget-boundary paths.
+
+    The full paths remain available to JSON callers.  This helper only reduces
+    repeated text output; it never changes finding counts or severity.
+    """
+    normalized = [str(path) for path in paths if str(path).strip()]
+    if not normalized:
+        return None
+    unique_paths = sorted(set(normalized))
+    roots = set()
+    for path in unique_paths:
+        clean = path.removeprefix("link:")
+        parts = clean.split("/")
+        roots.add("/".join(parts[:2]) if len(parts) >= 2 else clean)
+    samples = unique_paths[: max(1, int(sample_limit))]
+    return {
+        "count": len(normalized),
+        "root_count": len(roots),
+        "roots": sorted(roots),
+        "samples": samples,
+    }
+
+
+def format_incomplete_temp_scan_summary(paths, *, prefix="工作区"):
+    """Format repeated incomplete-temp-scan paths without dropping evidence."""
+    summary = summarize_incomplete_temp_scan_paths(paths)
+    if not summary:
+        return ""
+    roots = "、".join(summary["roots"])
+    samples = "；".join(summary["samples"])
+    return (
+        f"{prefix} incomplete-temp-scan：{summary['count']} 项，"
+        f"涉及 {summary['root_count']} 个临时目录（{roots}）；"
+        f"示例：{samples}；完整路径仍保留在 JSON 明细中"
+    )
+
+
 def scan_temp(root, folder, budget):
     queue, paths, issues = deque([folder]), [], []
     while queue and budget > 0:

@@ -1,6 +1,6 @@
 # 文档模型
 
-权威语义见根 RULE-018/019/020/029；本文说明职责和目录，操作见[工作路径与任务](workspace-tasks.md)。
+权威语义见根 RULE-002/003/018/019、[文档治理 RULE-016/022/026](../logic_domains/document-governance/logic_readme.md)及[任务交付 RULE-020/029](../logic_domains/task-workflow/logic_readme.md)；本文说明职责和目录，操作见[工作路径与任务](workspace-tasks.md)。
 
 ```text
 <project-root>/
@@ -14,7 +14,7 @@
 |-- AGENTS.md / CLAUDE.md                 # 短阅读入口
 `-- logic_version/
     |-- index.md                         # 历史索引
-    |-- records/                         # 已结束的不可变决策记录
+    |-- records/                         # 已结束修改的不可变留档
     |-- decisions/                       # 可选ADR
     |-- working/<version_slug>/          # 仅兼容旧logic_temp；关案删除
     `-- backups/                         # 确有交付用途的受控证据
@@ -24,9 +24,9 @@
 
 ## 现行规则
 
-根 `logic_readme.md` 保存跨领域规则、INT/FLOW/UXI、范围登记表、不变量、工作路径约定及最近有效决策入口。领域 readme 保存 `owned_paths` 内的现行规则、稳定代码锚点和验证入口。意图来源只能来自真实用户或已确认依据；文件扫描的描述标为推断。
+根 `logic_readme.md` 保存跨领域规则、INT/FLOW/UXI、范围登记表、不变量、工作路径声明及最近有效决策入口。只有特定任务需要的规则按完整条款迁入领域，原 RULE-ID 保留；根给阅读触发条件和链接，不复制领域规则摘要。领域 readme 保存 `owned_paths` 内的现行规则、稳定代码锚点和验证入口。意图来源只能来自真实用户或已确认依据；文件扫描的描述标为推断。
 
-规则正文只在所属 readme；RULE/INT 编号全项目唯一。每条规则保留一句why、决策链接与复核日期。根有效索引只留最近3条，全量在 `logic_version/index.md`；移出最近索引前保留规则反链。未实施方案不写成现行行为。
+规则正文只在所属 readme；RULE/INT 编号全项目唯一。每条规则保留一句why、决策链接与复核日期。根有效索引只留最近3条，全量在 `logic_version/index.md`；移出最近索引前保留规则反链。未实施方案不写成现行行为。增量修改只改受影响条款，并合并为能独立理解的现行表述；不要求读者拼接 CHG 或历史补丁。
 
 文件地图通过 `recall inventory --write` 生成，记录文件/目录、简要类型与领域归属；数据目录只列上层，明确预算和未深入范围。它不是制度，也不能把算法猜测变成业务事实。每次只对相关目录更新，阅读时按需打开。
 
@@ -44,9 +44,9 @@ medium/high按[CHG模板](logic-change-template.md)保全需求三字段、验�
 
 ## 读取、历史与代理入口
 
-读取顺序：根readme → 根change → `recall route`命中的领域与任务 → 相关代码/测试/运行证据；仅需要时按ID读取历史。
+读取顺序：根readme → 根change公报 → `recall route`命中领域的现行readme → 本任务及必要的相关议案 → 相关代码/测试/运行证据。日常修改不加载历史；仅在任务明确要求查阅历史时按ID读取，不因历史链接、高风险或兼容性标签自动展开。
 
-`logic_version/records/`保留为什么、取舍、影响、验证、清理事实，以及从任务搬入的简短修订表；不保存代码快照、逐轮全文或整套任务副本。历史只追加，后续纠正另建记录。模板见[VER](logic-version-template.md)。
+`logic_version/records/`留档改了什么、必要理由与取舍、影响、验证、清理事实及简短修订表。生效内容已合并到所属readme，留档不参与现行规则解释或补充。历史只追加，后续纠正另建记录；不保存代码快照、逐轮全文或整套任务副本。格式、链接与本次归档完整性核验仍可读取记录，这不将历史纳入日常设计上下文。模板见[VER](logic-version-template.md)。
 
 AGENTS/CLAUDE只给短阅读路由；.agents/.claude只存代理配置，不放业务规则或任务历史。根规则优先于领域；当前系统、开发者和用户指令优先。
 

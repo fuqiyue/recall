@@ -30,10 +30,10 @@ RECALL_BUSINESS_TRUTH: project-root-current-logic-docs
 RECALL_HISTORY_ROOT: <project-root>/logic_version
 RECALL_AGENT_CONFIG_ROOT: <project-root>/.agents
 
-1. Read the relevant sections of root `logic_readme.md` (current effective policy) and `logic_change.md` (non-effective proposals), then run `recall route <target paths>` and read only the matched `logic_domains/<domain>/logic_readme.md` + `logic_change.md`, then the affected code, callers, configuration, and tests, before changing behavior. Load `logic_version/` history only when the current docs reference it.
-2. Route the change as `simple` / `medium` / `high` before editing. `medium` requires presenting plan, impact, and verification first; `high` additionally requires real-consumer and history review, migration/rollback comparison, and user confirmation of the current proposal revision.
+1. Read root `logic_readme.md`, then root `logic_change.md` (the active-task bulletin). Run `recall route <task ID or target paths>`; read the matched domain policies before the relevant task proposals (legacy domain ledgers remain supported), then the affected code, callers, configuration, and tests. Read history by ID only when the task explicitly asks to examine history; links alone do not trigger it (see the recall skill).
+2. Route the change as `simple` / `medium` / `high` before editing. For `medium`, record plan, impact, and verification; for `high`, also check real consumers and cross-domain contracts and compare migration/rollback options. Record existing authorization; ask only about unresolved material decisions.
 3. On material conflict with current policy, an active proposal, or confirmed intent — or ambiguity that changes scope, semantics, compatibility, or data safety — list sources, the exact contradiction, options, impacts, and a recommendation, then ask the user before editing the affected area.
-4. After a code change, update the relevant tests, run them, and report results plus `docs_impact`; update root `logic_readme.md` whenever current rules, map anchors, contracts, or validation obligations actually changed.
+4. Verify the change and report results plus `docs_impact`. Incrementally merge effective changes into the owning root or domain `logic_readme.md`, keeping it sufficient to describe current policy. Keep task status current; archive the completed change and close the proposal using the recall skill.
 5. Full workflow semantics live in the recall skill (SKILL.md). Tool-specific folders (`.agents/`, `.claude/`, `.codex/`) hold configuration only — never current policy, proposals, ADRs, or history.
 ~~~
 
@@ -50,17 +50,17 @@ RECALL_BUSINESS_TRUTH: project-root-current-logic-docs
 RECALL_HISTORY_ROOT: <project-root>/logic_version
 RECALL_AGENT_CONFIG_ROOT: <project-root>/.claude
 
-1. Read the relevant sections of root `logic_readme.md` (current effective policy) and `logic_change.md` (non-effective proposals), then run `recall route <target paths>` and read only the matched `logic_domains/<domain>/logic_readme.md` + `logic_change.md`, then the affected code, callers, configuration, and tests, before changing behavior. Load `logic_version/` history only when the current docs reference it.
-2. Route the change as `simple` / `medium` / `high` before editing. `medium` requires presenting plan, impact, and verification first; `high` additionally requires real-consumer and history review, migration/rollback comparison, and user confirmation of the current proposal revision.
+1. Read root `logic_readme.md`, then root `logic_change.md` (the active-task bulletin). Run `recall route <task ID or target paths>`; read the matched domain policies before the relevant task proposals (legacy domain ledgers remain supported), then the affected code, callers, configuration, and tests. Read history by ID only when the task explicitly asks to examine history; links alone do not trigger it (see the recall skill).
+2. Route the change as `simple` / `medium` / `high` before editing. For `medium`, record plan, impact, and verification; for `high`, also check real consumers and cross-domain contracts and compare migration/rollback options. Record existing authorization; ask only about unresolved material decisions.
 3. On material conflict with current policy, an active proposal, or confirmed intent — or ambiguity that changes scope, semantics, compatibility, or data safety — list sources, the exact contradiction, options, impacts, and a recommendation, then ask the user before editing the affected area.
-4. After a code change, update the relevant tests, run them, and report results plus `docs_impact`; update root `logic_readme.md` whenever current rules, map anchors, contracts, or validation obligations actually changed.
+4. Verify the change and report results plus `docs_impact`. Incrementally merge effective changes into the owning root or domain `logic_readme.md`, keeping it sufficient to describe current policy. Keep task status current; archive the completed change and close the proposal using the recall skill.
 5. Full workflow semantics live in the recall skill (SKILL.md). Tool-specific folders (`.claude/`, `.agents/`, `.codex/`) hold configuration only — never current policy, proposals, ADRs, or history.
 ~~~
 
 ## 边界
 
 - 项目根入口负责自动发现与路由；子目录代理文件只在确有工具作用域需求时使用，并继续指向同一项目根真源。
-- 当前制度与活跃议案只能位于项目根与已登记的 `logic_domains/<domain>/`（RULE-018）；ADR、历史和临时协调记录只能位于根 `logic_version/`。`.agents/`、`.claude/` 和 `.codex/` 可以保存工具设置、权限、命令或缓存，但不能保存业务真源。
+- 现行制度位于根与已登记领域的 readme；新任务正文位于 `logic_changes/<任务>/logic_change.md`，根公报索引，旧领域账本兼容（RULE-018）。ADR与变更留档位于根 `logic_version/`；本轮临时物使用项目声明的 scratch_root。`.agents/`、`.claude/` 和 `.codex/` 可以保存工具设置、权限、命令或缓存，但不能保存业务真源。
 - 未安装 recall 技能的代理仍按入口中的五条最小协议执行；意图提炼、需求保全、通道细则等完整语义在安装技能后由 SKILL.md 提供。
 - `owner`、`changed_by`、`decision_confirmed_by` 和 `semantic_reviewed_by` 是责任和来源记录，不授予文件、分支或部署权限。真实权限控制使用 Git、CODEOWNERS、分支保护或外部系统。
 - 当前用户、系统或开发者指令高于仓库文档。发现冲突时先核对优先级；若没有更高优先级指令或已声明的精确唯一权威直接裁定，就列明新旧来源、矛盾、选项和影响，向用户或授权决策方确认，不擅自改写真源或替其选边。

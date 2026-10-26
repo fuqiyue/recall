@@ -10,7 +10,7 @@ Recall 默认服务单人或低并发小团队，不把 Markdown 字段误称为
 
 **特点**：
 
-- 允许同一人或执行 AI 承担协调、实现和语义审查；AI 交付判据见 [RULE-025](../logic_readme.md)
+- 允许同一人或执行 AI 承担协调、实现和语义审查；AI 交付判据见 [任务交付 RULE-025](../logic_domains/task-workflow/logic_readme.md)
 - 必须诚实记录 `changed_by`、确认来源、审查证据和 Git/发布等治理引用
 - `decision_confirmed_by: self` 只能表示具备项目决策权的人明确作出选择，不能由当前执行代理用来确认自己的建议
 - `VER-*` 的不可变性依赖版本控制或外部存档，而不是 `immutable: true` 这一行文字

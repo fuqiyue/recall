@@ -537,6 +537,36 @@ def collect_audit(args: argparse.Namespace) -> dict:
     }
 
 
+def _print_current_integrity_problems(current_integrity: dict) -> None:
+    """Render current-state issues with repeated workspace boundaries grouped."""
+    if not any(current_integrity.values()):
+        return
+    print("\nCurrent-state integrity problems:")
+    for key in (
+        "document_issues",
+        "scope_registry_issues",
+        "responsibility_issues",
+    ):
+        for item in current_integrity[key]:
+            print(f"  - {key}: {item}")
+    proposal_issues = current_integrity["proposal_issues"]
+    boundary_paths = [
+        item.split("workspace:incomplete-temp-scan:", 1)[1]
+        for item in proposal_issues
+        if item.startswith("workspace:incomplete-temp-scan:")
+    ]
+    for item in proposal_issues:
+        if not item.startswith("workspace:incomplete-temp-scan:"):
+            print(f"  - proposal_issues: {item}")
+    if boundary_paths:
+        from workspace_check import format_incomplete_temp_scan_summary
+
+        print(
+            "  - proposal_issues: "
+            + format_incomplete_temp_scan_summary(boundary_paths, prefix="workspace")
+        )
+
+
 def print_text(report: dict) -> None:
     summary = report["summary"]
     lightweight_current = report["profile"] == "current-state"
@@ -695,16 +725,8 @@ def print_text(report: dict) -> None:
                 print(f"  - {key}: {item}")
 
     current_integrity = report["current_integrity"]
-    if current_profile and any(current_integrity.values()):
-        print("\nCurrent-state integrity problems:")
-        for key in (
-            "document_issues",
-            "scope_registry_issues",
-            "proposal_issues",
-            "responsibility_issues",
-        ):
-            for item in current_integrity[key]:
-                print(f"  - {key}: {item}")
+    if current_profile:
+        _print_current_integrity_problems(current_integrity)
 
     formal_review = report["formal_review"]
     if formal_review_profile and any(formal_review.values()):

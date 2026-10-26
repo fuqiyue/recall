@@ -3,6 +3,8 @@
 `recall init` 只负责 Git 管道（仓库、身份、自动同步、hook）。本文档回答它不回答的问题：
 **logic_readme.md 的内容从哪来** —— 尤其是已有大量代码的存量项目。
 
+规则来源：[文档治理 RULE-016](../logic_domains/document-governance/logic_readme.md)。
+
 **核心策略：模块化渐进接入。** 不做一次性全量扫描；先建宪法骨架加至少一个领域（RULE-018 一二级拆分法），之后按模块补全。
 文档补全只在两种时机发生：
 

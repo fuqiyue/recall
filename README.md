@@ -70,9 +70,9 @@ recall help          # 完整帮助
 | `logic_domains/<domain>/` | 领域现行规则与可重建文件地图，按需导入（`recall route`） |
 | `.work/临时-具体功能/` | 临时代码和输出，完成后删除；忽略规则不代替清理 |
 | `explainers/` | 可直接打开的 HTML 解释快照（非制度真源） |
-| `logic_version/` | 不可变决策记录：为什么改、方案取舍、如何回滚 |
+| `logic_version/` | 不可变变更留档：改了什么、必要理由与验证；查历史时按需读取 |
 
-代码变化由 Git 管理，决策记录通过 commit hash 与代码双向关联。
+议案完成后，生效内容增量合并进所属 `logic_readme.md`；日常修改读取现行规则与相关议案。代码变化由 Git 管理，变更留档通过 commit hash 与代码关联。
 
 ## 文档
 

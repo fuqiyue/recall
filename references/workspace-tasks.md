@@ -1,6 +1,6 @@
 # 工作路径与任务账本
 
-规则来源：根 RULE-018/020/027/029。按本文设置路径、盘点文件或管理任务；不用另建 PLAN、STATUS、HANDOFF 正文。
+规则来源：根 RULE-018 及[任务交付 RULE-020/025/027/029](../logic_domains/task-workflow/logic_readme.md)。按本文设置路径、盘点文件或管理任务；不用另建 PLAN、STATUS、HANDOFF 正文。
 
 ## 项目根与文件地图
 

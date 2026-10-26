@@ -12,12 +12,12 @@
 - governance_evidence: git:https://github.com/fuqiyue/recall@main
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
-- last_updated: 2026-10-25
+- last_updated: 2026-10-26
 - active_changes: 0
 
 ## 议案规则
 
-本账本保存全项目任务公报；新任务正文唯一位于logic_changes/<任务>/logic_change.md，旧根/领域正文兼容。状态与需求保全见根 RULE-014/018/025，操作见[生命周期](references/change-lifecycle.md)。所有活跃项保持 `effective: false`；已有授权沿用，不把空公报当作实施授权。
+本账本保存全项目任务公报；新任务正文唯一位于logic_changes/<任务>/logic_change.md，旧根/领域正文兼容。状态与需求保全见根 RULE-014/018 及[任务交付 RULE-025](logic_domains/task-workflow/logic_readme.md)，操作见[生命周期](references/change-lifecycle.md)。所有活跃项保持 `effective: false`；已有授权沿用，不把空公报当作实施授权。
 
 ## 讨论主题索引
 
@@ -30,6 +30,7 @@
 
 | change_id | status | scope | owner | target/summary | blocked_by | proposal_path | last_updated |
 |---|---|---|---|---|---|---|---|
+| CHG-20261026-002 | promoting | . | self | 精简根现行规则并同步 GitHub | none | [CHG-20261026-002](logic_changes/root-domain-slim/logic_change.md#chg-20261026-002) | 2026-10-26 |
 
 已完成决定见[历史索引](logic_version/index.md)。
 

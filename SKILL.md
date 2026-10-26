@@ -2,12 +2,12 @@
 name: recall
 description: 在修改、规划、诊断或审查会影响项目逻辑的代码或文档时，恢复现行规则、用户意图与未完任务，按领域读取上下文并完成可验证收尾；普通无逻辑影响的局部编辑无需使用。
 metadata:
-  version: "2026.10.25.1"
+  version: "2026.10.26.2"
 ---
 
 # Recall
 
-Recall 保存设计理由、约束和剩余工作；Git 保存代码历史。现行规则在所属 `logic_readme.md`，新任务正文在 `logic_changes/<任务>/logic_change.md`，根 `logic_change.md` 监督全项目任务，已结束的决定在根 `logic_version/`。
+Recall 用所属 `logic_readme.md` 保存现行规则，用 `logic_changes/<任务>/logic_change.md` 保存修改议案与进度，根 `logic_change.md` 提供任务公报。议案完成后，将生效内容合并进所属 readme，修改事实留档到 `logic_version/`（RULE-002/003/025）；Git 保存代码历史。
 
 ## 定位与读取
 
@@ -15,10 +15,10 @@ Recall 保存设计理由、约束和剩余工作；Git 保存代码历史。现
 
 1. 完整读取目标项目根 `logic_readme.md`，恢复现行规则、功能意图和领域目录。缺失时按[项目接入](references/project-onboarding.md)处理，不把代码推断写成已确认意图。
 2. 读取根 `logic_change.md`；接手或选择下一项时运行 `recall next [--json]`，再核对相关正文的需求来源、剩余动作和证据时点。
-3. 运行 `recall route <任务ID、路径、关键词或 INT-ID>`；任务 ID/路径按声明范围准确找规则，其他相关任务先看摘要，必要时再展开正文（兼容旧领域 change）。CLI 在目标项目根执行；命中清单是阅读范围，不是实施授权。
-4. 核对受影响代码、真实消费者、测试与必要运行证据。当前引用、冲突或兼容问题需要时，才按 ID 读取对应 VER/ADR。
+3. 运行 `recall route <任务ID、路径、关键词或 INT-ID>`；按声明范围先读命中领域的现行 readme，再读本任务及必要的相关议案（兼容旧领域 change）；其他任务先看摘要。CLI 在目标项目根执行；命中清单是阅读范围，不是实施授权。
+4. 核对受影响代码、真实消费者、测试与必要运行证据。日常修改不加载历史；任务明确要求查阅历史时才按 ID 读取 VER/ADR，现行文档中的历史链接本身不触发读取（RULE-003）。
 
-本文的 RULE 编号属于 Recall 技能规则。消费项目的业务制度与一次性授权始终由该项目文档承载，不写入通用技能入口。
+本文的 RULE 编号属于 Recall 技能规则，定义按职责存放在[全局](logic_readme.md)、[文档治理](logic_domains/document-governance/logic_readme.md)、[任务交付](logic_domains/task-workflow/logic_readme.md)、[Git管道](logic_domains/git-pipeline/logic_readme.md)和[工具链](logic_domains/toolchain/logic_readme.md)；按本次涉及规则读取。消费项目的业务制度与一次性授权始终由该项目文档承载，不写入通用技能入口。
 
 用户指定的项目文件夹作为根；命令显式设置 cwd，输出使用根相对路径且只拼接一次。目录不清楚先 `recall inventory`；输出前用 `recall path` 核对，临时代码与输出放 `.work/临时-具体功能`（或项目声明的 scratch_root）。详见[工作路径与任务](references/workspace-tasks.md)。
 
@@ -29,7 +29,8 @@ Recall 保存设计理由、约束和剩余工作；Git 保存代码历史。现
 - 区分想法、已决定但未开始的任务和本次实施授权。`code-derived` / `inferred` 保留为待核实来源；只有项目认可的用户来源可驱动实施。
 - 已有授权在同一任务内有效。计划获准后直接承接必要拆解并实施；只有实质需求冲突、未决长期选择或新增高风险外部操作，才说明来源、影响、选项与建议并请求裁决。
 - 需要 CHG 时先查活跃案，相同/相近需求能统一验收与收尾则合并原正文；保留 `raw_request`、`decomposition`、`fit_analysis`、影响、验证与回滚。当前状态只写在顶部，旧计划精简进[修订记录](references/workspace-tasks.md#多轮修订)；合并方法见该参考，不另建过程正文。承接待办后移除原行。
-- 接手或阻塞时记录下一步、依据和真实缺口，不编造来源、日期、确认或验证结果。
+- 状态变化、取得实质验证结果及交接前，对照证据更新 `status/current_result/next_action`；阻塞记解除动作，不复制逐条日志（RULE-027）。
+- 按受影响范围增量修改规则、代码地图和同任务正文；修改后的 readme 应独立说明完整的现行规则（RULE-002/029）。
 
 ## 按影响选择深度
 
@@ -37,7 +38,7 @@ Recall 保存设计理由、约束和剩余工作；Git 保存代码历史。现
 |---|---|---|
 | simple | 局部隔离、意图明确，不触及 public/persisted/security 契约或活跃案 | 直接修改并适度验证；通常不建 CHG/VER，按实际影响同步文档 |
 | medium | 触及契约路径但语义不变，或多个相关文件且无未决长期选择 | 按 RULE-014/020 在任务正文记录计划、影响、验证和产物台账；规则/行为变化保留精简 VER |
-| high | 改变对外语义、迁移、安全边界或长期结构 | 核真实消费者与必要历史，比较最小修改、结构修改和保持现状；明确迁移/回滚，记录已有授权，未决关键选择先裁决，保留完整 VER |
+| high | 改变对外语义、迁移、安全边界或长期结构 | 核真实消费者与跨域契约，比较最小修改、结构修改和保持现状；明确迁移/回滚，记录已有授权，未决关键选择先裁决，保留完整 VER |
 
 治理字段按[治理模式](references/governance-modes.md)选择；完整表单和 `formal-review` 仅用于用户明确要求的正式审查。
 
