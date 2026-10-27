@@ -36,6 +36,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261027-002 | logic_version-20261027-002-public-docs-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加公开文档整理的真实提交证据，原记录保持不可变 | [记录](records/logic_version-20261027-002-public-docs-commit-link.md) |
 | VER-20261027-001 | logic_version-20261027-001-public-docs-clarity | 2026-10-27 | effective | . | RULE-019 | 1 | 公开文档以用途和上手为先，校正贡献指引，合并安全提醒并保留事实边界 | [记录](records/logic_version-20261027-001-public-docs-clarity.md) |
 | VER-20261026-004 | logic_version-20261026-004-policy-boundary-commit-link | 2026-10-26 | correction | . | RULE-013 | none | 追加现行/历史边界更新的真实提交证据 | [记录](records/logic_version-20261026-004-policy-boundary-commit-link.md) |
 | VER-20261026-003 | logic_version-20261026-003-audit-summary-commit-link | 2026-10-26 | correction | logic_domains/toolchain | RULE-013 | none | 追加审计提示汇总修复的真实提交证据 | [记录](records/logic_version-20261026-003-audit-summary-commit-link.md) |
