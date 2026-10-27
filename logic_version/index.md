@@ -36,6 +36,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261027-004 | logic_version-20261027-004-local-materials-cleanup | 2026-10-27 | correction | . | RULE-020, RULE-025 | 1 | 18份本地材料按3/7/8处置，追加证据位置，CLI66项通过 | [记录](records/logic_version-20261027-004-local-materials-cleanup.md) |
 | VER-20261027-003 | logic_version-20261027-003-closure-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加授权沿用变更的实际提交关联并记录历史证据补齐 | [记录](records/logic_version-20261027-003-closure-commit-link.md) |
 | VER-20261027-002 | logic_version-20261027-002-public-docs-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加公开文档整理的真实提交证据，原记录保持不可变 | [记录](records/logic_version-20261027-002-public-docs-commit-link.md) |
 | VER-20261027-001 | logic_version-20261027-001-public-docs-clarity | 2026-10-27 | effective | . | RULE-019 | 1 | 公开文档以用途和上手为先，校正贡献指引，合并安全提醒并保留事实边界 | [记录](records/logic_version-20261027-001-public-docs-clarity.md) |
