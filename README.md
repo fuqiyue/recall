@@ -4,91 +4,94 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 
-**AI 驱动的项目逻辑追溯系统** — 让每次代码修改都能理解当初的设计意图。
+**为 AI 编程保留项目记忆，让每次接手都理解设计意图。**
 
-Recall 记录 **"系统架构 + 设计原因"**，而不是 **"代码快照"**。代码版本交给 Git，设计逻辑交给 Recall：每个新开启的 AI 会话像新人接手成熟项目，从文档恢复上下文，而不是重扫代码库。
+Recall 将项目的现行规则、功能意图、任务进度和设计决策保存在仓库中。AI 会话开始时，先从文档恢复上下文，再按任务读取相关代码与测试，帮助你持续推进项目。
 
----
+Git 保存代码版本，Recall 连接“为什么这样设计”和“接下来做什么”。适合个人与小团队在持续迭代、会话切换和项目交接中使用。
 
-## v2026.10.25.1：先核验删除，受限再兜底
+## 能帮你做什么
 
-清理先核归属、准确路径及归档/文件指纹，再逐项删除文件和已确认的空目录；需要额外权限时走环境提供的正式审批。成功后核实文件消失、正式归档与其他任务未变，并移除对应待清理登记。
-
-仍受限的已归档重复正文，才在执行策略允许下移入 `logic_version/pending_cleanup/`；移动也受限，仅在现有历史索引登记“原位待清理，允许时可删除”。移动仍有清理欠账，不新增过程文档。CLI只读核验，具体操作见[清理步骤](references/workspace-tasks.md#核验后逐项删除)。
-
-## v2026.10.24：任务准确路由、增量地图与分层清理
-
-本版沿用现有任务正文和文件地图，让上下文按任务准确恢复、局部扫描保留已有覆盖、清理结果明确归属。
-
-- **按任务声明找规则**：任务 ID 或路径依据 `scope` / `affected_scopes` 定位领域；其他相关任务先给摘要，按需展开正文，减少漏读与无关上下文。
-- **文件地图增量更新**：只替换完整列举的目录范围，未重扫或截断的条目保留旧时间；确认目录消失才移除对应索引。
-- **分任务、分轮次核对产物**：支持 `workspace --task` 和 `--round`，全局问题另列；共享临时目录仍归属双方，关案检查不按轮次过滤。
-- **相近需求合并维护**：能统一目标、验收和收尾的需求优先并入同一任务，当前状态只维护一处，修订事实随最终决定归档。
-- **保留产物写明依据**：台账补充保留依据、退出条件和轮次；每轮处置临时物，任务完成后清理临时文件及空目录。
-
-兼容旧五列台账和旧文件地图，保留原 JSON 字段；筛选检查的退出码对应所选任务或轮次。工具不自动删除文件。详见[工作路径与任务](references/workspace-tasks.md)及[本版发布](https://github.com/fuqiyue/recall/releases/tag/v2026.10.24)。
+- **延续上下文**：从现行文档和任务进度接手，减少反复解释项目背景。
+- **按需读取**：根据任务、路径或关键词定位相关领域，集中阅读本次需要的规则。
+- **保留设计依据**：把需求、取舍和验证结果与 Git 提交关联，方便追溯。
+- **完成任务交付**：持续维护同一任务的计划、进度与产物，支持验证、归档和收尾。
 
 ## 快速开始
 
-```bash
-# 在需要接入的项目根运行（recall 代表已配置的命令入口）
-# 初始化 Git、同步 hook、.gitignore 和首次提交；逻辑文档接入见下方说明
-recall init          # Windows 使用维护源 recall.bat；其他平台使用 recall.sh
+准备 Python 3.11+ 和 Git，然后克隆完整仓库：
 
-# 日常命令
-recall status        # 查看系统状态
-recall next          # 当前任务、下一步与阻塞上下文
-recall index         # 生成并核对根公报；加 --write 显式更新
-recall inventory     # 有界盘点真实目录；--write 更新领域文件地图
-recall workspace --task CHG-ID --round 01 # 核本轮产物；全局遗留另列
-recall path <相对路径> # 输出前核对路径，防止越界和重复项目根
-recall workspace --closing CHG-ID # 核台账与真实产物，包括被忽略的临时文件
-recall new "描述" tag  # 在已定位项目创建草稿；可加 --project <项目根>
-recall sync          # 自动保存并同步（未跟踪新文件默认排除，--include-new 纳入）
-recall validate      # 验证一致性
-recall audit         # 文档审计静态门（默认 --current-state）
-recall route <任务ID、路径或关键词> # 任务按声明范围找规则；相关任务先给摘要
-recall query file <路径>  # 查询文件的决策历史
-recall help          # 完整帮助
+```bash
+git clone https://github.com/fuqiyue/recall.git
 ```
 
-`init` 完成 Git 管道后，按[项目接入](references/project-onboarding.md)建立或补全项目逻辑文档。维护 Recall 技能使用本仓库；处理业务项目使用业务项目根，不在技能仓库登记业务规则或授权。
+在**要接入的项目根目录**调用 Recall。以下假设仓库位于 `D:\tools\recall` 或 `~/tools/recall`，请替换为你的实际路径。
 
-最小实践见[三个操作示例](references/practical-examples.md)：首次接入、中等修改与中断接手。
+Windows（PowerShell）：
 
-完整命令、台账字段和兼容边界见[工作路径与任务](references/workspace-tasks.md)。
+```powershell
+& 'D:\tools\recall\recall.bat' init
+```
 
-## 工作方式
+Linux / macOS：
 
-两级文档承载全部项目逻辑（一二级拆分法）：
+```bash
+bash ~/tools/recall/recall.sh init
+```
 
-| 文档 | 角色 |
+`init` 配置 Git 仓库、身份、`.gitignore` 和首次提交，并默认启用提交后的自动同步；使用 `--no-auto-sync` 可选择手动同步。随后让 AI 按 [SKILL.md](SKILL.md) 和[项目接入流程](references/project-onboarding.md)建立根文档、首个领域与功能意图初稿。
+
+下文用 `recall` 代表上述入口；实际调用时继续使用对应路径，或将命令入口加入你的环境。首次接入、中途修改和会话恢复可直接参考[三个操作示例](references/practical-examples.md)。
+
+## 日常使用
+
+| 你想做什么 | 命令 |
 |---|---|
-| `logic_readme.md` | 宪法：全局规则、功能意图与领域目录，每个任务必读 |
-| `logic_change.md` | 全项目活跃任务索引 |
-| `logic_changes/<task>/logic_change.md` | 同任务唯一正文：需求、计划、进度、修改与产物台账 |
-| `logic_domains/<domain>/` | 领域现行规则与可重建文件地图，按需导入（`recall route`） |
-| `.work/临时-具体功能/` | 临时代码和输出，完成后删除；忽略规则不代替清理 |
-| `explainers/` | 可直接打开的 HTML 解释快照（非制度真源） |
-| `logic_version/` | 不可变变更留档：改了什么、必要理由与验证；查历史时按需读取 |
+| 接手当前任务，查看下一步 | `recall next` |
+| 找到本次应读的文档 | `recall route <任务ID、路径或关键词>` |
+| 查看项目与 Git 状态 | `recall status` |
+| 核对文档一致性 | `recall validate` / `recall audit` |
+| 查询文件的设计决策 | `recall query file <路径>` |
+| 保存并同步进度 | `recall sync` |
+| 查看完整命令 | `recall help` |
 
-议案完成后，生效内容增量合并进所属 `logic_readme.md`；日常修改读取现行规则与相关议案。代码变化由 Git 管理，变更留档通过 commit hash 与代码关联。
+`sync` 默认自动提交已跟踪文件的变更，再拉取变基并推送。新文件由你先 `git add` 选入，或用 `--include-new` 一并纳入；提交前会列出文件清单。配置与说明见 [Git 同步](references/git-sync.md)。
 
-## 文档
+需要维护任务公报、文件地图或核对任务产物时，参阅[工作路径与任务](references/workspace-tasks.md)，了解 `index`、`inventory`、`path` 和 `workspace`。
 
-规则语义与使用方式的权威来源（本 README 只是入口，不重述规章）：
+## 文档如何协作
 
-- **[SKILL.md](SKILL.md)** — 核心原则、变更通道与使用方式
-- **[logic_readme.md](logic_readme.md)** — 当前生效规则与代码地图
-- **[AI 交付流程说明](explainers/ai-delivery-closure-20260907.html)** — AI 审查、关案与人工反馈的关系
-- **[references/](references/)** — 模板、生命周期与项目接入流程
+根文档提供全局上下文，领域文档承载具体规则，任务文件保存当前工作，历史记录用于追溯。
 
-## 兼容性
+| 位置 | 内容 |
+|---|---|
+| `logic_readme.md` | 全局现行规则、功能意图与领域目录 |
+| `logic_change.md` | 全项目活跃任务公报与正文链接 |
+| `logic_domains/<domain>/` | 领域现行规则、代码地图与验证入口 |
+| `logic_changes/<task>/logic_change.md` | 同一任务的需求、计划、进度与产物台账 |
+| `logic_version/` | 已完成变更的设计依据、影响与验证记录 |
+| `explainers/` | 便于阅读的 HTML 流程与架构说明 |
 
-- Windows / Linux / macOS，Python 3.11+，仅依赖标准库
-- `scripts/` 须整目录部署（`audit_logic_map.py` 是 `recall_audit/` 分层包的入口，`recall_common.py` 为各脚本共用）
-- 与 Claude Code（CLAUDE.md）和 Codex（AGENTS.md）代理入口兼容
+读取、实施与交付步骤见 [SKILL.md](SKILL.md)；目录与模板说明见[文档模型](references/document-model.md)。
+
+## 按需阅读
+
+| 你关心的内容 | 入口 |
+|---|---|
+| 第一次使用或接入已有项目 | [项目接入](references/project-onboarding.md) · [操作示例](references/practical-examples.md) |
+| AI 如何读取上下文、修改和交付 | [技能入口](SKILL.md) · [变更生命周期](references/change-lifecycle.md) |
+| Recall 自身的现行设计与领域导航 | [现行规则](logic_readme.md) |
+| 任务恢复、目录盘点与产物管理 | [任务上下文](references/task-context.md) · [工作路径与任务](references/workspace-tasks.md) |
+| 模板与参考材料 | [references/](references/) |
+| 版本更新 | [GitHub Releases](https://github.com/fuqiyue/recall/releases) |
+| 参与贡献与安全使用 | [贡献指南](CONTRIBUTING.md) · [安全说明](SECURITY.md) |
+
+## 运行环境
+
+- Windows / Linux / macOS，Python 3.11+ 与 Git；Python 部分使用标准库。
+- 保留完整 `scripts/` 目录，CLI 脚本共享其中的模块。
+- 提供 [Codex 代理入口](AGENTS.md)和 [Claude Code 代理入口](CLAUDE.md)。
 
 ## 许可
 
-MIT — 见 [LICENSE](LICENSE)。
+[MIT](LICENSE)

@@ -6,7 +6,7 @@
 - history_root: logic_version/
 - root_only: true
 - allowed_children: records, index.md, working, decisions, backups, pending_cleanup
-- last_updated: 2026-10-26
+- last_updated: 2026-10-27
 - owner: self
 
 ## 关于逻辑回档
@@ -36,6 +36,7 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261027-001 | logic_version-20261027-001-public-docs-clarity | 2026-10-27 | effective | . | RULE-019 | 1 | 公开文档以用途和上手为先，校正贡献指引，合并安全提醒并保留事实边界 | [记录](records/logic_version-20261027-001-public-docs-clarity.md) |
 | VER-20261026-004 | logic_version-20261026-004-policy-boundary-commit-link | 2026-10-26 | correction | . | RULE-013 | none | 追加现行/历史边界更新的真实提交证据 | [记录](records/logic_version-20261026-004-policy-boundary-commit-link.md) |
 | VER-20261026-003 | logic_version-20261026-003-audit-summary-commit-link | 2026-10-26 | correction | logic_domains/toolchain | RULE-013 | none | 追加审计提示汇总修复的真实提交证据 | [记录](records/logic_version-20261026-003-audit-summary-commit-link.md) |
 | VER-20261026-002 | logic_version-20261026-002-root-domain-slim | 2026-10-26 | effective | ., logic_domains/document-governance, logic_domains/task-workflow | RULE-016, RULE-018, RULE-020, RULE-022, RULE-025, RULE-026, RULE-027, RULE-029 | 1 | 七条完整规则下放，根必读成本减少约36%，规则唯一且按需路由 | [记录](records/logic_version-20261026-002-root-domain-slim.md) |

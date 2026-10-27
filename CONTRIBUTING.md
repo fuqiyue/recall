@@ -1,190 +1,107 @@
 # 贡献指南
 
-感谢你考虑为 Recall 做贡献！🎉
+欢迎通过问题反馈、功能建议、文档和代码改进参与 Recall。
 
-## 如何贡献
+## 反馈问题与建议
 
-### 报告 Bug
+在 [Issues](https://github.com/fuqiyue/recall/issues) 中查看相关讨论，再选择对应模板：
 
-发现问题？请在 [Issues](https://github.com/fuqiyue/recall/issues) 中报告：
+- **问题反馈**：提供复现步骤、预期与实际行为，以及操作系统、Python、Git 版本和 Recall 提交号。
+- **功能建议**：说明使用场景、期望的操作方式和希望达到的结果；实现思路可选。
+- **安全问题**：使用[安全说明](SECURITY.md)中的私密报告渠道。
 
-- **清晰的标题**：简短描述问题
-- **复现步骤**：详细说明如何触发问题
-- **预期行为**：你期望发生什么
-- **实际行为**：实际发生了什么
-- **环境信息**：
-  - OS: Windows/Linux/macOS
-  - Python 版本
-  - Git 版本
-  - Recall 版本
+## 准备开发环境
 
-### 提交功能请求
-
-有好点子？我们很乐意听到：
-
-1. 先在 Issues 中搜索，避免重复
-2. 创建新 Issue，选择 "Feature Request" 标签
-3. 说明：
-   - **为什么需要这个功能**（解决什么问题）
-   - **期望的行为**（如何使用）
-   - **可能的实现方案**（可选）
-
-### 提交代码
-
-#### 开发流程
-
-1. **Fork 仓库**
-
-2. **克隆到本地**
-   ```bash
-   git clone https://github.com/你的用户名/recall.git
-   cd recall
-   ```
-
-3. **创建功能分支**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-
-4. **进行修改**
-   - 遵循 Recall 自己的工作流！
-   - 先记录议案到 `logic_change.md`
-   - 实施修改
-   - 归档决策到 `logic_version/records/`
-   - 更新 `logic_readme.md`
-
-5. **测试**
-   ```bash
-   # 运行验证、审计静态门与全部测试
-   ./recall.sh validate
-   ./recall.sh audit
-   python -m unittest discover -s tests
-   
-   # 手动测试相关功能
-   ./recall.sh status
-   ./recall.sh query file <path>
-   ```
-
-6. **提交**
-   ```bash
-   git add .
-   git commit -m "feat: 添加某功能
-
-   详细说明修改内容和原因
-   
-   Ref: logic_version/records/logic_version-YYYYMMDD-NNN-<scope>.md"
-   ```
-
-7. **推送并创建 PR**
-   ```bash
-   git push origin feature/your-feature-name
-   ```
-
-#### Commit Message 规范
-
-使用 [Conventional Commits](https://www.conventionalcommits.org/) 格式：
-
-```
-<type>: <简短描述>
-
-<详细说明>
-
-Ref: logic_version/records/<record-file>.md
-```
-
-**Type 类型**：
-- `feat`: 新功能
-- `fix`: Bug 修复
-- `docs`: 文档修改
-- `style`: 代码格式（不影响功能）
-- `refactor`: 重构（不是新功能也不是修复）
-- `test`: 添加或修改测试
-- `chore`: 构建过程或辅助工具的变动
-
-#### 代码风格
-
-- **Python**: 遵循 PEP 8
-- **文档**: 简洁清晰，中文优先
-- **注释**: 解释"为什么"，而不是"做什么"
-
-#### Pull Request 检查清单
-
-在提交 PR 前，确保：
-
-- [ ] 代码通过 `recall validate` 验证
-- [ ] 更新了相关文档（README, CLAUDE.md 等）
-- [ ] 添加/更新了测试（如适用）
-- [ ] Commit messages 遵循规范
-- [ ] 创建了对应的 VER 记录（重要修改；历史索引见 logic_version/index.md）
-- [ ] PR 描述清楚说明了：
-  - 做了什么修改
-  - 为什么需要这个修改
-  - 如何测试
-
-### 文档贡献
-
-改进文档同样重要！
-
-- 修正错误、改进表述
-- 添加示例和使用场景
-- 翻译文档（如需要）
-
-直接编辑 Markdown 文件并提交 PR 即可。
-
-## 开发环境设置
+安装 Python 3.11+ 和 Git，Fork 仓库后克隆到本地：
 
 ```bash
-# 1. 安装 Python 3.11+
-python --version
-
-# 2. 初始化 Recall（如果是新克隆）
-./recall.sh init
-
-# 3. 验证环境
-./recall.sh status
+git clone https://github.com/你的用户名/recall.git
+cd recall
+git switch -c docs/your-change
+python scripts/recall.py status
 ```
+
+CLI 和测试使用 Python 标准库。开发代码功能时可使用 `feat/` 或 `fix/` 等描述性分支名。
+
+## 修改流程
+
+1. 按 [SKILL.md](SKILL.md)读取根现行文档、根任务公报，再运行 `python scripts/recall.py route <目标路径或关键词>`，读取相关领域规则与任务正文。
+2. 按影响选择变更深度。局部文案、排版等 simple 修改通常直接编辑；需要 CHG 的任务按[任务模板](references/logic-change-template.md)在 `logic_changes/<task>/logic_change.md` 保留计划与进度，并更新根公报。
+3. 实施修改，按实际影响同步所属现行文档，并完成必要验证。
+4. 按[变更生命周期](references/change-lifecycle.md)完成所需归档与产物清理，再提交 PR。
+
+完整分流标准以 [SKILL.md](SKILL.md)为准。文档贡献可以从修正表述、补充操作示例或校正链接开始。
+
+## 验证修改
+
+在仓库根目录运行文档检查：
+
+```bash
+python scripts/recall.py validate
+python scripts/recall.py audit
+python scripts/recall.py index
+git diff --check
+```
+
+修改代码时，运行与改动相关的测试；完整测试入口为：
+
+```bash
+python -m unittest discover -s tests
+```
+
+现有自动化测试覆盖 CLI、Git 同步、文档审计与验证、任务上下文和工作区管理等功能。[GitHub Actions](.github/workflows/validate.yml)在 Ubuntu 与 Windows 上运行验证、测试和审计。
+
+验证结果请记录具体命令、结果和环境，便于复核。
+
+## 提交与 Pull Request
+
+提交前用 `git diff` 和 `git status` 核对内容，再选择本次修改的文件加入暂存区。提交信息使用 Conventional Commits 格式：
+
+```text
+docs: 梳理项目快速开始与文档导航
+```
+
+常用类型包括 `feat`、`fix`、`docs`、`style`、`refactor`、`test` 和 `chore`。有对应 VER 的变更，在提交正文中补充实际记录路径：
+
+```text
+Ref: logic_version/records/<实际记录文件名>.md
+```
+
+推送你的分支并创建 PR，在描述中说明：
+
+- 修改解决的具体问题及结果。
+- 涉及的范围、文档和必要的兼容说明。
+- 执行过的验证及其结果。
+
+## 代码与文档风格
+
+- Python 遵循 PEP 8，沿用相关模块的组织方式。
+- 文档中文优先，使用简洁、具体的表述，示例与当前 CLI 保持一致。
+- 注释说明设计依据；现行规则由所属 `logic_readme.md` 维护，操作说明通过链接引用。
+- 对已归档记录的补充或纠正使用新的记录，保留原始内容以便追溯。
 
 ## 项目结构
 
-```
+```text
 recall/
-├── recall.bat / recall.sh      # CLI 入口
-├── scripts/                    # Python 脚本
-│   ├── cli.py                 # 命令解析
-│   ├── validator.py           # 验证逻辑
-│   ├── query.py               # 查询功能
-│   └── record.py              # 记录功能
-├── logic_readme.md            # 当前规则
-├── logic_change.md            # 活跃议案
-├── logic_version/             # 历史记录
-│   ├── records/              # VER 记录
-│   └── index.md              # 索引
-└── docs/                      # 文档
+├── recall.bat / recall.sh      # 平台命令入口
+├── SKILL.md                    # AI 操作入口
+├── scripts/
+│   ├── recall.py              # CLI 入口与命令分发
+│   ├── recall_common.py       # 共享能力
+│   ├── recall_audit/          # 文档审计模块
+│   └── ...                   # Git、路由、验证与工作区工具
+├── tests/                     # unittest 自动化测试
+├── logic_readme.md            # 全局现行规则与领域导航
+├── logic_change.md            # 全项目任务公报
+├── logic_domains/             # 领域规则与文件地图
+├── logic_changes/             # 活跃任务正文（按需创建）
+├── logic_version/             # 变更归档与索引
+├── references/                # 操作指引与模板
+├── explainers/                # HTML 解释文档
+└── .github/                   # CI 与社区模板
 ```
 
-## 测试
+## 协作交流
 
-目前主要通过手动测试和 `recall validate` 验证。
-
-计划添加：
-- 单元测试（pytest）
-- 集成测试
-- 端到端测试
-
-欢迎贡献测试框架！
-
-## 行为准则
-
-- **尊重**：友善对待每个人
-- **建设性**：提供有价值的反馈
-- **协作**：一起让 Recall 更好
-
-## 需要帮助？
-
-- 查看 [Issues](https://github.com/fuqiyue/recall/issues) 中标记为 `good first issue` 的任务
-- 在 [Discussions](https://github.com/fuqiyue/recall/discussions) 提问
-- 阅读 [CLAUDE.md](CLAUDE.md) 了解项目设计理念
-
----
-
-再次感谢你的贡献！每一个 PR、Issue 和建议都让 Recall 变得更好。❤️
+反馈尽量附上具体场景与证据，讨论时尊重彼此的经验与判断。需要选择贡献方向时，可以从 [Issues](https://github.com/fuqiyue/recall/issues) 和 [README 文档导航](README.md#按需阅读)开始。
