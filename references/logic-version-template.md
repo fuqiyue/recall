@@ -107,7 +107,7 @@ recall new "添加暗色模式支持" "add-dark-mode" --project /path/to/project
 
 ### 2. 实施、验证与定稿
 
-先按生命周期步骤7–8更新现行制度、执行清理并把真实结果写入草稿；定稿VER与索引后才关案。
+先按[晋升与关案](change-lifecycle.md#晋升与关案)更新现行制度、执行清理并把真实结果写入草稿；定稿VER与索引后删除已结束任务正文并核实退出。
 提交时在 commit message 中引用决策记录（`Ref: logic_version/records/<filename>.md`）。
 提交后无需手动操作：post-commit hook 解析 Ref 行（或同一提交内的规范命名记录），
 把 `- after_commit: _待填写_` 占位符自动回填为提交哈希（RULE-013）。
@@ -116,7 +116,7 @@ recall new "添加暗色模式支持" "add-dark-mode" --project /path/to/project
 ### 3. 归档议案
 
 归档语义见 RULE-014/025/027（需求、修订过程与落选方案保全）；操作步骤见
-[变更与决策生命周期](change-lifecycle.md) 第 7-9 步。
+[晋升与关案](change-lifecycle.md#晋升与关案)。
 
 ---
 

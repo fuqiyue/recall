@@ -101,14 +101,14 @@
 | INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | RULE-021 | scripts/detect_conflicts.py | user-confirmed:2026-08-16 | 2026-09-03 |
 | INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建宪法骨架 + 至少一个领域，按触发时机逐模块补全 | FLOW-005#2 | RULE-016, RULE-018 | references/project-onboarding.md | user-confirmed:2026-08-16 | 2026-09-04 |
 | INT-20260816-011 | 根与领域拆分 | 根保留全局规则，按领域读取；增量下放完整规则并消除重复 | FLOW-005#4 | RULE-018 | references/logic-domain-template.md; scripts/recall_audit/integrity.py | user:2026-10-26 | 2026-10-26 |
-| INT-20260903-001 | 收尾归零（任务内产物台账 + workspace 实物核对） | AI 沿用已有授权完成核验与清理，再报告任务结束，用户无需重复批准同范围收尾 | FLOW-002#4/6 | RULE-020, RULE-025 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | user:2026-10-26 | 2026-10-26 |
+| INT-20260903-001 | 收尾归零（任务内产物台账 + workspace 实物核对） | AI 沿用授权完成核验，安置必要材料、删除已归档任务正文与临时物，再核索引和实物退出；用户无需重复批准同范围收尾 | FLOW-002#4/6 | RULE-020, RULE-025 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | user:2026-10-27 | 2026-10-27 |
 | INT-20260903-002 | recall route | 按目标路径/关键词得到本次应读的文档清单与上下文成本，只导入命中的领域 | FLOW-002#1 | RULE-018 | scripts/route_docs.py | user:2026-09-03 | 2026-09-06 |
 | INT-20260907-001 | AI 审查与关案 | AI 审查验证后自主交付，人工后测发现问题另开案 | FLOW-002#4 | RULE-025 | references/change-lifecycle.md | user:2026-09-07 | 2026-09-07 |
 | INT-20260907-002 | explainers HTML | 需要解释文档时直接在项目 explainers 打开查看 | FLOW-003#4 | RULE-026 | references/explainers.md | user:2026-09-07 | 2026-09-07 |
 | INT-20261020-001 | inventory / path / workspace / 任务文件 | 正确定位路径与规则、增量维护文件地图、合并相近任务并按轮清理；清理受限时保全已归档正文且持续提示欠账 | FLOW-002#1/2/4/6 | RULE-018, RULE-020, RULE-025, RULE-027, RULE-029 | scripts/workspace_cli.py; scripts/workspace_inventory.py; scripts/workspace_check.py; references/workspace-tasks.md | user:2026-10-25 | 2026-10-25 |
 ### 用户流程
 - FLOW-001 首次接入：1. recall init → INT-20260816-002；2. 配置远端（可选）；3. recall sync → INT-20260816-005。
-- FLOW-002 日常修改：1. 定位项目，读宪法/账本并 route → INT-20260816-001/003、INT-20260903-002；2. 判通道并记录必要 CHG/需求与验证计划；3. 按需 recall new 留决策骨架后实施 → INT-20260816-004；4. 审查验证后更新现行文档、清理、定稿VER/index、关案 → INT-20260907-001；5. commit/sync → INT-20260816-005；6. status 收尾 → INT-20260903-001。
+- FLOW-002 日常修改：1. 定位项目，读宪法/账本并 route → INT-20260816-001/003、INT-20260903-002；2. 判通道并记录必要 CHG/需求与验证计划；3. 按需 recall new 留决策骨架后实施 → INT-20260816-004；4. 审查验证后更新现行文档、安置与清理产物、定稿VER/index、删除已结束任务正文并核公报 → INT-20260907-001；5. commit/sync → INT-20260816-005；6. status 收尾 → INT-20260903-001。
 - FLOW-003 追溯审查：1. next/status/list/index → INT-20260816-006；2. query → INT-20260816-007；3. validate/audit → INT-20260816-008；4. explainers → INT-20260907-002。
 - FLOW-004 冲突澄清：1. conflicts → INT-20260816-009；2. 标注所属账本；3. 用户裁决后实施。
 - FLOW-005 项目接入：1. recall init；2. 建宪法、领域与意图访谈 → INT-20260816-010；3. 按触发时机补全；4. 超限时拆域并登记 → INT-20260816-011。

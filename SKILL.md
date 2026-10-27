@@ -2,7 +2,7 @@
 name: recall
 description: 在修改、规划、诊断或审查会影响项目逻辑的代码或文档时，恢复现行规则、用户意图与未完任务，按领域读取上下文并完成可验证收尾；普通无逻辑影响的局部编辑无需使用。
 metadata:
-  version: "2026.10.27.1"
+  version: "2026.10.27.2"
 ---
 
 # Recall
@@ -18,15 +18,21 @@ flowchart TD
     A[确定用户指定的项目] --> B[读根 readme 与 change]
     B --> C[route 目标：先读领域规则，再读相关任务]
     C --> D[核用户意图、现有授权、代码与消费者]
-    D --> E{有未获授权的实质影响或未决选择？}
-    E -- 有 --> F[仅澄清受影响部分；继续独立工作]
+    D --> E{下一步影响已获授权且无未决选择？}
+    E -- 否 --> F[只澄清缺口；继续独立工作]
     F --> D
-    E -- 无 --> G[沿用授权，按影响选 simple / medium / high]
-    G --> H[实施、审查验证、更新文档并清理]
-    H --> I[必要归档与关案；按授权提交推送]
+    E -- 是 --> G[按影响选 simple / medium / high]
+    G --> P{执行时环境要求审批？}
+    P -- 是 --> Q[申请具体操作权限]
+    Q -- 通过 --> H[实施与必要验证]
+    Q -- 受阻 --> R[说明具体缺口；继续可做部分]
+    P -- 否 --> H
+    H --> I[更新现行文档；安置必要材料并清理]
+    I --> J[按通道归档；删除已结束任务正文并核公报]
+    J --> K[按授权提交推送；核结果与残留]
 ```
 
-环境明确要求审批或拒绝某项操作时，按 RULE-025 处理该操作；不把每个步骤都变成用户确认点。接手/压缩不重置原授权。
+授权决定范围，平台权限决定能否执行，验证决定是否完成；三者分别核对。图中权限判断适用于实际写入、删除或发布操作，不是一次审批覆盖全部步骤。接手/压缩不重置原授权，high 表示深入核验，不自动增加确认轮次。具体示例见[任务上下文](references/task-context.md#授权判断示例)。
 
 ## 定位与读取
 
@@ -51,23 +57,25 @@ flowchart TD
 
 - 按 RULE-014/017/025/027 恢复用户来源与原授权；区分想法、已决定待办、本次实施，推断不能冒充已确认意图。需要 CHG 时先找可合并的活跃案，在同正文保全需求三字段、当前计划和简短修订表；承接待办后移除原行。
 - 状态变化、实质验证及交接前更新顶部 `status/current_result/next_action`；阻塞写解除动作。规则及地图增量更新，readme 合并成完整现行表述（RULE-002/029）。长期兼容层先核真实消费者、退出条件及回滚。
-- 按 RULE-020/025：核 diff → 语义审查/必要验证 → 更新 readme/地图 → 核验并清理 → 需求与修订归同一 VER/index → 关闭 CHG/公报。提前建的 VER 保持关联草稿，清理事实齐备才定稿；定稿只追加。simple 无 CHG 用简短汇报。
-- 清理按[逐项核验步骤](references/workspace-tasks.md#核验后逐项删除)沿用授权；每轮处理本轮产物，keep 记依据和退出条件，复用物先晋升。关案用 `workspace --closing CHG-ID` 核实物，列本次结果与全局遗留；旧 logic_temp 兼容，新任务台账在正文。
+- 审查验证通过后按[晋升与关案](references/change-lifecycle.md#晋升与关案)连续收尾。提前建的 VER 保持关联草稿，清理事实齐备才定稿；定稿只追加。simple 无 CHG 用简短汇报。
+- 按 RULE-020/025，每轮处理本轮产物；完成时安置仍需使用的材料、更新当前引用，再删除临时副本、已归档任务正文及空目录，核公报和实物。keep 写具体用途及退出条件，不能仅因曾被历史提及就永久保留整目录。步骤见[产物去向](references/workspace-tasks.md#完成时的产物去向)；旧 logic_temp 兼容，新台账在任务正文。
 - 静态通过、源码交付、生产启用分别报告；人工交付后新问题另开案，简单修复仍 simple。Git 操作按[Git 管道 RULE-010/011/013](logic_domains/git-pipeline/logic_readme.md)。
 
 ## 命令与按需参考
 
 Windows 用维护源 `recall.bat`，Linux/macOS 用 `recall.sh`；在目标项目根调用，需 Python 3.11+ 和完整 scripts/。
 
-| 目的 | 命令 |
-|---|---|
-| 接手/阅读 | `recall next --json`、`recall route <目标>`、`recall status` |
-| 公报核对/更新 | `recall index`（差异退出 1）；显式更新用 `index --write` |
-| 路径/地图 | `recall path <相对路径>`、`recall inventory [目录]`；更新地图用 `inventory --write` |
-| 产物核对 | `recall workspace --task CHG-ID [--round 01]`、`workspace --closing CHG-ID` |
-| 一致性/静态门 | `recall validate`、`recall audit`；正式审查才加 `--formal-review` |
+| 操作 | 命令 | 实际影响 |
+|---|---|---|
+| 接手/阅读 | `recall next --json`、`route <目标>`、`status` | 只读，不授权或自动实施 |
+| 路径/地图 | `recall path <相对路径>`、`inventory [目录]` | 只读 |
+| 产物核对 | `recall workspace --task CHG-ID [--round 01]`、`workspace --closing CHG-ID` | 只读，不删除文件 |
+| 一致性检查 | `recall index`、`validate`、`audit` | 只读；index 差异退出 1；正式审查才用 `--formal-review` |
+| 更新派生文档 | `recall index --write`、`inventory --write` | 写公报或地图，不修改业务文件 |
+| 创建留档草稿 | `recall new` | 写 VER 草稿，不代表任务完成 |
+| Git 接入/同步 | `recall init`、`sync` | 可改配置、提交及推送；先读[Git 操作表](references/git-sync.md#命令实际影响) |
 
-上表仅两个 `--write` 写派生文档，其余只读；不删除、不推送。
+命令影响与用户授权分别核对；正式提交前还要核 hook，避免提交时意外触发发布。
 
 | 需要处理 | 读取 |
 |---|---|
