@@ -36,8 +36,9 @@
 
 | version_id | version_slug | date | status | affected_scopes | linked_rule_ids | confirmed_revision | summary | path |
 |---|---|---|---|---|---|---|---|---|
+| VER-20261027-007 | logic_version-20261027-007-workflow-authorization-closure | 2026-10-27 | effective | ., logic_domains/task-workflow, logic_domains/git-pipeline | RULE-020, RULE-025 | 1 | 授权运行流程与任务正文、产物实际退出 | [记录](records/logic_version-20261027-007-workflow-authorization-closure.md) |
 | VER-20261027-005 | logic_version-20261027-005-cleanup-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加本地材料整理的真实提交关联，仅发布Recall正式文档 | [记录](records/logic_version-20261027-005-cleanup-commit-link.md) |
-| VER-20261027-006 | 2026-10-27 | effective | 文档精简、授权路径与旧副本退出 | [记录](records/logic_version-20261027-006-docs-slim-authorization.md) | 353项测试；静态与链接核验；实施提交 ab821c2 |
+| VER-20261027-006 | logic_version-20261027-006-docs-slim-authorization | 2026-10-27 | effective | ., logic_domains/document-governance | RULE-022, RULE-025 | 1 | 文档精简、授权路径与旧副本退出 | [记录](records/logic_version-20261027-006-docs-slim-authorization.md) |
 | VER-20261027-004 | logic_version-20261027-004-local-materials-cleanup | 2026-10-27 | correction | . | RULE-020, RULE-025 | 1 | 18份本地材料按3/7/8处置，追加证据位置，CLI66项通过 | [记录](records/logic_version-20261027-004-local-materials-cleanup.md) |
 | VER-20261027-003 | logic_version-20261027-003-closure-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加授权沿用变更的实际提交关联并记录历史证据补齐 | [记录](records/logic_version-20261027-003-closure-commit-link.md) |
 | VER-20261027-002 | logic_version-20261027-002-public-docs-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加公开文档整理的真实提交证据，原记录保持不可变 | [记录](records/logic_version-20261027-002-public-docs-commit-link.md) |
