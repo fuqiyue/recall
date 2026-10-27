@@ -92,14 +92,14 @@
 ## 读取策略
 
 - 日常读取根 `logic_readme.md` 和根 `logic_change.md`，不默认读取本目录
-- 只有当前文档直接引用、需要解释冲突或追溯兼容性时，才按 ID 读取相关记录
+- 仅任务明确要求查阅历史时按 ID 读取；现行文档中的历史链接不触发读取（根 RULE-003）。格式、链接和本次归档保全核验按同规则执行
 - 历史记录是"回忆设计思路"的工具，不是日常审查对象
 
 ---
 
 ## 记录创建规则
 
-哪条通道要不要建记录见 SKILL.md"三条变更通道"表（RULE-004，此处不重述）。
+哪条通道要不要建记录见 SKILL.md“按影响选择深度”表（RULE-004，此处不重述）。
 
 **新增记录步骤**：
 
@@ -115,3 +115,9 @@
 
 | task_id | original_path | path | archive | sha256 | reason | recorded_at | exit_condition |
 |---|---|---|---|---|---|---|---|
+
+## 旧副本的恢复位置
+
+2026-10-27 清理 Recall 工具的旧文档/源码副本；此前已提交的 50 份文件可从 [GitHub 历史树](https://github.com/fuqiyue/recall/tree/f4da7f300988d649f9ab72da0f2954b2c4d03748/logic_version/backups) 恢复。查旧清单中的快照路径时，使用该提交的完整目录；不要把历史路径当作当前文件。
+
+原路径仅保留 4 份被不可变记录直接引用的收据：skill-document-clarity-20261012 的 checks.json、manifest.json，以及 six-improvements-20261012、reliable-context-20261013 各自的 checks.json。它们是历史证据，不参与日常规则读取。worklog-schema-validation-20261013 的 10 份未上传材料，用户知悉无法从 GitHub 恢复后明确要求删除；旧清理记录描述其当时的保全状态。

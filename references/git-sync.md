@@ -6,7 +6,7 @@
 
 `recall init` 默认启用自动同步：安装受管理的 `post-commit` hook，提交后执行 `pull --rebase --autostash` 再 `push`，失败只告警、不阻断本地提交。
 
-自动同步只在跑过 `recall init` 的仓库里生效。只接入了文档、没接管道的项目（`git config --get recall.autoSync` 为空或 `.git/hooks/post-commit` 不存在）不会自动推送，提交后必须自己推：`recall sync` 或 `git push`。一批提交只推前几个，会让远端停在实现未进的中间提交上（2026-09-02 消费项目实例：7 个提交只推 1 个，CI 18 项失败）。
+执行前核 `recall.autoSync` 与实际 hook。未启用自动同步时，提交方完成已获授权的推送，再核远端；提交成功不代表同步成功。已有“修改并推送”授权无需重问；仅要求本地修改时，先完成可审阅结果，发布前确认范围。
 
 核对入口：
 
@@ -23,7 +23,7 @@
 - `--disable`：完全关闭自动同步
 - 无远端时先 `git remote add origin <url>`
 
-post-commit hook 场景绝不自动提交其他脏文件（UXI-003）。
+post-commit hook 不自动提交其他脏文件（UXI-003）。工作树混有其他任务的已跟踪改动时，按本次授权逐项暂存并核清单；默认 sync 会收进这些已跟踪改动，不适合直接用于选择性发布。
 
 ## 决策记录的 after_commit 回填
 

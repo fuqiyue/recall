@@ -20,10 +20,10 @@
 - governance_verification: recorded
 - governance_verified_at: 2026-08-08
 - effective_from: 2026-08-07
-- last_verified: 2026-10-26
+- last_verified: 2026-10-27
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: logic_readme.md; 已登记领域的 logic_readme.md（SKILL.md 为操作入口）
-- source_decisions: 全量见 logic_version/index.md；最近 VER-20261026-001, VER-20261026-002, VER-20261026-005
+- source_decisions: 见规则决策列；全量见 logic_version/index.md
 - intent_summary: 从现行文档恢复设计逻辑；根必读、领域按需，历史仅留档
 - intent_sources: 用户访谈 2026-08-07；用户确认 2026-09-03（一二级拆分法）
 - decision_validity: valid
@@ -44,13 +44,13 @@
 | rule_id | 规则等级 | 当前有效规则/行为 | why（仅一句可审计摘要） | 决策记录 | 决策依据 | 验证证据 | validity | last_reviewed | review_owner |
 |---|---|---|---|---|---|---|---|---|---|
 | RULE-001 | key | 逻辑回档而非代码回档 | 避免上下文膨胀，保持文档简洁可读 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 用户确认 | SKILL.md 章节 | valid | 2026-08-08 | self |
-| RULE-002 | key | ①现行readme只留最新规则；增量改受影响条款并合并为完整现行表述，不靠CHG/VER拼接，删除废弃正文。②根有效决策索引只留全量index指针和最近3条。③每条生效VER须在根索引或所属规则决策列保留链接，移出滚动索引前核规则反链。 | 保证局部更新后的现行制度完整且可追溯。 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md)；[VER-20260904-002](logic_version/records/logic_version-20260904-002-docs-consolidation.md)；[VER-20261026-001](logic_version/records/logic_version-20261026-001-current-policy-archive-boundary.md) | user:2026-10-26 | 文档模型/生命周期；validate | valid | 2026-10-26 | Codex |
-| RULE-003 | key | 历史仅留档：记录改了什么、必要理由与取舍、影响、验证和清理事实，不补充或覆盖现行规则。日常修改不加载历史，仅在任务明确要求查阅历史时按ID读VER/ADR；格式、链接及本次归档保全核验不等于恢复历史规则。 | 让现行文档足以指导修改，历史仅用于追溯。 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md)；[VER-20261026-001](logic_version/records/logic_version-20261026-001-current-policy-archive-boundary.md) | user:2026-10-26 | SKILL.md；文档模型/VER模板；代理入口 | valid | 2026-10-26 | Codex |
+| RULE-002 | key | 现行 readme 只写完整的最新规则，增量合并受影响条款并删除废弃正文。 根索引保留全量 index 指针与最近 3 条；每条生效 VER 至少保留一处根索引或规则决策列链接，移出根索引前核反链。 | 保证局部更新后的现行制度完整且可追溯。 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | user:2026-10-26 | 文档模型/生命周期；validate | valid | 2026-10-27 | Codex |
+| RULE-003 | key | 历史留档修改、必要理由/取舍、影响、验证与清理事实，不补充或覆盖现行规则。 仅任务明确要求时按 ID 读 VER/ADR；格式、链接和本次归档保全核验可读历史，但不据此恢复旧规则。 | 让现行文档足以指导修改，历史仅用于追溯。 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | user:2026-10-26 | SKILL.md；文档模型/VER模板；代理入口 | valid | 2026-10-27 | Codex |
 | RULE-004 | ordinary | 三条通道分流修改 | 简单/中等/高风险，避免过度流程化 | [VER-20260808-001](logic_version/records/logic_version-20260808-001-recall-restructure.md) | 最佳实践 | SKILL.md | valid | 2026-08-08 | self |
-| RULE-014 | key | ①INT/FLOW/UXI只在根维护，INT用 `INT-YYYYMMDD-NNN`，登记来源和代码锚点；②仅user/user-confirmed意图可驱动实施，inferred/code-derived告警，已决定新目标先登记，想法留待办；③medium/high实施前记raw_request/decomposition/fit_analysis，归档原样搬入VER；落选方案及理由随胜出记录，独立落选案建rejected VER并搬三字段；④获准Plan按通道落盘后实施；⑤personal维护INT、合并FLOW、按需UXI，协作全量。 | 把用户意图与需求拆解从会话保全到项目真源。 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-feature-intent-layer.md)；[VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md)；[VER-20260831-002](logic_version/records/logic_version-20260831-002-arch-simplify.md)；[VER-20260904-001](logic_version/records/logic_version-20260904-001-intent-provenance-conflicts.md) | 用户确认；历史依据见决策记录 | 本文件意图层; scripts/validate.py; 治理模式 | valid | 2026-09-04 | self |
-| RULE-017 | key | 新会话或压缩后从现行文档与活跃案接手，不要求用户重述背景；仅在用户明确指出问题时修改现行制度；歧义先按现行逻辑分析并建议，再咨询真实未决点。 | 让文档完成交接，减少重复发现背景。 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认；历史依据见决策记录 | SKILL.md 上下文读取入口 | valid | 2026-08-16 | self |
-| RULE-018 | key | ①根readme保全局规则与意图，领域readme保现行规则/代码地图，新领域readme-only、旧paired兼容。②根change派生任务公报，logic_changes/任务/logic_change.md为唯一正文。③route先用任务ID/路径解析scope与affected_scopes找所属规则，其他相关任务先给摘要链接；关键词仍启发式。④RULE/INT/CHG全项目唯一，未登记规则仍属平行真源；密度门见RULE-022。 | 根保全局约束，领域按需控制阅读成本。 |[VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md)；[VER-20260903-004](logic_version/records/logic_version-20260903-004-two-level-docs.md)；[VER-20260904-002](logic_version/records/logic_version-20260904-002-docs-consolidation.md)；[VER-20260904-005](logic_version/records/logic_version-20260904-005-density-gate.md)；[VER-20260906-001](logic_version/records/logic_version-20260906-001-constitution-slim-alignment.md)；[VER-20261020-001](logic_version/records/logic_version-20261020-001-workspace-task-governance.md)；[VER-20261024-001](logic_version/records/logic_version-20261024-001-task-context-workspace.md)；[VER-20261026-002](logic_version/records/logic_version-20261026-002-root-domain-slim.md) | user:2026-10-26 | scripts/route_docs.py; recall_audit; tests/ | valid | 2026-10-26 | Codex |
-| RULE-019 | key | 规则语义只在所属readme规则行；SKILL、模板、生命周期及代理入口只放规则指针与操作步骤；Git跟踪的顶层Markdown入口须在owned_paths或unmapped_paths登记，否则静态门失败。 | 防止入口、模板与现行制度各自漂移。 | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md)；[VER-20261011-003](logic_version/records/logic_version-20261011-003-maintenance-boundaries.md)；公开文档维护：[VER-20261027-001](logic_version/records/logic_version-20261027-001-public-docs-clarity.md) | 用户确认；历史依据见决策记录 | scripts/audit_logic_map.py 根目录覆盖对账 + tests/test_audit_logic_map.py | valid | 2026-09-04 | self |
+| RULE-014 | key | 意图：INT/FLOW/UXI 只在根维护；INT 用 INT-YYYYMMDD-NNN，留来源和代码锚点。仅 user/user-confirmed 可驱动实施；inferred/code-derived 告警。已决定目标先登记，想法留待办。 需求：medium/high 实施前记 raw_request/decomposition/fit_analysis，归档原样搬入 VER。落选方案及理由随胜出记录；独立落选案建 rejected VER 并保全三字段。 计划：获准 Plan 按通道落盘再实施。personal 维护 INT、合并 FLOW、按需 UXI；协作全量。 | 把用户意图与需求拆解从会话保全到项目真源。 | [VER-20260816-001](logic_version/records/logic_version-20260816-001-feature-intent-layer.md)；[VER-20260831-002](logic_version/records/logic_version-20260831-002-arch-simplify.md) | 用户确认；历史依据见决策记录 | 本文件意图层; scripts/validate.py; 治理模式 | valid | 2026-10-27 | Codex |
+| RULE-017 | key | 新会话或压缩后，从现行文档和活跃案接手，不要求用户重述背景。仅对用户明确提出的问题修改现行制度；歧义先按现行逻辑分析并建议，只询问真实未决点。 | 让文档完成交接，减少重复发现背景。 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | 用户确认；历史依据见决策记录 | SKILL.md 上下文读取入口 | valid | 2026-10-27 | Codex |
+| RULE-018 | key | 根 readme 保存全局规则与意图；领域 readme 保存现行规则和代码地图，新领域 readme-only、旧 paired 兼容。 任务正文唯一位于 logic_changes/任务/logic_change.md，根 change 派生公报。route 按任务 ID/路径的 scope、affected_scopes 先找所属规则，相关任务先给摘要；关键词启发式匹配。 RULE/INT/CHG 全项目唯一；未登记规则仍属平行真源。密度见 RULE-022。 | 根保全局约束，领域按需控制阅读成本。 | [VER-20260816-004](logic_version/records/logic_version-20260816-004-handoff-hierarchy.md) | user:2026-10-26 | scripts/route_docs.py; recall_audit; tests/ | valid | 2026-10-27 | Codex |
+| RULE-019 | key | 规则只在所属 readme 定义；SKILL、模板、生命周期和代理入口只放指针与步骤。Git 跟踪的顶层 Markdown 须登记 owned_paths 或 unmapped_paths，否则静态门失败。 | 防止入口、模板与现行制度各自漂移。 | [VER-20260816-005](logic_version/records/logic_version-20260816-005-audit-remediation.md)；[VER-20261027-001](logic_version/records/logic_version-20261027-001-public-docs-clarity.md) | 用户确认；历史依据见决策记录 | scripts/audit_logic_map.py 根目录覆盖对账 + tests/test_audit_logic_map.py | valid | 2026-10-27 | Codex |
 ### 按需领域入口
 下表只导航，不重述领域规则；按相关路径、RULE 或 INT 运行 `recall route`。涉及多个职责时读取相应领域。
 | 何时读取 | 现行规则位置 | 规则编号 |
@@ -75,7 +75,7 @@
 - workspace_root: .
 - scratch_root: .work/
 - data_roots: none
-- unmapped_paths: agents/ (Codex 配置), .agents/ (代理私有目录), .claude/ (代理私有目录), logic_version/backups/ (归档快照), .github/ (仓库社区配置), CONTRIBUTING.md (社区贡献指南、非真源), SECURITY.md (安全政策、非真源), acl-reports/ (运行时 ACL 审计输出、非 Recall 真源)
+- unmapped_paths: agents/ (Codex 配置), .agents/ (代理私有目录), .claude/ (代理私有目录), logic_version/backups/ (历史记录引用的必要检查收据), .github/ (仓库社区配置), CONTRIBUTING.md (社区贡献指南、非真源), SECURITY.md (安全政策、非真源), acl-reports/ (运行时 ACL 审计输出、非 Recall 真源)
 
 ### 范围登记表
 | module_id | scope_path | membership | scope_type/layer | doc_policy | logic_readme | logic_change | owner | status |
