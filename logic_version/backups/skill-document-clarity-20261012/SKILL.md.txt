@@ -1,0 +1,73 @@
+---
+name: recall
+description: 在修改、规划、诊断或审查会影响项目逻辑的代码或文档时，恢复现行规则、用户意图与未完任务，按领域读取上下文并完成可验证收尾；普通无逻辑影响的局部编辑无需使用。
+---
+
+# Recall
+
+Recall 保存设计理由、约束和剩余工作；Git 保存代码历史。使用它时，以项目中登记的逻辑文档为真源，不从代码快照臆测用户意图。
+
+## 必做入口
+
+1. 定位本次任务的项目根，完整读取根 `logic_readme.md`（现行规则、功能意图、领域目录）。缺失时按[接入流程](references/project-onboarding.md)处理；文档缺失不能声称已恢复设计原因。
+2. 读取根 `logic_change.md`（待办、修宪议案、全项目活跃议案索引）。接手任务或选择下一项时运行 `recall next [--json]`，再读相关正文；该视图提供上下文，不提供实施授权。
+3. 运行 `recall route <路径、关键词或 INT-ID>`，只读取命中领域的 `logic_readme.md` 与 `logic_change.md`。
+4. 核对受影响的代码、真实消费者、测试和运行证据；仅在当前引用、冲突或兼容问题需要时读取对应 VER/ADR。
+
+维护 Recall 本身时，维护源目录是其项目根；维护源的 `logic_readme.md` 约束技能自身，不是消费项目的业务制度。处理消费项目时，仍须按上面的顺序读取消费项目文档。维护源不得写入某个消费项目的规则、议案或一次性授权。
+
+## 需求、授权与记录
+
+执行语义见项目宪法 RULE-014/017/018/027；操作细节见[任务上下文](references/task-context.md)。
+
+- 区分想法、已决定但尚未开始的任务，以及本次实施授权。只有项目认可的 `user:` / `user-confirmed:` 来源可驱动实施；讨论中的想法留在所属账本的待办区。
+- 开始实施时按下面的通道工作。需要 CHG 时承接待办的来源与完成条件，再移除待办行，避免双写；必须一起保持不变量的修改放在同一 CHG。
+- 已有授权在同一任务内继续有效，不重复请求批准。只有出现实质性需求冲突、未决定的长期选择，或需要新的高风险外部操作时，才说明来源、选项和建议后请求裁决。
+- 接手或阻塞时记录剩余动作与依据；缺少事实就明确标注未知，不为填满字段编造来源、日期或验证结果。
+
+## 按影响选择深度
+
+| 通道 | 适用 | 必要工作 |
+|---|---|---|
+| simple | 局部隔离，不触及 public/persisted/security 契约或活跃案，意图明确 | 直接修改并适度验证；通常无需 CHG/VER，文档有实际影响时同步更新 |
+| medium | 触及契约路径但语义不变，或涉及多个相关文件且无未决长期选择 | 记录计划、影响和验证；按 RULE-014/020 建 CHG 与收尾台账，规则/行为变化保留精简 VER |
+| high | 改变对外语义、迁移、安全边界或长期结构 | 核实真实消费者与历史，比较最小修改、结构修改和保持现状，说明迁移与回滚；记录已有授权，未决关键选择先裁决，保留完整 VER |
+
+风险决定分析和验证深度。普通开发不使用完整表单；`formal-review` 仅在用户明确要求正式审查时使用。计划已获准后，直接把必要的需求拆解落入 CHG，再修改代码，无需让用户重复批准。
+
+## 交付与收尾
+
+- 依据实际 diff 判断文档影响，在同一交付更新所属 readme、代码地图、验证入口和必要的历史索引；规则正文只保留在所属 readme，待办/活跃议案只保留在所属 change，历史 VER 只追加（RULE-018/019）。
+- 按 RULE-025 完成 AI 语义审查和必要验证。验证通过后继续晋升、归档和关案；没有生产证据时如实说明，不能把静态通过写成已上线。人工交付后的新问题另开案，简单修复仍走 simple。
+- 按 RULE-020 清理本次新建的临时、探针和草稿文件，并在汇报中列出处置；任何工具都不自动删除用户文件。
+- 引入兼容层等长期复杂度前，先核实真实消费者、退出条件和回滚路径。
+
+## 常用命令
+
+以下示例用 `recall` 表示命令入口；Windows 仓库内使用 `.\recall.bat`，Linux/macOS 使用 `./recall.sh`。
+
+```bash
+recall next [--json]          # 当前任务、下一步和阻塞上下文；只读
+recall index                  # 从 CHG 正文生成并核对根公报；差异退出 1
+recall index --write          # 显式写入派生公报和根 CHG 计数
+recall route <目标>            # 输出本任务应读的领域文档
+recall status                 # 行动摘要与项目/Git 状态
+recall validate               # 一致性检查与残留提示
+recall audit                  # 当前状态静态审计
+recall audit --formal-review  # 仅用户明确要求正式审查时使用
+```
+
+CLI 需要 Python 3.11+ 与完整 `scripts/` 目录。除 `index --write` 外，上述命令不推送、不删除；Git 初始化、同步和推送责任见 RULE-010/011/013。若 CLI 不可用，保留同样的读取顺序，并明确记录未执行的命令和影响。
+
+## 按需读取
+
+| 任务 | 参考 |
+|---|---|
+| 待办、下一步、公报自动生成 | [任务上下文](references/task-context.md) |
+| CHG 状态、交付、归档 | [生命周期](references/change-lifecycle.md) |
+| 文档创建或拆分 | [文档模型](references/document-model.md)、[领域模板](references/logic-domain-template.md) |
+| personal、协作和正式审查字段 | [治理模式](references/governance-modes.md)、[字段词汇](references/field-vocabulary.md) |
+| 填写必要记录 | [CHG](references/logic-change-template.md)、[VER](references/logic-version-template.md)、[临时台账](references/logic-temp-template.md) |
+| 接入项目或 Git 同步 | [项目接入](references/project-onboarding.md)、[Git 同步](references/git-sync.md) |
+| 对接 Plan/Spec/Steering | [外部工作流](references/workflow-integration.md) |
+| 需要持久解释文档 | [explainers HTML](references/explainers.md)（RULE-026；简单问答无需建页） |

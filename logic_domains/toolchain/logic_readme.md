@@ -70,7 +70,7 @@
 
 | 路径/稳定锚点 | artifact_class/layer | contract_class | 职责 | 输入 | 输出 | 权威来源 | 可直接编辑 | 关联测试 |
 |---|---|---|---|---|---|---|---|---|
-| recall.bat / recall.sh / .gitattributes | source/runtime-code+config | public | 双平台入口与换行约定（RULE-005/008） | 命令行参数 | 子命令输出与退出码 | 入口文件 | yes | none |
+| recall.bat / recall.sh / .gitattributes | source/runtime-code+config | public | 双平台入口与换行约定（RULE-005/008）；已归档原字节文档快照按精确目录禁用换行转换 | 命令行参数/归档快照 | 子命令输出、退出码与原字节 | 入口文件/归档清单 | yes | 平台入口测试；快照 SHA256 核验 |
 | scripts/recall_common.py | source/runtime-code | internal | 根/Git/编码/登记表基础设施与失败诊断（RULE-021） | 起点路径 / git 参数 / porcelain 文本 / 项目根 | 项目根 / (ok, stdout, stderr) / 分类路径 / 计数 / 领域与账本列表 | 脚本文件 | yes | tests/test_recall_common.py |
 | scripts/record_context.py | source/runtime-code | internal | VER生命周期、commit解析与追加证据的共享判断 | 账本与记录 | 状态/证据 | 所属文档与记录 | yes | tests/test_record_context.py |
 | scripts/task_context.py | source/runtime-code | public | next任务视图与根公报派生（RULE-028） | 已登记账本、CLI 选项 | 文本/JSON，显式请求更新根公报 | 所属账本正文 | yes | tests/test_task_context.py |

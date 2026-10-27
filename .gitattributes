@@ -11,3 +11,8 @@
 
 # 待清理副本以原始字节核验，不能在跨平台检出时转换换行。
 logic_version/pending_cleanup/** -text whitespace=cr-at-eol
+
+# 已归档清单引用的原字节文档快照，保留换行及历史空白，由 SHA256 核验。
+logic_version/backups/skill-document-clarity-20261012/*.md.txt -text -whitespace
+logic_version/backups/six-improvements-20261012/*.md.txt -text -whitespace
+logic_version/backups/reliable-context-20261013/*.md.txt -text -whitespace
