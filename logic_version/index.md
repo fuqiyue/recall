@@ -38,6 +38,7 @@
 |---|---|---|---|---|---|---|---|---|
 | VER-20261027-002 | logic_version-20261027-002-public-docs-commit-link | 2026-10-27 | correction | . | RULE-013 | none | 追加公开文档整理的真实提交证据，原记录保持不可变 | [记录](records/logic_version-20261027-002-public-docs-commit-link.md) |
 | VER-20261027-001 | logic_version-20261027-001-public-docs-clarity | 2026-10-27 | effective | . | RULE-019 | 1 | 公开文档以用途和上手为先，校正贡献指引，合并安全提醒并保留事实边界 | [记录](records/logic_version-20261027-001-public-docs-clarity.md) |
+| VER-20261026-005 | logic_version-20261026-005-authorization-through-closure | 2026-10-26 | effective | ., logic_domains/task-workflow | RULE-020, RULE-025 | 1 | 授权覆盖必要收尾，核验后直接清理，执行审批仅按真实触发处理 | [记录](records/logic_version-20261026-005-authorization-through-closure.md) |
 | VER-20261026-004 | logic_version-20261026-004-policy-boundary-commit-link | 2026-10-26 | correction | . | RULE-013 | none | 追加现行/历史边界更新的真实提交证据 | [记录](records/logic_version-20261026-004-policy-boundary-commit-link.md) |
 | VER-20261026-003 | logic_version-20261026-003-audit-summary-commit-link | 2026-10-26 | correction | logic_domains/toolchain | RULE-013 | none | 追加审计提示汇总修复的真实提交证据 | [记录](records/logic_version-20261026-003-audit-summary-commit-link.md) |
 | VER-20261026-002 | logic_version-20261026-002-root-domain-slim | 2026-10-26 | effective | ., logic_domains/document-governance, logic_domains/task-workflow | RULE-016, RULE-018, RULE-020, RULE-022, RULE-025, RULE-026, RULE-027, RULE-029 | 1 | 七条完整规则下放，根必读成本减少约36%，规则唯一且按需路由 | [记录](records/logic_version-20261026-002-root-domain-slim.md) |

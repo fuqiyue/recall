@@ -23,7 +23,7 @@
 - last_verified: 2026-10-26
 - review_trigger: interval:90d; event:major-refactor
 - source_of_truth: logic_readme.md; 已登记领域的 logic_readme.md（SKILL.md 为操作入口）
-- source_decisions: 全量见 logic_version/index.md；最近 VER-20261025-006, VER-20261026-001, VER-20261026-002
+- source_decisions: 全量见 logic_version/index.md；最近 VER-20261026-001, VER-20261026-002, VER-20261026-005
 - intent_summary: 从现行文档恢复设计逻辑；根必读、领域按需，历史仅留档
 - intent_sources: 用户访谈 2026-08-07；用户确认 2026-09-03（一二级拆分法）
 - decision_validity: valid
@@ -101,7 +101,7 @@
 | INT-20260816-009 | recall conflicts | 新需求与现行规则矛盾时提前暴露，交用户裁决 | FLOW-004#1 | RULE-021 | scripts/detect_conflicts.py | user-confirmed:2026-08-16 | 2026-09-03 |
 | INT-20260816-010 | 项目接入流程（references/project-onboarding.md） | 存量/新项目模块化建立文档初稿：接入时建宪法骨架 + 至少一个领域，按触发时机逐模块补全 | FLOW-005#2 | RULE-016, RULE-018 | references/project-onboarding.md | user-confirmed:2026-08-16 | 2026-09-04 |
 | INT-20260816-011 | 根与领域拆分 | 根保留全局规则，按领域读取；增量下放完整规则并消除重复 | FLOW-005#4 | RULE-018 | references/logic-domain-template.md; scripts/recall_audit/integrity.py | user:2026-10-26 | 2026-10-26 |
-| INT-20260903-001 | 收尾归零（任务内产物台账 + workspace 实物核对） | 任务结束时工作区只剩交付物，AI 不遗留探针脚本、临时测试与草稿 | FLOW-002#6 | RULE-020 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | user:2026-09-03 | 2026-09-03 |
+| INT-20260903-001 | 收尾归零（任务内产物台账 + workspace 实物核对） | AI 沿用已有授权完成核验与清理，再报告任务结束，用户无需重复批准同范围收尾 | FLOW-002#4/6 | RULE-020, RULE-025 | references/logic-temp-template.md; scripts/recall.py; scripts/validate.py | user:2026-10-26 | 2026-10-26 |
 | INT-20260903-002 | recall route | 按目标路径/关键词得到本次应读的文档清单与上下文成本，只导入命中的领域 | FLOW-002#1 | RULE-018 | scripts/route_docs.py | user:2026-09-03 | 2026-09-06 |
 | INT-20260907-001 | AI 审查与关案 | AI 审查验证后自主交付，人工后测发现问题另开案 | FLOW-002#4 | RULE-025 | references/change-lifecycle.md | user:2026-09-07 | 2026-09-07 |
 | INT-20260907-002 | explainers HTML | 需要解释文档时直接在项目 explainers 打开查看 | FLOW-003#4 | RULE-026 | references/explainers.md | user:2026-09-07 | 2026-09-07 |
@@ -119,7 +119,7 @@
 - UXI-003: hook 与自动化绝不提交用户未提交的其他文件；自动保存只提交已跟踪文件的变更，未跟踪新文件默认排除并列出（`--include-new` 或 `git add` 才是用户的明确要求）；来源：VER-20260816-005；影响：INT-20260816-005
 - UXI-004: 全部 CLI 在非交互与重定向环境可用；来源：VER-20260808-002；影响：全部 INT 条目
 - UXI-005: 新会话默认延续：用户不需要重述项目哲学与背景，文档即交接；现行规则仅在用户明确否定时才修改；来源：VER-20260816-004；影响：INT-20260816-001, INT-20260816-003
-- UXI-006: 工具绝不静默删除文件：workspace/validate核对台账与实际产物，status保留Git候选，台账是处置清单而非删除脚本输入；来源：VER-20260903-001；影响：INT-20260903-001, INT-20260816-006, INT-20260816-008
+- UXI-006: Recall检查命令只核对和报告；代理按RULE-020/025核验后沿用授权清理并汇报。台账及status候选不直接驱动删除；来源：user:2026-10-26；影响：INT-20260903-001, INT-20260816-006, INT-20260816-008
 ## 全局契约与验证
 - INV-001/002：每个登记范围只有一份现行 readme，每项任务只有一份活跃正文，禁止平行真源。
 - INV-003/004：VER 只追加（仅允许受管控 after_commit 回填），留档修改及必要理由、验证与清理事实，不保存代码快照。
@@ -129,9 +129,9 @@
 ## 有效决策索引
 | version_id | 决策摘要 | 关联规则 | 记录 |
 |---|---|---|---|
-| VER-20261025-006 | audit/validate将重复临时目录边界告警汇总显示，JSON逐路径保留 | RULE-020, RULE-022 | [记录](logic_version/records/logic_version-20261025-006-audit-boundary-summary.md) |
 | VER-20261026-001 | 现行规则独立完整、历史仅留档、增量更新与及时交接 | RULE-002, RULE-003, RULE-027 | [记录](logic_version/records/logic_version-20261026-001-current-policy-archive-boundary.md) |
 | VER-20261026-002 | 根规则精简、领域归属与按需读取 | RULE-018 | [记录](logic_version/records/logic_version-20261026-002-root-domain-slim.md) |
+| VER-20261026-005 | 授权覆盖必要收尾，代理核验后直接清理；平台审批按实际触发 | RULE-020, RULE-025 | [记录](logic_version/records/logic_version-20261026-005-authorization-through-closure.md) |
 ## 活跃议案入口
 - [logic_change.md](logic_change.md) 派生全项目公报；任务正文见公报链接，接手用 `recall next`。
 ## 当前限制与交付检查
