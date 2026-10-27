@@ -129,7 +129,7 @@
 ## 有效决策索引
 | version_id | 决策摘要 | 关联规则 | 记录 |
 |---|---|---|---|
-| VER-20261026-001 | 现行规则独立完整、历史仅留档、增量更新与及时交接 | RULE-002, RULE-003, RULE-027 | [记录](logic_version/records/logic_version-20261026-001-current-policy-archive-boundary.md) |
+| VER-20261027-006 | 精简表达与阅读流程，保留功能、授权边界及必要证据 | RULE-022, RULE-025 | [记录](logic_version/records/logic_version-20261027-006-docs-slim-authorization.md) |
 | VER-20261026-002 | 根规则精简、领域归属与按需读取 | RULE-018 | [记录](logic_version/records/logic_version-20261026-002-root-domain-slim.md) |
 | VER-20261026-005 | 授权覆盖必要收尾，代理核验后直接清理；平台审批按实际触发 | RULE-020, RULE-025 | [记录](logic_version/records/logic_version-20261026-005-authorization-through-closure.md) |
 ## 活跃议案入口
